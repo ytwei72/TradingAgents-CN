@@ -237,14 +237,14 @@ def render_login_form():
 
             username = st.text_input(
                 "用户名",
-                placeholder="请输入您的用户名（首次使用：admin）",
+                placeholder="请输入您的用户名（默认：admin）",
                 key="username_input",
                 label_visibility="collapsed"
             )
             password = st.text_input(
                 "密码",
                 type="password",
-                placeholder="请输入您的密码（首次使用：admin123）",
+                placeholder="请输入您的密码（默认：admin123）",
                 key="password_input",
                 label_visibility="collapsed"
             )
