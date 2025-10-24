@@ -1,8 +1,7 @@
-
 import streamlit as st
 from web2.utils.auth_manager import auth_manager
-# from web2.components.login2 import render_login_form
-from web2.components.login import render_login_form
+from web2.components.login2 import render_login_form
+# from web2.components.login import render_login_form
 
 def render_placeholder_page(page_name):
     st.title(page_name)

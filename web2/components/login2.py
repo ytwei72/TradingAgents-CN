@@ -1,8 +1,10 @@
-
 import streamlit as st
 
+from web2.theme.anthropic import ANTHROPIC_THEME
+
 def render_login_form():
-    html_content = """
+    theme = ANTHROPIC_THEME
+    html_content = f"""
     <html>
       <head>
         <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
@@ -10,17 +12,17 @@ def render_login_form():
           rel="stylesheet"
           as="style"
           onload="this.rel='stylesheet'"
-          href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900"
+          href="https://fonts.googleapis.com/css2?display=swap&family=Inter%3Awght%40400%3B500%3B700%3B900&family=Noto+Sans%3Awght%40400%3B500%3B700%3B900"
         />
         <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
       </head>
       <body>
-        <div class="relative flex h-auto min-h-screen w-full flex-col bg-[#111a22] dark group/design-root overflow-x-hidden" style='font-family: Inter, "Noto Sans", sans-serif;'>
+        <div class="relative flex h-auto min-h-screen w-full flex-col bg-[{theme['primary_bg']}] group/design-root overflow-x-hidden" style='font-family: Inter, "Noto Sans", sans-serif;'>
           <div class="layout-container flex h-full grow flex-col">
             <div class="px-40 flex flex-1 justify-center py-5">
               <div class="layout-content-container flex flex-col w-[512px] max-w-[512px] py-5 max-w-[960px] flex-1">
-                <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#233648] px-10 py-3">
-                  <div class="flex items-center gap-4 text-white">
+                <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[{theme['border']}] px-10 py-3">
+                  <div class="flex items-center gap-4 text-[{theme['text_primary']}]">
                     <div class="size-4">
                       <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path
@@ -37,17 +39,17 @@ def render_login_form():
                         ></path>
                       </svg>
                     </div>
-                    <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">TradingAgents-CN</h2>
+                    <h2 class="text-[{theme['text_primary']}] text-lg font-bold leading-tight tracking-[-0.015em]">TradingAgents-CN</h2>
                   </div>
                 </header>
-                <h3 class="text-white tracking-light text-2xl font-bold leading-tight px-4 text-center pb-2 pt-5">用户登录</h3>
+                <h3 class="text-[{theme['text_primary']}] tracking-light text-2xl font-bold leading-tight px-4 text-center pb-2 pt-5">用户登录</h3>
                 <div class="flex flex-col items-center w-full px-4 py-3 gap-y-4">
                   <div class="w-full max-w-[480px]">
                     <label class="flex flex-col w-full">
                       <input
                         id="username"
                         placeholder="admin"
-                        class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border border-[#324d67] bg-[#192633] focus:border-[#324d67] h-14 placeholder:text-[#92adc9] p-[15px] text-base font-normal leading-normal"
+                        class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-[{theme['text_primary']}] focus:outline-0 focus:ring-0 border border-[{theme['accent']}] bg-[{theme['secondary_bg']}] focus:border-[{theme['accent']}] h-14 placeholder:text-[{theme['text_secondary']}] p-[15px] text-base font-normal leading-normal"
                         value=""
                       />
                     </label>
@@ -58,7 +60,7 @@ def render_login_form():
                         id="password"
                         type="password"
                         placeholder="••••••"
-                        class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border border-[#324d67] bg-[#192633] focus:border-[#324d67] h-14 placeholder:text-[#92adc9] p-[15px] text-base font-normal leading-normal"
+                        class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-[{theme['text_primary']}] focus:outline-0 focus:ring-0 border border-[{theme['accent']}] bg-[{theme['secondary_bg']}] focus:border-[{theme['accent']}] h-14 placeholder:text-[{theme['text_secondary']}] p-[15px] text-base font-normal leading-normal"
                         value=""
                       />
                     </label>
@@ -66,7 +68,7 @@ def render_login_form():
                   <div class="w-full max-w-[480px]">
                     <button
                       id="login-button"
-                      class="flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#1172d4] text-white text-sm font-bold leading-normal tracking-[0.015em]"
+                      class="flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[{theme['accent']}] text-white text-sm font-bold leading-normal tracking-[0.015em]"
                     >
                       <span class="truncate">立即登录</span>
                     </button>
@@ -80,8 +82,8 @@ def render_login_form():
                       style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCqsqBasbK5vq-kj21xvaI9Dry3wOJQZU-Z5eIGMnp-YVtrjDxiQN27yP3F0Y6hNNNNZ_JjG2bKbTIyX87W3yICfvf2PLuoAdWOD44AWTbIpaTMWHLl3gQKpdEQUpbcn4VtL2NWgHYXQo9Wf7vA4fRoHlzQWFJU5BVrnIcVu4N-MjJkslfJqaXMkoB0KcsMGSnrlF3JHEf3vjV6oLNCMeYoKw69tkhBZT3cW8BG3_W1nPExsLaMgbSbhEfiDB88Lzb7KU3ih3WVP7w");'></div>
                     </div>
                     <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">智能分析</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">AI驱动的投资分析</p>
+                      <p class="text-[{theme['text_primary']}] text-base font-medium leading-normal">智能分析</p>
+                      <p class="text-[{theme['text_secondary']}] text-sm font-normal leading-normal">AI驱动的投资分析</p>
                     </div>
                   </div>
                   <div class="flex flex-col gap-3 pb-3">
@@ -91,8 +93,8 @@ def render_login_form():
                       style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA4K0CROyxil-3U9G4zGoFNF-FP4pdx3wdTWqm86HWP1-7GAoqmDkjl8EIdRDPPbSI4UmfsH5iJyFz21q7zKXY-UJmWjQ4iK6g6BWut5RfWw8vbh0cKyJP1m1KrroUJQYn4D1DAA8WEiASO2tHf6bMmNRPm6XFF9hR9tTGNwuThB4gtVi_AnPrF3cwVoJYgogYYBRIb9MPLBr2BTnn2CSlxRLValLptG44Anb2vVKH0tZusS5m9-0KCAFXRuGAAHvTZHmHevCys4Ps");'></div>
                     </div>
                     <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">深度研究</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">全方位市场洞察</p>
+                      <p class="text-[{theme['text_primary']}] text-base font-medium leading-normal">深度研究</p>
+                      <p class="text-[{theme['text_secondary']}] text-sm font-normal leading-normal">全方位市场洞察</p>
                     </div>
                   </div>
                   <div class="flex flex-col gap-3 pb-3">
@@ -102,8 +104,8 @@ def render_login_form():
                       style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBkHkcHZDB3JEIEXQCpYmQ9o4gJ6MvnqG9SxygMNLa__lfLZqmlVEsayO1f2S54ylQvNOwKq6pgRnhRQ2ouoKVWHS6IwksIZ_JiTsx4m6hfdbAMSPfTRXO5RCaRc8HyCtD5YrBZCgQ5AerHwJgnJkSloVWFrr0bjrnBtoOfiT0hw7tnE9c0E0-klmjTT31mJlirPVdwdaWhiv-rhdoUDgJZL13HJiK9C6wP3kCC_kD9YIOd1PLGlnE2D-vZh0dpdRcIOiYOJX8FSps");'></div>
                     </div>
                     <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">实时数据</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">最新市场信息</p>
+                      <p class="text-[{theme['text_primary']}] text-base font-medium leading-normal">实时数据</p>
+                      <p class="text-[{theme['text_secondary']}] text-sm font-normal leading-normal">最新市场信息</p>
                     </div>
                   </div>
                   <div class="flex flex-col gap-3 pb-3">
@@ -113,8 +115,8 @@ def render_login_form():
                       style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDiGRSWXHvS6Nk9iLYfpfj7fVwYWz6LfO-INL7W_OR15IMTd1s7yo3q0S_WBiw54TT8gsQ4qg3XXcfl5P5gQLqJM8HZhYws8ydz8E_kzLpgYn5RHuQRMuNyeyWoFfK1QaPOsYm6VaWDIriYPsmX1Nxy551yJ4bbx8lq0dBqHQsFc6ix3qfSWNAq9l2JN-9SPNeVJtulHTTqNG8TZ892EX7nbUIjUUDQWvAlsq7pljrYzp0BXpYsGrJtFrefb6uG0ST9ZlVKVxLkRkk");'></div>
                     </div>
                     <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">风险控制</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">智能风险评估</p>
+                      <p class="text-[{theme['text_primary']}] text-base font-medium leading-normal">风险控制</p>
+                      <p class="text-[{theme['text_secondary']}] text-sm font-normal leading-normal">智能风险评估</p>
                     </div>
                   </div>
                 </div>
@@ -127,14 +129,13 @@ def render_login_form():
             const passwordInput = document.getElementById('password');
             const loginButton = document.getElementById('login-button');
 
-            loginButton.addEventListener('click', () => {
+            loginButton.addEventListener('click', () => {{
                 const username = usernameInput.value;
                 const password = passwordInput.value;
-                window.location.href = `?username=${username}&password=${password}`;
-            });
+                window.location.href = `?username=${{username}}&password=${{password}}`;
+            }});
         </script>
       </body>
     </html>
     """
     st.components.v1.html(html_content, height=800)
-
