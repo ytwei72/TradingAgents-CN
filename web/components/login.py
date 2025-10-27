@@ -80,156 +80,216 @@ def get_base64_image(image_path):
 
 def render_login_form():
     """渲染登录表单"""
-    params = st.query_params
-    if "username" in params and "password" in params:
-        username = params.get("username")
-        password = params.get("password")
-        if auth_manager.login(username, password):
-            st.success("Logged in successfully!")
-            st.query_params.clear()
-            st.rerun()
-        else:
-            st.error("Invalid username or password")
-            # Clear the params to avoid login loop
-            st.query_params.clear()
-            time.sleep(1)
-            st.rerun()
 
-    html_content = """
-    <html>
-      <head>
-        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
-        <link
-          rel="stylesheet"
-          as="style"
-          onload="this.rel='stylesheet'"
-          href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900"
-        />
-        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-      </head>
-      <body>
-        <div class="relative flex h-auto min-h-screen w-full flex-col bg-[#111a22] dark group/design-root overflow-x-hidden" style='font-family: Inter, "Noto Sans", sans-serif;'>
-          <div class="layout-container flex h-full grow flex-col">
-            <div class="px-40 flex flex-1 justify-center py-5">
-              <div class="layout-content-container flex flex-col w-[512px] max-w-[512px] py-5 max-w-[960px] flex-1">
-                <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#233648] px-10 py-3">
-                  <div class="flex items-center gap-4 text-white">
-                    <div class="size-4">
-                      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path
-                          fill-rule="evenodd"
-                          clip-rule="evenodd"
-                          d="M24 18.4228L42 11.475V34.3663C42 34.7796 41.7457 35.1504 41.3601 35.2992L24 42V18.4228Z"
-                          fill="currentColor"
-                        ></path>
-                        <path
-                          fill-rule="evenodd"
-                          clip-rule="evenodd"
-                          d="M24 8.18819L33.4123 11.574L24 15.2071L14.5877 11.574L24 8.18819ZM9 15.8487L21 20.4805V37.6263L9 32.9945V15.8487ZM27 37.6263V20.4805L39 15.8487V32.9945L27 37.6263ZM25.354 2.29885C24.4788 1.98402 23.5212 1.98402 22.646 2.29885L4.98454 8.65208C3.7939 9.08038 3 10.2097 3 11.475V34.3663C3 36.0196 4.01719 37.5026 5.55962 38.098L22.9197 44.7987C23.6149 45.0671 24.3851 45.0671 25.0803 44.7987L42.4404 38.098C43.9828 37.5026 45 36.0196 45 34.3663V11.475C45 10.2097 44.2061 9.08038 43.0155 8.65208L25.354 2.29885Z"
-                          fill="currentColor"
-                        ></path>
-                      </svg>
-                    </div>
-                    <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">TradingAgents-CN</h2>
-                  </div>
-                </header>
-                <h3 class="text-white tracking-light text-2xl font-bold leading-tight px-4 text-center pb-2 pt-5">用户登录</h3>
-                <div class="flex flex-col items-center w-full px-4 py-3 gap-y-4">
-                  <div class="w-full max-w-[480px]">
-                    <label class="flex flex-col w-full">
-                      <input
-                        id="username"
-                        placeholder="admin"
-                        class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border border-[#324d67] bg-[#192633] focus:border-[#324d67] h-14 placeholder:text-[#92adc9] p-[15px] text-base font-normal leading-normal"
-                        value=""
-                      />
-                    </label>
-                  </div>
-                  <div class="w-full max-w-[480px]">
-                    <label class="flex flex-col w-full">
-                      <input
-                        id="password"
-                        type="password"
-                        placeholder="••••••"
-                        class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border border-[#324d67] bg-[#192633] focus:border-[#324d67] h-14 placeholder:text-[#92adc9] p-[15px] text-base font-normal leading-normal"
-                        value=""
-                      />
-                    </label>
-                  </div>
-                  <div class="w-full max-w-[480px]">
-                    <button
-                      id="login-button"
-                      class="flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#1172d4] text-white text-sm font-bold leading-normal tracking-[0.015em]"
-                    >
-                      <span class="truncate">立即登录</span>
-                    </button>
-                  </div>
-                </div>
-                <div class="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 p-4">
-                  <div class="flex flex-col gap-3 pb-3">
-                    <div class="w-1/2 mx-auto">
-                    <div
-                      class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg"
-                      style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCqsqBasbK5vq-kj21xvaI9Dry3wOJQZU-Z5eIGMnp-YVtrjDxiQN27yP3F0Y6hNNNNZ_JjG2bKbTIyX87W3yICfvf2PLuoAdWOD44AWTbIpaTMWHLl3gQKpdEQUpbcn4VtL2NWgHYXQo9Wf7vA4fRoHlzQWFJU5BVrnIcVu4N-MjJkslfJqaXMkoB0KcsMGSnrlF3JHEf3vjV6oLNCMeYoKw69tkhBZT3cW8BG3_W1nPExsLaMgbSbhEfiDB88Lzb7KU3ih3WVP7w");'></div>
-                    </div>
-                    <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">智能分析</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">AI驱动的投资分析</p>
-                    </div>
-                  </div>
-                  <div class="flex flex-col gap-3 pb-3">
-                    <div class="w-1/2 mx-auto">
-                    <div
-                      class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg"
-                      style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA4K0CROyxil-3U9G4zGoFNF-FP4pdx3wdTWqm86HWP1-7GAoqmDkjl8EIdRDPPbSI4UmfsH5iJyFz21q7zKXY-UJmWjQ4iK6g6BWut5RfWw8vbh0cKyJP1m1KrroUJQYn4D1DAA8WEiASO2tHf6bMmNRPm6XFF9hR9tTGNwuThB4gtVi_AnPrF3cwVoJYgogYYBRIb9MPLBr2BTnn2CSlxRLValLptG44Anb2vVKH0tZusS5m9-0KCAFXRuGAAHvTZHmHevCys4Ps");'></div>
-                    </div>
-                    <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">深度研究</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">全方位市场洞察</p>
-                    </div>
-                  </div>
-                  <div class="flex flex-col gap-3 pb-3">
-                    <div class="w-1/2 mx-auto">
-                    <div
-                      class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg"
-                      style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBkHkcHZDB3JEIEXQCpYmQ9o4gJ6MvnqG9SxygMNLa__lfLZqmlVEsayO1f2S54ylQvNOwKq6pgRnhRQ2ouoKVWHS6IwksIZ_JiTsx4m6hfdbAMSPfTRXO5RCaRc8HyCtD5YrBZCgQ5AerHwJgnJkSloVWFrr0bjrnBtoOfiT0hw7tnE9c0E0-klmjTT31mJlirPVdwdaWhiv-rhdoUDgJZL13HJiK9C6wP3kCC_kD9YIOd1PLGlnE2D-vZh0dpdRcIOiYOJX8FSps");'></div>
-                    </div>
-                    <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">实时数据</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">最新市场信息</p>
-                    </div>
-                  </div>
-                  <div class="flex flex-col gap-3 pb-3">
-                    <div class="w-1/2 mx-auto">
-                    <div
-                      class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg"
-                      style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDiGRSWXHvS6Nk9iLYfpfj7fVwYWz6LfO-INL7W_OR15IMTd1s7yo3q0S_WBiw54TT8gsQ4qg3XXcfl5P5gQLqJM8HZhYws8ydz8E_kzLpgYn5RHuQRMuNyeyWoFfK1QaPOsYm6VaWDIriYPsmX1Nxy551yJ4bbx8lq0dBqHQsFc6ix3qfSWNAq9l2JN-9SPNeVJtulHTTqNG8TZ892EX7nbUIjUUDQWvAlsq7pljrYzp0BXpYsGrJtFrefb6uG0ST9ZlVKVxLkRkk");'></div>
-                    </div>
-                    <div class="text-center">
-                      <p class="text-white text-base font-medium leading-normal">风险控制</p>
-                      <p class="text-[#92adc9] text-sm font-normal leading-normal">智能风险评估</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+    # 现代化登录页面样式
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .login-container {
+        max-width: 550px;
+        margin: 0.5rem auto;
+        padding: 2.5rem 2rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .login-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .login-title {
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
+    }
+    
+    .login-subtitle {
+        color: #718096;
+        font-size: 1.1rem;
+        font-weight: 400;
+        margin-bottom: 0;
+    }
+    
+    .login-form {
+        margin-top: 1rem;
+    }
+    
+    .stTextInput > div > div > input {
+        background: rgba(247, 250, 252, 0.8);
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        background: white;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    .login-tips {
+        background: linear-gradient(135deg, #e6fffa 0%, #f0fff4 100%);
+        border: 1px solid #9ae6b4;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1.5rem;
+        text-align: center;
+    }
+    
+    .login-tips-icon {
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+    }
+    
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+    
+    .feature-card {
+        background: rgba(255, 255, 255, 0.7);
+        padding: 1.5rem;
+        border-radius: 15px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    
+    .feature-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .feature-title {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+    }
+    
+    .feature-desc {
+        color: #718096;
+        font-size: 0.9rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 主登录容器
+    st.markdown("""
+    <div class="login-container">
+        <div class="login-header">
+            <h1 class="login-title">🚀 TradingAgents-CN</h1>
+            <p class="login-subtitle">AI驱动的股票交易分析平台 · 让投资更智能</p>
         </div>
-        <script>
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            const loginButton = document.getElementById('login-button');
+    </div>
+    """, unsafe_allow_html=True)
 
-            loginButton.addEventListener('click', () => {
-                const username = usernameInput.value;
-                const password = passwordInput.value;
-                window.location.href = `?username=${username}&password=${password}`;
-            });
-        </script>
-      </body>
-    </html>
-    """
-    st.components.v1.html(html_content, height=800)
+    # 登录表单
+    with st.container():
+        st.markdown('<div class="login-form">', unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("### 🔐 用户登录")
+
+            username = st.text_input(
+                "用户名",
+                placeholder="请输入您的用户名（首次使用：admin）",
+                key="username_input",
+                label_visibility="collapsed"
+            )
+            password = st.text_input(
+                "密码",
+                type="password",
+                placeholder="请输入您的密码（首次使用：admin123）",
+                key="password_input",
+                label_visibility="collapsed"
+            )
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            if st.button("🚀 立即登录", use_container_width=True, key="login_button"):
+                if username and password:
+                    # 使用auth_manager.login()方法来确保前端缓存被正确保存
+                    if auth_manager.login(username, password):
+                        st.success("✅ 登录成功！正在为您跳转...")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ 用户名或密码错误，请重试")
+                else:
+                    st.warning("⚠️ 请输入完整的登录信息")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 功能特色展示
+    st.markdown("""
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <div class="feature-title">智能分析</div>
+            <div class="feature-desc">AI驱动的股票分析</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <div class="feature-title">深度研究</div>
+            <div class="feature-desc">全方位市场洞察</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <div class="feature-title">实时数据</div>
+            <div class="feature-desc">最新市场信息</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🛡️</div>
+            <div class="feature-title">风险控制</div>
+            <div class="feature-desc">智能风险评估</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def render_sidebar_user_info():
     """在侧边栏渲染用户信息"""
