@@ -12,6 +12,7 @@ from pathlib import Path
 import datetime
 import time
 from dotenv import load_dotenv
+from streamlit_option_menu import option_menu
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
@@ -891,7 +892,7 @@ def main():
     render_header()
 
     # 侧边栏布局 - 标题在最顶部
-    st.sidebar.title("🤖 TradingAgents-CN")
+    st.sidebar.title("🤖 投顾智能体")
     st.sidebar.markdown("---")
     
     # 页面导航 - 在标题下方显示用户信息
@@ -900,14 +901,39 @@ def main():
     # 在用户信息和功能导航之间添加分隔线
     st.sidebar.markdown("---")
 
-    # 添加功能切换标题
-    st.sidebar.markdown("**🎯 功能导航**")
-
-    page = st.sidebar.selectbox(
-        "切换功能模块",
-        ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "💰 Token统计", "📋 操作日志", "📈 分析结果", "🔧 系统状态"],
-        label_visibility="collapsed"
-    )
+    # 使用 option_menu 替代 selectbox
+    with st.sidebar:
+        page = option_menu(
+            menu_title="🎯 功能导航",
+            options=["股票分析", "配置管理", "缓存管理", "Token统计", "操作日志", "分析结果", "系统状态"],
+            icons=["graph-up-arrow", "gear-fill", "archive-fill", "currency-dollar", "file-text", "bar-chart-fill", "wrench-adjustable"],
+            menu_icon="list",
+            default_index=0,
+            styles={
+                "container": {"padding": "5px", "background-color": "#fafafa"},
+                "icon": {"color": "#667eea", "font-size": "18px"},
+                "nav-link": {
+                    "font-size": "14px",
+                    "text-align": "left",
+                    "margin": "2px 0px",
+                    "padding": "8px 12px",
+                    "--hover-color": "#e8eaf6",
+                },
+                "nav-link-selected": {"background-color": "#667eea", "color": "white"},
+            }
+        )
+    
+    # 添加emoji前缀以保持与原有逻辑的兼容性
+    page_mapping = {
+        "股票分析": "📊 股票分析",
+        "配置管理": "⚙️ 配置管理",
+        "缓存管理": "💾 缓存管理",
+        "Token统计": "💰 Token统计",
+        "操作日志": "📋 操作日志",
+        "分析结果": "📈 分析结果",
+        "系统状态": "🔧 系统状态"
+    }
+    page = page_mapping[page]
     
     # 记录页面访问活动
     try:

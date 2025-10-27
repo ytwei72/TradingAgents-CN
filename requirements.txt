@@ -34,6 +34,7 @@ google-genai>=0.1.0
 google-generativeai>=0.8.0
 dashscope
 streamlit
+streamlit-option-menu
 plotly
 psutil
 pymongo  # MongoDB数据库支持，用于Token使用记录存储
