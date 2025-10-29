@@ -13,50 +13,43 @@ from utils.report_exporter import render_export_buttons
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
+
+# 导入共用组件和工具函数
+from components.ui_components import (
+    render_metric_row, render_section_header, render_info_box,
+    render_key_value_table, render_empty_state
+)
+from components.component_utils import (
+    safe_get, safe_get_nested, get_display_name,
+    format_percentage, format_currency, extract_config_from_results
+)
+
 logger = get_logger('web')
 
 def render_results(results):
     """渲染分析结果"""
 
     if not results:
-        st.warning("暂无分析结果")
+        render_empty_state(
+            message="暂无分析结果",
+            icon="📊",
+            action_button=None
+        )
         return
 
-    # 添加CSS确保结果内容不被右侧遮挡
-    st.markdown("""
-    <style>
-    /* 确保分析结果内容有足够的右边距 */
-    .element-container, .stMarkdown, .stExpander {
-        margin-right: 1.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-
-    /* 特别处理展开组件 */
-    .streamlit-expanderHeader {
-        margin-right: 1rem !important;
-    }
-
-    /* 确保文本内容不被截断 */
-    .stMarkdown p, .stMarkdown div {
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    stock_symbol = results.get('stock_symbol', 'N/A')
-    decision = results.get('decision', {})
-    state = results.get('state', {})
-    success = results.get('success', False)
-    error = results.get('error')
+    stock_symbol = safe_get(results, 'stock_symbol')
+    decision = safe_get(results, 'decision', {})
+    state = safe_get(results, 'state', {})
+    success = safe_get(results, 'success', False)
+    error = safe_get(results, 'error')
 
     st.markdown("---")
     st.header(f"📊 {stock_symbol} 分析结果")
 
     # 如果分析失败，显示错误信息
     if not success and error:
-        st.error(f"❌ **分析失败**: {error}")
-        st.info("💡 **解决方案**: 请检查API密钥配置，确保网络连接正常，然后重新运行分析。")
+        render_info_box(f"**分析失败**: {error}", box_type="error")
+        render_info_box("**解决方案**: 请检查API密钥配置，确保网络连接正常，然后重新运行分析。", box_type="info", icon="💡")
         return
 
     # 投资决策摘要

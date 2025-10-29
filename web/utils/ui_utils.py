@@ -1,141 +1,56 @@
 #!/usr/bin/env python3
 """
 UI工具函数
-提供通用的UI组件和样式
+提供通用的UI辅助功能（样式已迁移到 static/css/styles.css）
 """
 
 import streamlit as st
+from pathlib import Path
+
+
+def load_external_css(css_file: str = "styles.css"):
+    """
+    加载外部CSS文件
+    
+    Args:
+        css_file: CSS文件名（位于 web/static/css/ 目录下）
+    """
+    css_path = Path(__file__).parent.parent / "static" / "css" / css_file
+    if css_path.exists():
+        with open(css_path, 'r', encoding='utf-8') as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    else:
+        st.warning(f"CSS文件不存在: {css_path}")
+
+
+def load_external_js(js_file: str = "scripts.js"):
+    """
+    加载外部JavaScript文件
+    
+    Args:
+        js_file: JS文件名（位于 web/static/js/ 目录下）
+    """
+    js_path = Path(__file__).parent.parent / "static" / "js" / js_file
+    if js_path.exists():
+        with open(js_path, 'r', encoding='utf-8') as f:
+            st.markdown(f'<script>{f.read()}</script>', unsafe_allow_html=True)
+    else:
+        st.warning(f"JavaScript文件不存在: {js_path}")
+
+
+def apply_common_styles():
+    """
+    应用通用样式（加载外部CSS和JS文件）
+    注意：样式定义已迁移到 web/static/css/styles.css
+    """
+    load_external_css("styles.css")
+    load_external_js("scripts.js")
+
 
 def apply_hide_deploy_button_css():
     """
     应用隐藏Deploy按钮和工具栏的CSS样式
-    在所有页面中调用此函数以确保一致的UI体验
+    注意：此功能已集成到 styles.css 中，调用此函数仅为向后兼容
     """
-    st.markdown("""
-    <style>
-        /* 隐藏Streamlit顶部工具栏和Deploy按钮 - 多种选择器确保兼容性 */
-        .stAppToolbar {
-            display: none !important;
-        }
-        
-        header[data-testid="stHeader"] {
-            display: none !important;
-        }
-        
-        .stDeployButton {
-            display: none !important;
-        }
-        
-        /* 新版本Streamlit的Deploy按钮选择器 */
-        [data-testid="stToolbar"] {
-            display: none !important;
-        }
-        
-        [data-testid="stDecoration"] {
-            display: none !important;
-        }
-        
-        [data-testid="stStatusWidget"] {
-            display: none !important;
-        }
-        
-        /* 隐藏整个顶部区域 */
-        .stApp > header {
-            display: none !important;
-        }
-        
-        .stApp > div[data-testid="stToolbar"] {
-            display: none !important;
-        }
-        
-        /* 隐藏主菜单按钮 */
-        #MainMenu {
-            visibility: hidden !important;
-            display: none !important;
-        }
-        
-        /* 隐藏页脚 */
-        footer {
-            visibility: hidden !important;
-            display: none !important;
-        }
-        
-        /* 隐藏"Made with Streamlit"标识 */
-        .viewerBadge_container__1QSob {
-            display: none !important;
-        }
-        
-        /* 隐藏所有可能的工具栏元素 */
-        div[data-testid="stToolbar"] {
-            display: none !important;
-        }
-        
-        /* 隐藏右上角的所有按钮 */
-        .stApp > div > div > div > div > section > div {
-            padding-top: 0 !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-def apply_common_styles():
-    """
-    应用通用的页面样式
-    包括隐藏Deploy按钮和其他美化样式
-    """
-    # 隐藏Deploy按钮
-    apply_hide_deploy_button_css()
-    
-    # 其他通用样式
-    st.markdown("""
-    <style>
-        /* 应用样式 */
-        .main-header {
-            background: linear-gradient(90deg, #1f77b4, #ff7f0e);
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            color: white;
-            text-align: center;
-        }
-        
-        .metric-card {
-            background: #f0f2f6;
-            padding: 1rem;
-            border-radius: 10px;
-            border-left: 4px solid #1f77b4;
-            margin: 0.5rem 0;
-        }
-        
-        .analysis-section {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin: 1rem 0;
-        }
-        
-        .success-box {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 5px;
-            padding: 1rem;
-            margin: 1rem 0;
-        }
-        
-        .warning-box {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 5px;
-            padding: 1rem;
-            margin: 1rem 0;
-        }
-        
-        .error-box {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 5px;
-            padding: 1rem;
-            margin: 1rem 0;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    # 为了向后兼容，保留此函数，但实际样式已在 styles.css 中定义
+    pass

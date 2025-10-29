@@ -8,6 +8,11 @@ import datetime
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 
+from utils.thread_tracker import check_analysis_status
+from utils.smart_session_manager import smart_session_manager
+from utils.task_control_manager import pause_task, resume_task, stop_task
+import time
+
 # 导入用户活动记录器
 try:
     from utils.user_activity_logger import user_activity_logger
@@ -259,7 +264,6 @@ def render_analysis_form():
         if current_config != initial_config:
             st.session_state.form_config = current_config
             try:
-                from utils.smart_session_manager import smart_session_manager
                 current_analysis_id = st.session_state.get('current_analysis_id', 'form_config_only')
                 smart_session_manager.save_analysis_state(
                     analysis_id=current_analysis_id,
@@ -298,7 +302,6 @@ def render_analysis_form():
     form_current_analysis_id = st.session_state.get('current_analysis_id')
     
     # 调试信息
-    # import os
     # if form_current_analysis_id:
     #     st.info(f"🔍 调试：分析ID = {form_current_analysis_id}")
     # else:
@@ -307,7 +310,6 @@ def render_analysis_form():
     if form_current_analysis_id:
         # 使用线程检测来获取真实状态
         try:
-            from utils.thread_tracker import check_analysis_status
             actual_status = check_analysis_status(form_current_analysis_id)
             
             logger.info(f"🎮 [任务控制] 分析ID: {form_current_analysis_id}, 状态: {actual_status}")
@@ -326,11 +328,9 @@ def render_analysis_form():
                 with btn_col1:
                     if actual_status == 'running':
                         if st.button("⏸️ 暂停分析", key="pause_btn_form", use_container_width=True):
-                            from ..utils.task_control_manager import pause_task
                             if pause_task(form_current_analysis_id):
                                 st.success("✅ 任务已暂停")
                                 logger.info(f"⏸️ [用户操作] 暂停任务: {form_current_analysis_id}")
-                                import time
                                 time.sleep(1)
                                 st.rerun()
                             else:
@@ -338,11 +338,9 @@ def render_analysis_form():
                     
                     elif actual_status == 'paused':
                         if st.button("▶️ 继续分析", key="resume_btn_form", use_container_width=True):
-                            from ..utils.task_control_manager import resume_task
                             if resume_task(form_current_analysis_id):
                                 st.success("✅ 任务已恢复")
                                 logger.info(f"▶️ [用户操作] 恢复任务: {form_current_analysis_id}")
-                                import time
                                 time.sleep(1)
                                 st.rerun()
                             else:
@@ -350,13 +348,11 @@ def render_analysis_form():
                 
                 with btn_col2:
                     if st.button("⏹️ 停止分析", key="stop_btn_form", use_container_width=True):
-                        from ..utils.task_control_manager import stop_task
                         if stop_task(form_current_analysis_id):
                             st.success("✅ 任务已停止")
                             logger.info(f"⏹️ [用户操作] 停止任务: {form_current_analysis_id}")
                             # 清理分析状态
                             st.session_state.analysis_running = False
-                            import time
                             time.sleep(1)
                             st.rerun()
                         else:
@@ -408,7 +404,6 @@ def render_analysis_form():
 
         # 保存到持久化存储
         try:
-            from utils.smart_session_manager import smart_session_manager
             # 获取当前分析ID（如果有的话）
             current_analysis_id = st.session_state.get('current_analysis_id', 'form_config_only')
             smart_session_manager.save_analysis_state(
