@@ -10,7 +10,7 @@ from tradingagents.utils.logging_manager import get_logger
 
 # 导入用户活动记录器
 try:
-    from ..utils.user_activity_logger import user_activity_logger
+    from utils.user_activity_logger import user_activity_logger
 except ImportError:
     user_activity_logger = None
 
@@ -272,12 +272,105 @@ def render_analysis_form():
             except Exception as e:
                 logger.warning(f"⚠️ [配置自动保存] 保存失败: {e}")
 
-        # 提交按钮（不禁用，让用户可以点击）
-        submitted = st.form_submit_button(
-            "🚀 开始分析",
-            type="primary",
-            use_container_width=True
-        )
+        # 检查当前是否有任务在运行或暂停
+        analysis_running = st.session_state.get('analysis_running', False)
+        current_analysis_id = st.session_state.get('current_analysis_id')
+        
+        # 如果有任务在运行或暂停，禁用提交按钮
+        if analysis_running and current_analysis_id:
+            st.form_submit_button(
+                "🚀 开始分析",
+                type="primary",
+                use_container_width=True,
+                disabled=True
+            )
+            st.info("⚠️ 当前有任务正在运行或暂停中，请先停止或完成当前任务")
+            submitted = False
+        else:
+            # 提交按钮（启用状态）
+            submitted = st.form_submit_button(
+                "🚀 开始分析",
+                type="primary",
+                use_container_width=True
+            )
+
+    # 在表单外添加任务控制按钮（重新从session_state获取analysis_id）
+    form_current_analysis_id = st.session_state.get('current_analysis_id')
+    
+    # 调试信息
+    # import os
+    # if form_current_analysis_id:
+    #     st.info(f"🔍 调试：分析ID = {form_current_analysis_id}")
+    # else:
+    #     st.warning("🔍 调试：没有找到 current_analysis_id")
+    
+    if form_current_analysis_id:
+        # 使用线程检测来获取真实状态
+        try:
+            from utils.thread_tracker import check_analysis_status
+            actual_status = check_analysis_status(form_current_analysis_id)
+            
+            logger.info(f"🎮 [任务控制] 分析ID: {form_current_analysis_id}, 状态: {actual_status}")
+            
+            # 调试信息
+            # st.info(f"🔍 调试：任务状态 = '{actual_status}'")
+            
+            if actual_status in ['running', 'paused']:
+                # st.success(f"✅ 调试：条件满足，应该显示按钮！状态={actual_status}")
+                st.markdown("---")
+                st.markdown("### 🎮 任务控制")
+                
+                # 创建按钮列
+                btn_col1, btn_col2, btn_col3 = st.columns(3)
+                
+                with btn_col1:
+                    if actual_status == 'running':
+                        if st.button("⏸️ 暂停分析", key="pause_btn_form", use_container_width=True):
+                            from ..utils.task_control_manager import pause_task
+                            if pause_task(form_current_analysis_id):
+                                st.success("✅ 任务已暂停")
+                                logger.info(f"⏸️ [用户操作] 暂停任务: {form_current_analysis_id}")
+                                import time
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("❌ 暂停失败")
+                    
+                    elif actual_status == 'paused':
+                        if st.button("▶️ 继续分析", key="resume_btn_form", use_container_width=True):
+                            from ..utils.task_control_manager import resume_task
+                            if resume_task(form_current_analysis_id):
+                                st.success("✅ 任务已恢复")
+                                logger.info(f"▶️ [用户操作] 恢复任务: {form_current_analysis_id}")
+                                import time
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("❌ 恢复失败")
+                
+                with btn_col2:
+                    if st.button("⏹️ 停止分析", key="stop_btn_form", use_container_width=True):
+                        from ..utils.task_control_manager import stop_task
+                        if stop_task(form_current_analysis_id):
+                            st.success("✅ 任务已停止")
+                            logger.info(f"⏹️ [用户操作] 停止任务: {form_current_analysis_id}")
+                            # 清理分析状态
+                            st.session_state.analysis_running = False
+                            import time
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ 停止失败")
+                
+                with btn_col3:
+                    # 预留空间或添加其他控制按钮
+                    pass
+            else:
+                # 调试信息：状态不匹配
+                st.warning(f"⚠️ 调试：状态 '{actual_status}' 不在 ['running', 'paused'] 中")
+        except Exception as e:
+            logger.warning(f"⚠️ [任务控制] 获取任务状态失败: {e}")
+            st.error(f"❌ 调试：获取状态失败 - {str(e)}")
 
     # 只有在提交时才返回数据
     if submitted and stock_symbol:  # 确保有股票代码才提交
