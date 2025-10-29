@@ -146,10 +146,10 @@ st.button("▶️ 继续分析",
 - 🚀 添加桌面通知（任务状态变化时）
 
 ### 参考链接
-- [详细技术文档](docs/features/UI_TASK_CONTROL_IMPROVEMENTS.md)
-- [中文使用说明](docs/features/任务控制界面优化说明.md)
-- [功能总结](UI_IMPROVEMENTS_SUMMARY.md)
-- [测试代码](tests/web/test_ui_task_control.py)
+- [详细技术文档](UI_TASK_CONTROL_IMPROVEMENTS.md)
+- [中文使用说明](任务控制界面优化说明.md)
+- [功能总结](../improvements/UI_IMPROVEMENTS_SUMMARY.md)
+- [测试代码](../../tests/web/test_ui_task_control.py)
 
 ### 贡献者
 - AI Assistant (Cursor)
