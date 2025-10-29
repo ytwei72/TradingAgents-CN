@@ -218,14 +218,20 @@ def render_login_form():
     """, unsafe_allow_html=True)
 
     # 主登录容器
+    # st.markdown("""
+    # <div class="login-container">
+    #     <div class="login-header">
+    #         <h1 class="login-title">🚀 TradingAgents-CN</h1>
+    #         <p class="login-subtitle">AI驱动的股票交易分析平台 · 让投资更智能</p>
+    #     </div>
+    # </div>
+    # """, unsafe_allow_html=True)
     st.markdown("""
-    <div class="login-container">
-        <div class="login-header">
-            <h1 class="login-title">🚀 TradingAgents-CN</h1>
-            <p class="login-subtitle">AI驱动的股票交易分析平台 · 让投资更智能</p>
+        <div class="main-header">
+            <h3>📈 投资顾问分析平台</h3>
+            <p>📊 实时市场数据 · 🤖 多智能体协同分析 · 🧠 深度反思优化 · 🎯 专业分析师决策支持</p>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # 登录表单
     with st.container():

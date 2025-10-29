@@ -68,10 +68,6 @@ st.markdown("""
     
     header[data-testid="stHeader"] {
         display: none !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
     }
     
     .stDeployButton {
@@ -94,17 +90,10 @@ st.markdown("""
     /* 隐藏整个顶部区域 */
     .stApp > header {
         display: none !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        max-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
     }
     
     .stApp > div[data-testid="stToolbar"] {
         display: none !important;
-        height: 0 !important;
-        min-height: 0 !important;
     }
     
     /* 隐藏主菜单按钮 */
@@ -138,8 +127,6 @@ st.markdown("""
     .stApp {
         font-family: 'Inter', sans-serif;
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        padding-top: 0 !important;
-        margin-top: 0 !important;
     }
     
     /* 主容器样式 */
@@ -797,10 +784,8 @@ def main():
     section[data-testid="stMain"] > div {
         padding-left: 8px !important;
         padding-right: 8px !important;
-        padding-top: 0px !important;
         margin-left: 0px !important;
         margin-right: 0px !important;
-        margin-top: 0px !important;
     }
 
     /* 特别处理列容器 */
@@ -900,32 +885,19 @@ def main():
             elements.forEach(el => {
                 el.style.paddingLeft = '8px';
                 el.style.paddingRight = '8px';
-                el.style.paddingTop = '0px';
                 el.style.marginLeft = '0px';
                 el.style.marginRight = '0px';
-                el.style.marginTop = '0px';
             });
         });
 
-        // 特别处理主容器宽度和边距
+        // 特别处理主容器宽度和上下边距
         const mainContainer = document.querySelector('.main .block-container');
         if (mainContainer) {
             mainContainer.style.width = 'calc(100vw - 336px)';
             mainContainer.style.maxWidth = 'calc(100vw - 336px)';
             mainContainer.style.paddingTop = '8px';
             mainContainer.style.paddingBottom = '8px';
-            mainContainer.style.marginTop = '0px';
         }
-        
-        // 强制隐藏的 header 元素不占空间
-        const headers = document.querySelectorAll('header, .stApp > header, header[data-testid="stHeader"]');
-        headers.forEach(header => {
-            header.style.display = 'none';
-            header.style.height = '0';
-            header.style.minHeight = '0';
-            header.style.padding = '0';
-            header.style.margin = '0';
-        });
     }
 
     // 页面加载后执行
@@ -1088,7 +1060,7 @@ def main():
                 st.error(f"❌ {key}: 未配置")
         
         return
-
+    
     # 渲染侧边栏
     config = render_sidebar()
     
