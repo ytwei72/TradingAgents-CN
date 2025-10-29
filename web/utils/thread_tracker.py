@@ -1,6 +1,6 @@
 """
 分析线程跟踪器
-用于跟踪和检测分析线程的存活状态
+用于跟踪和检测分析线程的存活状态，支持任务控制
 """
 
 import threading
@@ -11,16 +11,25 @@ from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('web')
 
 class ThreadTracker:
-    """线程跟踪器"""
+    """线程跟踪器 - 支持任务控制"""
     
     def __init__(self):
         self._threads: Dict[str, threading.Thread] = {}
+        self._stop_events: Dict[str, threading.Event] = {}  # 停止事件
         self._lock = threading.Lock()
     
-    def register_thread(self, analysis_id: str, thread: threading.Thread):
-        """注册分析线程"""
+    def register_thread(self, analysis_id: str, thread: threading.Thread, stop_event: threading.Event = None):
+        """注册分析线程
+        
+        Args:
+            analysis_id: 分析ID
+            thread: 线程对象
+            stop_event: 停止事件（可选）
+        """
         with self._lock:
             self._threads[analysis_id] = thread
+            if stop_event:
+                self._stop_events[analysis_id] = stop_event
             logger.info(f"📊 [线程跟踪] 注册分析线程: {analysis_id}")
     
     def unregister_thread(self, analysis_id: str):
@@ -28,7 +37,9 @@ class ThreadTracker:
         with self._lock:
             if analysis_id in self._threads:
                 del self._threads[analysis_id]
-                logger.info(f"📊 [线程跟踪] 注销分析线程: {analysis_id}")
+            if analysis_id in self._stop_events:
+                del self._stop_events[analysis_id]
+            logger.info(f"📊 [线程跟踪] 注销分析线程: {analysis_id}")
     
     def is_thread_alive(self, analysis_id: str) -> bool:
         """检查分析线程是否存活"""
@@ -93,16 +104,37 @@ class ThreadTracker:
                     'thread_name': thread.name,
                     'thread_id': thread.ident,
                     'is_alive': thread.is_alive(),
-                    'is_daemon': thread.daemon
+                    'is_daemon': thread.daemon,
+                    'has_stop_event': analysis_id in self._stop_events
                 }
             return info
+    
+    def get_stop_event(self, analysis_id: str) -> Optional[threading.Event]:
+        """获取停止事件"""
+        with self._lock:
+            return self._stop_events.get(analysis_id)
+    
+    def request_stop(self, analysis_id: str) -> bool:
+        """请求停止线程
+        
+        Returns:
+            bool: 是否成功设置停止标志
+        """
+        with self._lock:
+            if analysis_id in self._stop_events:
+                self._stop_events[analysis_id].set()
+                logger.info(f"⏹️ [线程跟踪] 请求停止线程: {analysis_id}")
+                return True
+            else:
+                logger.warning(f"⚠️ [线程跟踪] 未找到停止事件: {analysis_id}")
+                return False
 
 # 全局线程跟踪器实例
 thread_tracker = ThreadTracker()
 
-def register_analysis_thread(analysis_id: str, thread: threading.Thread):
+def register_analysis_thread(analysis_id: str, thread: threading.Thread, stop_event: threading.Event = None):
     """注册分析线程"""
-    thread_tracker.register_thread(analysis_id, thread)
+    thread_tracker.register_thread(analysis_id, thread, stop_event)
 
 def unregister_analysis_thread(analysis_id: str):
     """注销分析线程"""
@@ -127,9 +159,18 @@ def get_all_analysis_threads() -> Dict[str, Dict]:
 def check_analysis_status(analysis_id: str) -> str:
     """
     检查分析状态
-    返回: 'running', 'completed', 'failed', 'not_found'
+    返回: 'running', 'completed', 'failed', 'not_found', 'paused', 'stopped'
     """
-    # 首先检查线程是否存活
+    # 首先检查任务控制状态
+    try:
+        from .task_control_manager import get_task_state
+        control_state = get_task_state(analysis_id)
+        if control_state in ['paused', 'stopped']:
+            return control_state
+    except Exception:
+        pass
+    
+    # 检查线程是否存活
     if is_analysis_thread_alive(analysis_id):
         return 'running'
     
@@ -140,7 +181,7 @@ def check_analysis_status(analysis_id: str) -> str:
         
         if progress_data:
             status = progress_data.get('status', 'unknown')
-            if status in ['completed', 'failed']:
+            if status in ['completed', 'failed', 'stopped', 'paused']:
                 return status
             else:
                 # 状态显示运行中但线程已死亡，说明异常终止
@@ -150,3 +191,11 @@ def check_analysis_status(analysis_id: str) -> str:
     except Exception as e:
         logger.error(f"📊 [状态检查] 检查进度数据失败: {e}")
         return 'not_found'
+
+def request_stop_thread(analysis_id: str) -> bool:
+    """请求停止线程"""
+    return thread_tracker.request_stop(analysis_id)
+
+def get_thread_stop_event(analysis_id: str) -> Optional[threading.Event]:
+    """获取线程停止事件"""
+    return thread_tracker.get_stop_event(analysis_id)

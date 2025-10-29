@@ -97,7 +97,7 @@ def extract_risk_assessment(state):
         logger.info(f"提取风险评估数据时出错: {e}")
         return None
 
-def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None):
+def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None, analysis_id=None, async_tracker=None):
     """执行股票分析
 
     Args:
@@ -108,6 +108,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         llm_provider: LLM提供商 (dashscope/deepseek/google)
         llm_model: 大模型名称
         progress_callback: 进度回调函数，用于更新UI状态
+        analysis_id: 分析任务ID（用于任务控制）
+        async_tracker: AsyncProgressTracker实例（用于任务控制）
     """
 
     def update_progress(message, step=None, total_steps=None):
@@ -115,12 +117,64 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         if progress_callback:
             progress_callback(message, step, total_steps)
         logger.info(f"[进度] {message}")
+    
+    def check_task_control():
+        """检查任务控制信号（暂停/停止）"""
+        if not analysis_id:
+            return True  # 没有analysis_id，继续执行
+        
+        try:
+            from .task_control_manager import should_stop, should_pause, wait_if_paused
+            
+            # 检查停止信号
+            if should_stop(analysis_id):
+                logger.info(f"⏹️ [任务控制] 收到停止信号: {analysis_id}")
+                if async_tracker:
+                    async_tracker.mark_stopped("用户停止了分析任务")
+                return False
+            
+            # 检查暂停信号
+            if should_pause(analysis_id):
+                logger.info(f"⏸️ [任务控制] 收到暂停信号: {analysis_id}")
+                if async_tracker:
+                    async_tracker.mark_paused()
+                
+                # 等待直到恢复或停止
+                wait_if_paused(analysis_id)
+                
+                # 检查是否在暂停期间被停止
+                if should_stop(analysis_id):
+                    logger.info(f"⏹️ [任务控制] 暂停期间收到停止信号: {analysis_id}")
+                    if async_tracker:
+                        async_tracker.mark_stopped("用户停止了分析任务")
+                    return False
+                
+                # 恢复执行
+                logger.info(f"▶️ [任务控制] 任务恢复执行: {analysis_id}")
+                if async_tracker:
+                    async_tracker.mark_resumed()
+            
+            return True  # 继续执行
+        
+        except Exception as e:
+            logger.error(f"❌ [任务控制] 检查任务控制状态失败: {e}")
+            return True  # 出错时继续执行
 
     # 生成会话ID用于Token跟踪和日志关联
     session_id = f"analysis_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     # 1. 数据预获取和验证阶段
     update_progress("🔍 验证股票代码并预获取数据...", 1, 10)
+    
+    # 检查任务控制（在开始前检查）
+    if not check_task_control():
+        return {
+            'success': False,
+            'error': '任务已被停止',
+            'stock_symbol': stock_symbol,
+            'analysis_date': analysis_date,
+            'session_id': session_id if analysis_id else None
+        }
 
     try:
         from tradingagents.utils.stock_validator import prepare_stock_data
@@ -450,16 +504,52 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
 
         # 初始化交易图
         update_progress("🔧 初始化分析引擎...")
+        
+        # 检查任务控制（初始化前）
+        if not check_task_control():
+            return {
+                'success': False,
+                'error': '任务已被停止',
+                'stock_symbol': stock_symbol,
+                'analysis_date': analysis_date,
+                'session_id': session_id
+            }
+        
         graph = TradingAgentsGraph(analysts, config=config, debug=False)
 
         # 执行分析
         update_progress(f"📊 开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
+        
+        # 检查任务控制（分析前）
+        if not check_task_control():
+            return {
+                'success': False,
+                'error': '任务已被停止',
+                'stock_symbol': stock_symbol,
+                'analysis_date': analysis_date,
+                'session_id': session_id
+            }
+        
         logger.debug(f"🔍 [RUNNER DEBUG] ===== 调用graph.propagate =====")
         logger.debug(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
         logger.debug(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
         logger.debug(f"🔍 [RUNNER DEBUG]   date: '{analysis_date}'")
 
         state, decision = graph.propagate(formatted_symbol, analysis_date)
+        
+        # 检查任务控制（分析后）
+        if not check_task_control():
+            # 分析完成但被停止，返回部分结果
+            logger.warning(f"⚠️ [任务控制] 分析完成后检测到停止信号")
+            return {
+                'success': False,
+                'error': '任务已被停止（分析已完成）',
+                'stock_symbol': stock_symbol,
+                'analysis_date': analysis_date,
+                'session_id': session_id,
+                'state': state,
+                'decision': decision
+            }
 
         # 调试信息
         logger.debug(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")

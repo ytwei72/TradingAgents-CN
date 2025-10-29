@@ -70,7 +70,7 @@ def safe_serialize(obj):
             return str(obj)  # 转换为字符串
 
 class AsyncProgressTracker:
-    """异步进度跟踪器"""
+    """异步进度跟踪器 - 支持任务控制"""
     
     def __init__(self, analysis_id: str, analysts: List[str], research_depth: int, llm_provider: str):
         self.analysis_id = analysis_id
@@ -78,6 +78,8 @@ class AsyncProgressTracker:
         self.research_depth = research_depth
         self.llm_provider = llm_provider
         self.start_time = time.time()
+        self.pause_start_time = None  # 暂停开始时间
+        self.total_pause_duration = 0.0  # 总暂停时长
         
         # 生成分析步骤
         self.analysis_steps = self._generate_dynamic_steps()
@@ -88,6 +90,7 @@ class AsyncProgressTracker:
         self.progress_data = {
             'analysis_id': analysis_id,
             'status': 'running',
+            'control_state': 'running',  # 任务控制状态: running/paused/stopped
             'current_step': 0,
             'total_steps': len(self.analysis_steps),
             'progress_percentage': 0.0,
@@ -99,6 +102,8 @@ class AsyncProgressTracker:
             'last_message': '准备开始分析...',
             'last_update': time.time(),
             'start_time': self.start_time,
+            'pause_start_time': None,
+            'total_pause_duration': 0.0,
             'steps': self.analysis_steps
         }
         
@@ -324,7 +329,8 @@ class AsyncProgressTracker:
     def update_progress(self, message: str, step: Optional[int] = None):
         """更新进度状态"""
         current_time = time.time()
-        elapsed_time = current_time - self.start_time
+        # 使用有效时长（排除暂停时间）
+        elapsed_time = self.get_effective_elapsed_time()
 
         # 自动检测步骤
         if step is None:
@@ -588,6 +594,7 @@ class AsyncProgressTracker:
     def mark_failed(self, error_message: str):
         """标记分析失败"""
         self.progress_data['status'] = 'failed'
+        self.progress_data['control_state'] = 'stopped'
         self.progress_data['last_message'] = f"分析失败: {error_message}"
         self.progress_data['last_update'] = time.time()
         self._save_progress()
@@ -599,6 +606,62 @@ class AsyncProgressTracker:
             unregister_analysis_tracker(self.analysis_id)
         except ImportError:
             pass
+    
+    def mark_paused(self):
+        """标记任务暂停"""
+        self.pause_start_time = time.time()
+        self.progress_data['control_state'] = 'paused'
+        self.progress_data['pause_start_time'] = self.pause_start_time
+        self.progress_data['last_message'] = '⏸️ 任务已暂停'
+        self.progress_data['last_update'] = time.time()
+        self._save_progress()
+        logger.info(f"⏸️ [异步进度] 任务已暂停: {self.analysis_id}")
+    
+    def mark_resumed(self):
+        """标记任务恢复"""
+        if self.pause_start_time:
+            # 累计暂停时长
+            pause_duration = time.time() - self.pause_start_time
+            self.total_pause_duration += pause_duration
+            self.pause_start_time = None
+        
+        self.progress_data['control_state'] = 'running'
+        self.progress_data['pause_start_time'] = None
+        self.progress_data['total_pause_duration'] = self.total_pause_duration
+        self.progress_data['last_message'] = '▶️ 任务已恢复'
+        self.progress_data['last_update'] = time.time()
+        self._save_progress()
+        logger.info(f"▶️ [异步进度] 任务已恢复: {self.analysis_id}")
+    
+    def mark_stopped(self, message: str = "任务已停止"):
+        """标记任务停止"""
+        self.progress_data['status'] = 'stopped'
+        self.progress_data['control_state'] = 'stopped'
+        self.progress_data['last_message'] = f"⏹️ {message}"
+        self.progress_data['last_update'] = time.time()
+        self._save_progress()
+        logger.info(f"⏹️ [异步进度] 任务已停止: {self.analysis_id}")
+        
+        # 从日志系统注销
+        try:
+            from .progress_log_handler import unregister_analysis_tracker
+            unregister_analysis_tracker(self.analysis_id)
+        except ImportError:
+            pass
+    
+    def get_effective_elapsed_time(self) -> float:
+        """获取有效已用时间（排除暂停时长）"""
+        current_time = time.time()
+        total_elapsed = current_time - self.start_time
+        
+        # 如果当前正在暂停中，计算当前暂停时长
+        current_pause_duration = 0.0
+        if self.pause_start_time:
+            current_pause_duration = current_time - self.pause_start_time
+        
+        # 有效时长 = 总时长 - 历史暂停时长 - 当前暂停时长
+        effective_time = total_elapsed - self.total_pause_duration - current_pause_duration
+        return max(effective_time, 0.0)
 
 def get_progress_by_id(analysis_id: str) -> Optional[Dict[str, Any]]:
     """根据分析ID获取进度"""

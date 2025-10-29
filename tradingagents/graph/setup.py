@@ -11,6 +11,13 @@ from tradingagents.agents.utils.agent_utils import Toolkit
 
 from .conditional_logic import ConditionalLogic
 
+# 导入检查点支持
+try:
+    from langgraph.checkpoint.memory import MemorySaver
+    CHECKPOINTER_AVAILABLE = True
+except ImportError:
+    CHECKPOINTER_AVAILABLE = False
+
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
@@ -250,4 +257,12 @@ class GraphSetup:
         workflow.add_edge("Risk Judge", END)
 
         # Compile and return
-        return workflow.compile()
+        # 添加检查点支持以启用暂停/恢复功能
+        if CHECKPOINTER_AVAILABLE and self.config.get("enable_checkpointer", False):
+            checkpointer = MemorySaver()
+            logger.info("✅ [Graph Setup] 启用检查点支持 (MemorySaver)")
+            return workflow.compile(checkpointer=checkpointer)
+        else:
+            if not CHECKPOINTER_AVAILABLE:
+                logger.warning("⚠️ [Graph Setup] 检查点不可用，请安装 langgraph[checkpoint]")
+            return workflow.compile()

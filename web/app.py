@@ -223,6 +223,27 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
     }
     
+    /* 任务控制按钮样式优化 */
+    .stButton > button[kind="secondary"] {
+        background: linear-gradient(135deg, #FFA726 0%, #FB8C00 100%);
+        box-shadow: 0 4px 15px rgba(255, 167, 38, 0.3);
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background: linear-gradient(135deg, #FB8C00 0%, #F57C00 100%);
+        box-shadow: 0 8px 25px rgba(255, 167, 38, 0.4);
+    }
+    
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #45a049 0%, #388e3c 100%);
+        box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+    }
+    
     /* 输入框样式 */
     .stTextInput > div > div > input,
     .stSelectbox > div > div > select,
@@ -388,6 +409,14 @@ def initialize_session_state():
 
             if actual_status == 'running':
                 st.session_state.analysis_running = True
+                st.session_state.current_analysis_id = persistent_analysis_id
+            elif actual_status == 'paused':
+                # 暂停状态：保留analysis_id，但标记为运行中（线程仍活跃）
+                st.session_state.analysis_running = True
+                st.session_state.current_analysis_id = persistent_analysis_id
+            elif actual_status == 'stopped':
+                # 停止状态：保留analysis_id，但标记为未运行
+                st.session_state.analysis_running = False
                 st.session_state.current_analysis_id = persistent_analysis_id
             elif actual_status in ['completed', 'failed']:
                 st.session_state.analysis_running = False
@@ -1226,7 +1255,9 @@ def main():
                             llm_provider=config['llm_provider'],
                             market_type=form_data.get('market_type', '美股'),
                             llm_model=config['llm_model'],
-                            progress_callback=progress_callback
+                            progress_callback=progress_callback,
+                            analysis_id=analysis_id,
+                            async_tracker=async_tracker
                         )
 
                         # 标记分析完成并保存结果（不访问session state）
@@ -1279,18 +1310,24 @@ def main():
                         logger.error(f"❌ [分析失败] {analysis_id}: {e}")
 
                     finally:
-                        # 分析结束后注销线程
+                        # 分析结束后注销线程和任务控制
                         from utils.thread_tracker import unregister_analysis_thread
+                        from utils.task_control_manager import unregister_task
+                        
                         unregister_analysis_thread(analysis_id)
-                        logger.info(f"🧵 [线程清理] 分析线程已注销: {analysis_id}")
+                        unregister_task(analysis_id)
+                        logger.info(f"🧵 [线程清理] 分析线程和任务控制已注销: {analysis_id}")
 
                 # 启动后台分析线程
                 analysis_thread = threading.Thread(target=run_analysis_in_background)
                 analysis_thread.daemon = True  # 设置为守护线程，这样主程序退出时线程也会退出
                 analysis_thread.start()
 
-                # 注册线程到跟踪器
+                # 注册任务控制和线程跟踪
                 from utils.thread_tracker import register_analysis_thread
+                from utils.task_control_manager import register_task
+                
+                register_task(analysis_id)
                 register_analysis_thread(analysis_id, analysis_thread)
 
                 logger.info(f"🧵 [后台分析] 分析线程已启动: {analysis_id}")
@@ -1315,7 +1352,7 @@ def main():
             # 使用线程检测来获取真实状态
             from utils.thread_tracker import check_analysis_status
             actual_status = check_analysis_status(current_analysis_id)
-            is_running = (actual_status == 'running')
+            is_running = (actual_status in ['running', 'paused'])  # 暂停状态也算运行中（线程未死亡）
 
             # 同步session state状态
             if st.session_state.get('analysis_running', False) != is_running:
@@ -1326,17 +1363,111 @@ def main():
             from utils.async_progress_tracker import get_progress_by_id
             progress_data = get_progress_by_id(current_analysis_id)
 
-            # 显示分析信息
-            if is_running:
-                st.info(f"🔄 正在分析: {current_analysis_id}")
-            else:
-                if actual_status == 'completed':
-                    st.success(f"✅ 分析完成: {current_analysis_id}")
-
+            # 显示分析信息和任务控制按钮 - 优化的界面布局
+            # 使用更清晰的状态标题
+            st.markdown("### 📊 任务状态")
+            
+            # 状态信息和控制按钮分栏显示
+            status_col, btn_col1, btn_col2 = st.columns([2, 1, 1])
+            
+            with status_col:
+                # 根据状态显示不同的状态卡片
+                if is_running and actual_status == 'running':
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); 
+                                padding: 1rem; border-radius: 10px; color: white; text-align: center;">
+                        <h4 style="margin: 0; color: white;">🔄 分析进行中</h4>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">分析ID: {}</p>
+                    </div>
+                    """.format(current_analysis_id[:16] + "..."), unsafe_allow_html=True)
+                elif actual_status == 'paused':
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #FFA726 0%, #FB8C00 100%); 
+                                padding: 1rem; border-radius: 10px; color: white; text-align: center;">
+                        <h4 style="margin: 0; color: white;">⏸️ 分析已暂停</h4>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">点击"继续"按钮恢复分析</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                elif actual_status == 'stopped':
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); 
+                                padding: 1rem; border-radius: 10px; color: white; text-align: center;">
+                        <h4 style="margin: 0; color: white;">⏹️ 分析已停止</h4>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">任务已被用户停止</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                elif actual_status == 'completed':
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); 
+                                padding: 1rem; border-radius: 10px; color: white; text-align: center;">
+                        <h4 style="margin: 0; color: white;">✅ 分析完成</h4>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">查看下方分析报告</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 elif actual_status == 'failed':
-                    st.error(f"❌ 分析失败: {current_analysis_id}")
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); 
+                                padding: 1rem; border-radius: 10px; color: white; text-align: center;">
+                        <h4 style="margin: 0; color: white;">❌ 分析失败</h4>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">请查看错误信息</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 else:
                     st.warning(f"⚠️ 分析状态未知: {current_analysis_id}")
+            
+            # 任务控制按钮 - 优化的按钮样式
+            with btn_col1:
+                if actual_status == 'running':
+                    # 运行中状态：显示暂停按钮
+                    if st.button("⏸️ 暂停分析", 
+                                key=f"pause_{current_analysis_id}", 
+                                use_container_width=True,
+                                type="secondary",
+                                help="暂停当前分析任务，可随时恢复"):
+                        from utils.task_control_manager import pause_task
+                        if pause_task(current_analysis_id):
+                            st.success("✅ 任务已暂停")
+                            logger.info(f"⏸️ [用户操作] 暂停任务: {current_analysis_id}")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ 暂停失败")
+                            
+                elif actual_status == 'paused':
+                    # 暂停状态：显示继续按钮（主要操作）
+                    if st.button("▶️ 继续分析", 
+                                key=f"resume_{current_analysis_id}", 
+                                use_container_width=True,
+                                type="primary",
+                                help="继续执行被暂停的分析任务"):
+                        from utils.task_control_manager import resume_task
+                        if resume_task(current_analysis_id):
+                            st.success("✅ 任务已恢复")
+                            logger.info(f"▶️ [用户操作] 恢复任务: {current_analysis_id}")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ 恢复失败")
+            
+            with btn_col2:
+                if actual_status in ['running', 'paused']:
+                    # 运行中或暂停状态：显示停止按钮
+                    stop_key = f"stop_{current_analysis_id}" if actual_status == 'running' else f"stop_paused_{current_analysis_id}"
+                    if st.button("⏹️ 停止分析", 
+                                key=stop_key, 
+                                use_container_width=True,
+                                type="secondary",
+                                help="永久停止当前分析任务"):
+                        from utils.task_control_manager import stop_task
+                        if stop_task(current_analysis_id):
+                            st.success("✅ 任务已停止")
+                            logger.info(f"⏹️ [用户操作] 停止任务: {current_analysis_id}")
+                            # 清理分析状态
+                            st.session_state.analysis_running = False
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ 停止失败")
 
             # 显示进度（根据状态决定是否显示刷新控件）
             progress_col1, progress_col2 = st.columns([4, 1])
@@ -1345,9 +1476,13 @@ def main():
 
             is_completed = display_unified_progress(current_analysis_id, show_refresh_controls=is_running)
 
-            # 如果分析正在进行，显示提示信息（不添加额外的自动刷新）
-            if is_running:
+            # 根据状态显示提示信息
+            if actual_status == 'running':
                 st.info("⏱️ 分析正在进行中，可以使用下方的自动刷新功能查看进度更新...")
+            elif actual_status == 'paused':
+                st.warning("⏸️ 分析已暂停，点击【继续】按钮恢复分析...")
+            elif actual_status == 'stopped':
+                st.error("⏹️ 分析已被停止")
 
             # 如果分析刚完成，尝试恢复结果
             if is_completed and not st.session_state.get('analysis_results') and progress_data:
