@@ -475,6 +475,12 @@ class AsyncProgressTracker:
                 return self._find_step_by_keyword(["观点整合", "整合"])
             elif "trader" in message:
                 return self._find_step_by_keyword(["投资建议", "建议"])
+            elif "risky_analyst" in message or "risky" in message:
+                return self._find_step_by_keyword(["激进策略", "激进"])
+            elif "safe_analyst" in message or "safe" in message:
+                return self._find_step_by_keyword(["保守策略", "保守"])
+            elif "neutral_analyst" in message or "neutral" in message:
+                return self._find_step_by_keyword(["平衡策略", "平衡"])
             elif "risk_manager" in message:
                 return self._find_step_by_keyword(["风险控制", "控制"])
             elif "graph_signal_processing" in message or "signal" in message:
@@ -483,8 +489,23 @@ class AsyncProgressTracker:
         elif "工具调用" in message:
             # 保持当前步骤，不推进
             return None
-        # 模块完成日志 - 推进到下一步
+        # 模块完成日志 - 确保当前步骤被记录，然后推进到下一步
         elif "模块完成" in message:
+            # 检查当前步骤是否已记录，如果没有则记录
+            if self.current_step not in [s['step_index'] for s in self.step_history]:
+                step_start = self.step_start_times.get(self.current_step, time.time())
+                step_duration = time.time() - step_start
+                current_step_info = self.analysis_steps[self.current_step] if self.current_step < len(self.analysis_steps) else {'name': '未知'}
+                self.step_history.append({
+                    'step_index': self.current_step,
+                    'step_name': current_step_info['name'],
+                    'start_time': step_start,
+                    'end_time': time.time(),
+                    'duration': step_duration,
+                    'message': message
+                })
+                logger.debug(f"📊 [步骤记录] 记录步骤 {self.current_step} ({current_step_info['name']}) 完成")
+            
             # 模块完成时，从当前步骤推进到下一步
             # 不再依赖模块名称，而是基于当前进度推进
             next_step = min(self.current_step + 1, len(self.analysis_steps) - 1)

@@ -18,13 +18,20 @@
 
 **关键模块缺少日志装饰器！**
 
-以下关键模块没有使用 `@log_analysis_module` 装饰器，因此不会发送"📊 [模块开始]"和"📊 [模块完成]"日志消息：
+以下关键模块没有使用装饰器，因此不会发送"📊 [模块开始]"和"📊 [模块完成]"日志消息：
 
+### 第一批（已修复）
 1. ❌ `bull_researcher.py` - 多头研究员
 2. ❌ `bear_researcher.py` - 空头研究员
 3. ❌ `research_manager.py` - 研究经理
 4. ❌ `trader.py` - 交易员
 5. ❌ `risk_manager.py` - 风险经理
+
+### 第二批（补充修复）
+6. ❌ `market_analyst.py` - 市场分析师（非React版本）
+7. ❌ `aggresive_debator.py` - 激进风险辩论者
+8. ❌ `conservative_debator.py` - 保守风险辩论者
+9. ❌ `neutral_debator.py` - 中性/平衡风险辩论者
 
 而分析师模块都有装饰器：
 - ✅ `market_analyst.py` - @log_analyst_module("market")
@@ -39,6 +46,8 @@
 为所有缺少装饰器的模块添加 `@log_analysis_module` 装饰器。
 
 ### 修改文件清单
+
+#### 第一批修复（5个文件）
 
 #### 1. tradingagents/agents/researchers/bull_researcher.py
 
@@ -100,6 +109,95 @@ def create_risk_manager(llm, memory):
         # ... 原有代码 ...
 ```
 
+#### 第二批修复（4个文件）
+
+#### 6. tradingagents/agents/analysts/market_analyst.py
+
+```python
+def create_market_analyst(llm, toolkit):
+    @log_analyst_module("market")  # ← 添加装饰器（非React版本）
+    def market_analyst_node(state):
+        # ... 原有代码 ...
+```
+
+**注意**: `market_analyst_react` 版本已有装饰器，这里是为非React版本添加。
+
+#### 7. tradingagents/agents/risk_mgmt/aggresive_debator.py
+
+```python
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
+def create_risky_debator(llm):
+    @log_analysis_module("risky_analyst")  # ← 添加装饰器
+    def risky_node(state) -> dict:
+        # ... 原有代码 ...
+```
+
+#### 8. tradingagents/agents/risk_mgmt/conservative_debator.py
+
+```python
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
+def create_safe_debator(llm):
+    @log_analysis_module("safe_analyst")  # ← 添加装饰器
+    def safe_node(state) -> dict:
+        # ... 原有代码 ...
+```
+
+#### 9. tradingagents/agents/risk_mgmt/neutral_debator.py
+
+```python
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
+def create_neutral_debator(llm):
+    @log_analysis_module("neutral_analyst")  # ← 添加装饰器
+    def neutral_node(state) -> dict:
+        # ... 原有代码 ...
+```
+
+#### 10. web/utils/async_progress_tracker.py
+
+在 `_detect_step_from_message` 方法中添加风险辩论模块的检测：
+
+```python
+elif "trader" in message:
+    return self._find_step_by_keyword(["投资建议", "建议"])
+elif "risky_analyst" in message or "risky" in message:
+    return self._find_step_by_keyword(["激进策略", "激进"])
+elif "safe_analyst" in message or "safe" in message:
+    return self._find_step_by_keyword(["保守策略", "保守"])
+elif "neutral_analyst" in message or "neutral" in message:
+    return self._find_step_by_keyword(["平衡策略", "平衡"])
+elif "risk_manager" in message:
+    return self._find_step_by_keyword(["风险控制", "控制"])
+```
+
+#### 11. web/utils/analysis_runner.py
+
+更新模拟模式使用标准module_name：
+
+```python
+# 模拟风险评估（根据research_depth）
+if research_depth >= 3:
+    # 激进策略
+    update_progress("🔥 [模拟] 模块开始: risky_analyst")
+    mock_sleep()
+    update_progress("✅ [模拟] 模块完成: risky_analyst")
+    
+    # 保守策略
+    update_progress("🛡️ [模拟] 模块开始: safe_analyst")
+    mock_sleep()
+    update_progress("✅ [模拟] 模块完成: safe_analyst")
+    
+    # 平衡策略
+    update_progress("⚖️ [模拟] 模块开始: neutral_analyst")
+    mock_sleep()
+    update_progress("✅ [模拟] 模块完成: neutral_analyst")
+```
+
 ## 装饰器工作原理
 
 `@log_analysis_module` 装饰器会在函数执行前后自动发送日志：
@@ -122,10 +220,15 @@ def create_risk_manager(llm, memory):
 
 | 日志中的module_name | 检测关键词 | 对应步骤名称 |
 |-------------------|----------|------------|
+| `market_analyst` | `"market_analyst"` / `"market"` | 📊 市场分析 |
+| `fundamentals_analyst` | `"fundamentals_analyst"` / `"fundamentals"` | 💼 基本面分析 |
 | `bull_researcher` | `"bull_researcher"` / `"bull"` | 📈 多头观点 |
 | `bear_researcher` | `"bear_researcher"` / `"bear"` | 📉 空头观点 |
 | `research_manager` | `"research_manager"` | 🤝 观点整合 |
 | `trader` | `"trader"` | 💡 投资建议 |
+| `risky_analyst` | `"risky_analyst"` / `"risky"` | 🔥 激进策略 |
+| `safe_analyst` | `"safe_analyst"` / `"safe"` | 🛡️ 保守策略 |
+| `neutral_analyst` | `"neutral_analyst"` / `"neutral"` | ⚖️ 平衡策略 |
 | `risk_manager` | `"risk_manager"` | 🎯 风险控制 / ⚠️ 风险提示 |
 | `graph_signal_processing` | `"graph_signal_processing"` / `"signal"` | 📊 生成报告 |
 
@@ -272,12 +375,26 @@ def log_analysis_module(module_name: str):
 
 ## 总结
 
-通过为5个关键模块添加日志装饰器，成功修复了实际分析中的步骤跟踪问题：
+通过两批修复，为**9个关键模块**添加了日志装饰器，并更新了步骤检测逻辑：
 
+### 修复内容
+- ✅ 第一批：5个模块（研究员、经理、交易员）
+- ✅ 第二批：4个模块（市场分析师、3个风险辩论者）
+- ✅ 更新进度跟踪器：添加风险辩论模块检测
+- ✅ 更新模拟代码：使用标准module_name
+
+### 修改统计
+- **9个 Python文件**：添加 `@log_analysis_module` 装饰器
+- **2个配置文件**：更新步骤检测和模拟逻辑
+- **共计 11个文件**修改
+
+### 效果
 - ✅ 所有步骤都能正确推进
 - ✅ 每个步骤都有准确的执行时间
 - ✅ 时间戳精确到秒
 - ✅ 步骤用时和总用时都正确显示
+- ✅ 市场分析步骤正确跟踪
+- ✅ 风险评估各策略步骤正确跟踪
 
 现在Mock模式和实际分析模式的步骤跟踪都能完美工作！
 

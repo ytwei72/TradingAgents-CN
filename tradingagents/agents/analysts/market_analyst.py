@@ -264,7 +264,7 @@ def create_market_analyst_react(llm, toolkit):
 
 
 def create_market_analyst(llm, toolkit):
-
+    @log_analyst_module("market")
     def market_analyst_node(state):
         logger.debug(f"📈 [DEBUG] ===== 市场分析师节点开始 =====")
 

@@ -185,29 +185,29 @@ def run_mock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm
         # 模拟风险评估（根据research_depth）
         if research_depth >= 3:
             # 激进策略
-            update_progress("🔥 [模拟] 正在评估激进策略...")
+            update_progress("🔥 [模拟] 模块开始: risky_analyst")
             mock_sleep()
-            update_progress("✅ [模拟] 模块完成: 激进策略评估")
+            update_progress("✅ [模拟] 模块完成: risky_analyst")
             
             # 保守策略
-            update_progress("🛡️ [模拟] 正在评估保守策略...")
+            update_progress("🛡️ [模拟] 模块开始: safe_analyst")
             mock_sleep()
-            update_progress("✅ [模拟] 模块完成: 保守策略评估")
+            update_progress("✅ [模拟] 模块完成: safe_analyst")
             
             # 平衡策略
-            update_progress("⚖️ [模拟] 正在评估平衡策略...")
+            update_progress("⚖️ [模拟] 模块开始: neutral_analyst")
             mock_sleep()
-            update_progress("✅ [模拟] 模块完成: 平衡策略评估")
+            update_progress("✅ [模拟] 模块完成: neutral_analyst")
             
             # 风险控制
             update_progress("🎯 [模拟] 模块开始: risk_manager")
             mock_sleep()
             update_progress("✅ [模拟] 模块完成: risk_manager")
         else:
-            # 风险提示
-            update_progress("⚠️ [模拟] 正在识别投资风险...")
+            # 风险提示（快速和标准分析只有risk_manager）
+            update_progress("⚠️ [模拟] 模块开始: risk_manager")
             mock_sleep()
-            update_progress("✅ [模拟] 模块完成: 风险提示")
+            update_progress("✅ [模拟] 模块完成: risk_manager")
         
         # 模拟报告生成
         update_progress("📊 [模拟] 模块开始: graph_signal_processing")
