@@ -25,7 +25,82 @@ logger = get_logger('web')
 def render_analysis_form():
     """渲染股票分析表单"""
 
-    st.subheader("📋 分析配置")
+    # st.subheader("📋 分析配置")
+
+    # 添加分析流程说明 - 可展开/收缩的容器
+    with st.expander("📊 查看分析流程与步骤", expanded=False):
+        st.markdown("""
+        ### 🔄 完整分析流程
+        
+        本系统采用多Agent协同分析架构，为您提供全面的股票投资分析。以下是详细的分析步骤：
+        
+        #### **第一阶段：配置与准备** 🎯
+        1. **市场选择**：选择目标市场（美股/A股/港股）
+        2. **股票代码输入**：输入待分析的股票代码
+        3. **分析日期设定**：选择分析基准日期
+        4. **研究深度配置**：设定分析深度（1-5级）
+           - 1级：快速分析（基础指标）
+           - 2级：基础分析（核心指标）
+           - 3级：标准分析（全面指标）
+           - 4级：深度分析（详细研究）
+           - 5级：全面分析（深度挖掘）
+        
+        #### **第二阶段：多维度分析** 🔍
+        根据您选择的分析师团队，系统将执行以下分析：
+        
+        - **📈 市场分析师**
+          - 技术面分析：K线形态、均线系统
+          - 价格趋势分析：趋势判断、支撑阻力位
+          - 技术指标分析：MACD、RSI、KDJ等
+          - 成交量分析：量价关系研究
+        
+        - **💰 基本面分析师**
+          - 财务数据分析：营收、利润、现金流
+          - 公司基本面研究：业务模式、竞争优势
+          - 估值水平评估：PE、PB、PS等估值指标
+          - 财务健康度分析：资产负债、偿债能力
+        
+        - **📰 新闻分析师**
+          - 新闻事件收集：相关新闻抓取
+          - 事件影响分析：重大事件对股价的影响
+          - 市场动态追踪：行业动态、政策变化
+          - 舆情分析：新闻情绪倾向判断
+        
+        - **💭 社交媒体分析师**（非A股市场）
+          - 社交媒体数据采集：Twitter、Reddit等
+          - 投资者情绪分析：散户情绪、机构观点
+          - 热度指标监测：讨论热度、关注度变化
+          - 情绪趋势预测：情绪变化趋势分析
+        
+        #### **第三阶段：综合评估** 📋
+        - **情绪分析**（可选）
+          - 市场整体情绪评估
+          - 投资者信心指数
+          - 情绪与价格相关性分析
+        
+        - **风险评估**（可选）
+          - 系统性风险评估
+          - 个股特定风险识别
+          - 风险等级评定
+          - 风险提示与建议
+        
+        #### **第四阶段：报告生成** 📄
+        - **综合研究报告**
+          - 执行摘要：核心观点与建议
+          - 详细分析：各分析师报告整合
+          - 投资建议：买入/持有/卖出建议
+          - 风险提示：关键风险因素说明
+        
+        #### **第五阶段：结果展示** 📊
+        - **可视化图表**：价格走势、技术指标图表
+        - **数据报表**：关键数据整理展示
+        - **分析结论**：综合评分与投资建议
+        - **历史记录**：可查看历史分析结果
+        
+        ---
+        
+        💡 **提示**：研究深度越高，分析越详细，但耗时也越长。建议首次分析使用3级标准分析。
+        """)
 
     # 获取缓存的表单配置（确保不为None）
     cached_config = st.session_state.get('form_config') or {}
@@ -228,26 +303,9 @@ def render_analysis_form():
         else:
             st.success(f"✅ 已输入股票代码: {stock_symbol}")
 
-        # 添加JavaScript来改善用户体验
-        st.markdown("""
-        <script>
-        // 监听输入框的变化，提供更好的用户反馈
-        document.addEventListener('DOMContentLoaded', function() {
-            const inputs = document.querySelectorAll('input[type="text"]');
-            inputs.forEach(input => {
-                input.addEventListener('input', function() {
-                    if (this.value.trim()) {
-                        this.style.borderColor = '#00ff00';
-                        this.title = '按回车键确认输入';
-                    } else {
-                        this.style.borderColor = '';
-                        this.title = '';
-                    }
-                });
-            });
-        });
-        </script>
-        """, unsafe_allow_html=True)
+        # 添加JavaScript来改善用户体验（使用工具模块）
+        from utils.frontend_scripts import inject_stock_input_enhancer
+        inject_stock_input_enhancer()
 
         # 在提交按钮前检测配置变化并保存
         current_config = {

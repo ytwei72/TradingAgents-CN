@@ -24,103 +24,23 @@ except ImportError as e:
     MONGODB_AVAILABLE = False
     print(f"❌ MongoDB模块导入失败: {e}")
 
+# 导入工具模块
+from components.component_utils import safe_timestamp_to_datetime
+from utils.favorites_tags_manager import (
+    load_favorites, save_favorites, load_tags, save_tags,
+    add_tag_to_analysis, remove_tag_from_analysis, get_analysis_tags,
+    toggle_favorite as favorites_toggle_favorite
+)
+from config.report_constants import REPORT_DISPLAY_NAMES, get_report_display_name
+
 # 设置日志
 logger = logging.getLogger(__name__)
 
-def safe_timestamp_to_datetime(timestamp_value):
-    """安全地将时间戳转换为datetime对象"""
-    if isinstance(timestamp_value, datetime):
-        # 如果已经是datetime对象（来自MongoDB）
-        return timestamp_value
-    elif isinstance(timestamp_value, (int, float)):
-        # 如果是时间戳数字（来自文件系统）
-        try:
-            return datetime.fromtimestamp(timestamp_value)
-        except (ValueError, OSError):
-            # 时间戳无效，使用当前时间
-            return datetime.now()
-    else:
-        # 其他情况，使用当前时间
-        return datetime.now()
-
+# 从工具模块导入的函数，保留这里的get_analysis_results_dir用于向后兼容
 def get_analysis_results_dir():
     """获取分析结果目录"""
-    results_dir = Path(__file__).parent.parent / "data" / "analysis_results"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    return results_dir
-
-def get_favorites_file():
-    """获取收藏文件路径"""
-    return get_analysis_results_dir() / "favorites.json"
-
-def get_tags_file():
-    """获取标签文件路径"""
-    return get_analysis_results_dir() / "tags.json"
-
-def load_favorites():
-    """加载收藏列表"""
-    favorites_file = get_favorites_file()
-    if favorites_file.exists():
-        try:
-            with open(favorites_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return []
-    return []
-
-def save_favorites(favorites):
-    """保存收藏列表"""
-    favorites_file = get_favorites_file()
-    try:
-        with open(favorites_file, 'w', encoding='utf-8') as f:
-            json.dump(favorites, f, ensure_ascii=False, indent=2)
-        return True
-    except:
-        return False
-
-def load_tags():
-    """加载标签数据"""
-    tags_file = get_tags_file()
-    if tags_file.exists():
-        try:
-            with open(tags_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_tags(tags):
-    """保存标签数据"""
-    tags_file = get_tags_file()
-    try:
-        with open(tags_file, 'w', encoding='utf-8') as f:
-            json.dump(tags, f, ensure_ascii=False, indent=2)
-        return True
-    except:
-        return False
-
-def add_tag_to_analysis(analysis_id, tag):
-    """为分析结果添加标签"""
-    tags = load_tags()
-    if analysis_id not in tags:
-        tags[analysis_id] = []
-    if tag not in tags[analysis_id]:
-        tags[analysis_id].append(tag)
-        save_tags(tags)
-
-def remove_tag_from_analysis(analysis_id, tag):
-    """从分析结果移除标签"""
-    tags = load_tags()
-    if analysis_id in tags and tag in tags[analysis_id]:
-        tags[analysis_id].remove(tag)
-        if not tags[analysis_id]:  # 如果没有标签了，删除该条目
-            del tags[analysis_id]
-        save_tags(tags)
-
-def get_analysis_tags(analysis_id):
-    """获取分析结果的标签"""
-    tags = load_tags()
-    return tags.get(analysis_id, [])
+    from utils.favorites_tags_manager import get_analysis_results_dir as _get_dir
+    return _get_dir()
 
 def load_analysis_results(start_date=None, end_date=None, stock_symbol=None, analyst_type=None,
                          limit=100, search_text=None, tags_filter=None, favorites_only=False):
@@ -589,13 +509,8 @@ def render_results_cards(results: List[Dict[str, Any]]):
 # 弹窗功能已移除，详情现在以折叠方式显示
 
 def toggle_favorite(analysis_id):
-    """切换收藏状态"""
-    favorites = load_favorites()
-    if analysis_id in favorites:
-        favorites.remove(analysis_id)
-    else:
-        favorites.append(analysis_id)
-    save_favorites(favorites)
+    """切换收藏状态（向后兼容包装函数）"""
+    return favorites_toggle_favorite(analysis_id)
 
 def render_results_comparison(results: List[Dict[str, Any]]):
     """渲染结果对比功能"""
@@ -1258,23 +1173,10 @@ def render_detailed_analysis_content(selected_result):
         # 创建标签页显示不同的报告
         report_tabs = list(reports.keys())
 
-        # 为报告名称添加中文标题和图标
-        report_display_names = {
-            'final_trade_decision': '🎯 最终交易决策',
-            'fundamentals_report': '💰 基本面分析',
-            'technical_report': '📈 技术面分析',
-            'market_sentiment_report': '💭 市场情绪分析',
-            'risk_assessment_report': '⚠️ 风险评估',
-            'price_target_report': '🎯 目标价格分析',
-            'summary_report': '📋 分析摘要',
-            'news_analysis_report': '📰 新闻分析',
-            'social_media_report': '📱 社交媒体分析'
-        }
-        
-        # 创建显示名称列表
+        # 创建显示名称列表（使用配置文件中的常量）
         tab_names = []
         for report_key in report_tabs:
-            display_name = report_display_names.get(report_key, f"📄 {report_key.replace('_', ' ').title()}")
+            display_name = get_report_display_name(report_key)
             tab_names.append(display_name)
             print(f"🔍 [弹窗调试] 添加标签: {display_name}")
 
@@ -1753,37 +1655,11 @@ def show_expanded_detail(result):
         # 获取报告数据
         reports = result['reports']
 
-        # 为报告名称添加中文标题和图标
-        report_display_names = {
-            'final_trade_decision': '🎯 最终交易决策',
-            'fundamentals_report': '💰 基本面分析',
-            'technical_report': '📈 技术面分析',
-            'market_sentiment_report': '💭 市场情绪分析',
-            'risk_assessment_report': '⚠️ 风险评估',
-            'price_target_report': '🎯 目标价格分析',
-            'summary_report': '📋 分析摘要',
-            'news_analysis_report': '📰 新闻分析',
-            'news_report': '📰 新闻分析',
-            'market_report': '📈 市场分析',
-            'social_media_report': '📱 社交媒体分析',
-            'bull_state': '🐂 多头观点',
-            'bear_state': '🐻 空头观点',
-            'trader_state': '💼 交易员分析',
-            'invest_judge_state': '⚖️ 投资判断',
-            'research_team_state': '🔬 研究团队观点',
-            'risk_debate_state': '⚠️ 风险管理讨论',
-            'research_team_decision': '🔬 研究团队决策',
-            'risk_management_decision': '🛡️ 风险管理决策',
-            'investment_plan': '📋 投资计划',
-            'trader_investment_plan': '💼 交易员投资计划',
-            'investment_debate_state': '💬 投资讨论状态'
-        }
-
-        # 创建标签页显示不同的报告
+        # 创建标签页显示不同的报告（使用配置文件中的常量）
         report_tabs = list(reports.keys())
         tab_names = []
         for report_key in report_tabs:
-            display_name = report_display_names.get(report_key, f"📄 {report_key.replace('_', ' ').title()}")
+            display_name = get_report_display_name(report_key)
             tab_names.append(display_name)
 
         if len(tab_names) == 1:

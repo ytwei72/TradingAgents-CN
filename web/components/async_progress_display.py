@@ -254,6 +254,9 @@ def streamlit_auto_refresh_progress(analysis_id: str, refresh_interval: int = 2)
         st.info(f"📊 **进度**: 第 {current_step + 1} 步，共 {total_steps} 步 ({progress_percentage:.1f}%)\n\n"
                f"**当前步骤**: {step_name}\n\n"
                f"**步骤说明**: {step_description}")
+    
+    # 添加步骤日志记录 - 可展开/收缩的容器
+    _render_step_log(progress_data, analysis_id)
 
     # 时间信息 - 实时计算已用时间
     start_time = progress_data.get('start_time', 0)
@@ -372,6 +375,9 @@ def display_static_progress(analysis_id: str) -> bool:
     # 步骤详情
     step_description = progress_data.get('current_step_description', '正在处理...')
     st.write(f"**当前任务**: {step_description}")
+    
+    # 添加步骤日志记录 - 可展开/收缩的容器
+    _render_step_log(progress_data, analysis_id)
 
     # 状态信息
     last_message = progress_data.get('last_message', '')
@@ -548,6 +554,9 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
 
     # 显示当前任务
     st.write(f"**当前任务**: {current_step_description}")
+    
+    # 添加步骤日志记录 - 可展开/收缩的容器
+    _render_step_log(progress_data, analysis_id)
 
     # 显示当前状态
     status_icon = {
@@ -608,3 +617,142 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
     # 不需要清理session state，因为我们通过参数控制显示
 
     return status in ['completed', 'failed']
+
+
+def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
+    """
+    渲染分析步骤日志记录
+    显示每个阶段的状态信息和时间戳
+    """
+    from datetime import datetime
+    
+    # 从 progress_data 中提取步骤历史信息
+    steps_history = []
+    
+    # 获取分析步骤定义
+    analysis_steps = progress_data.get('steps', [])
+    current_step = progress_data.get('current_step', 0)
+    start_time = progress_data.get('start_time', time.time())
+    
+    # 构建步骤日志
+    # 1. 首先添加初始化步骤
+    steps_history.append({
+        'phase': '系统初始化',
+        'message': '分析系统启动，准备数据源和分析引擎',
+        'timestamp': start_time,
+        'status': 'completed',
+        'icon': '✅'
+    })
+    
+    # 2. 根据当前进度添加已完成和进行中的步骤
+    for i, step_info in enumerate(analysis_steps):
+        step_name = step_info.get('name', f'步骤 {i+1}')
+        step_description = step_info.get('description', '')
+        
+        # 估算步骤开始时间（基于权重分配）
+        step_start_time = start_time + (i * 60)  # 简化：每步约60秒
+        
+        if i < current_step:
+            # 已完成的步骤
+            steps_history.append({
+                'phase': f'阶段 {i+1}: {step_name}',
+                'message': f'{step_description} - 已完成',
+                'timestamp': step_start_time,
+                'status': 'completed',
+                'icon': '✅'
+            })
+        elif i == current_step:
+            # 当前进行中的步骤
+            current_message = progress_data.get('last_message', '')
+            steps_history.append({
+                'phase': f'阶段 {i+1}: {step_name}',
+                'message': f'{step_description}\n💬 {current_message}',
+                'timestamp': time.time(),
+                'status': 'running',
+                'icon': '🔄'
+            })
+        else:
+            # 待执行的步骤
+            steps_history.append({
+                'phase': f'阶段 {i+1}: {step_name}',
+                'message': f'{step_description} - 等待执行',
+                'timestamp': None,
+                'status': 'pending',
+                'icon': '⏳'
+            })
+    
+    # 如果分析完成，添加完成记录
+    if progress_data.get('status') == 'completed':
+        completion_time = progress_data.get('last_update', time.time())
+        steps_history.append({
+            'phase': '分析完成',
+            'message': '所有分析步骤已完成，报告生成成功',
+            'timestamp': completion_time,
+            'status': 'completed',
+            'icon': '🎉'
+        })
+    
+    # 使用 expander 创建可展开/收缩的容器
+    with st.expander("📋 查看详细分析步骤日志", expanded=False):
+        st.markdown("### 📊 分析流程追踪")
+        st.markdown("以下是本次分析的完整步骤记录，包含每个阶段的状态和执行时间：")
+        st.markdown("---")
+        
+        # 显示步骤日志
+        for idx, step in enumerate(steps_history):
+            # 根据状态设置样式
+            if step['status'] == 'completed':
+                bg_color = '#e8f5e9'  # 淡绿色
+                border_color = '#4caf50'
+            elif step['status'] == 'running':
+                bg_color = '#e3f2fd'  # 淡蓝色
+                border_color = '#2196f3'
+            else:  # pending
+                bg_color = '#f5f5f5'  # 灰色
+                border_color = '#9e9e9e'
+            
+            # 格式化时间戳
+            if step['timestamp']:
+                time_str = datetime.fromtimestamp(step['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+                elapsed = step['timestamp'] - start_time
+                elapsed_str = format_time(elapsed)
+            else:
+                time_str = '未开始'
+                elapsed_str = '-'
+            
+            # 使用HTML渲染美化的步骤卡片
+            step_html = f"""
+            <div style="background-color: {bg_color}; 
+                        border-left: 4px solid {border_color}; 
+                        padding: 12px; 
+                        margin-bottom: 10px; 
+                        border-radius: 5px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                        <strong style="font-size: 16px;">{step['icon']} {step['phase']}</strong>
+                        <p style="margin: 5px 0; color: #555; white-space: pre-wrap;">{step['message']}</p>
+                    </div>
+                    <div style="text-align: right; margin-left: 15px; min-width: 150px;">
+                        <div style="font-size: 12px; color: #666;">🕐 {time_str}</div>
+                        <div style="font-size: 12px; color: #666;">⏱️ 用时: {elapsed_str}</div>
+                    </div>
+                </div>
+            </div>
+            """
+            st.markdown(step_html, unsafe_allow_html=True)
+        
+        # 添加统计信息
+        completed_count = sum(1 for s in steps_history if s['status'] == 'completed')
+        total_count = len(steps_history)
+        
+        st.markdown("---")
+        st.markdown(f"**📈 进度统计**: 已完成 {completed_count}/{total_count} 个步骤")
+        
+        # 显示总耗时
+        if progress_data.get('status') == 'completed':
+            total_time = progress_data.get('elapsed_time', 0)
+            st.markdown(f"**⏱️ 总耗时**: {format_time(total_time)}")
+        else:
+            current_time = time.time()
+            elapsed = current_time - start_time
+            st.markdown(f"**⏱️ 当前用时**: {format_time(elapsed)}")

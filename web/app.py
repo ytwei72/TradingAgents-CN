@@ -37,6 +37,7 @@ from components.analysis_form import render_analysis_form
 from components.results_display import render_results
 from components.login import render_login_form, check_authentication, render_user_info, render_sidebar_user_info, render_sidebar_logout, require_permission
 from components.user_activity_dashboard import render_user_activity_dashboard, render_activity_summary_widget
+from components.task_status_display import render_task_status_card, render_progress_hint
 from utils.api_checker import check_api_keys
 from utils.analysis_runner import run_stock_analysis, validate_analysis_params, format_analysis_results
 from utils.progress_tracker import SmartStreamlitProgressDisplay, create_smart_progress_callback
@@ -45,6 +46,8 @@ from components.async_progress_display import display_unified_progress
 from utils.smart_session_manager import get_persistent_analysis_id, set_persistent_analysis_id
 from utils.auth_manager import auth_manager
 from utils.user_activity_logger import user_activity_logger
+from utils.session_initializer import initialize_session_state as init_session, cleanup_zombie_analysis_state, restore_from_session_state
+from utils.frontend_scripts import inject_frontend_cache_check
 
 # 设置页面配置
 st.set_page_config(
@@ -79,115 +82,13 @@ def load_custom_js():
 load_custom_css()
 load_custom_js()
 
-def initialize_session_state():
-    """初始化会话状态"""
-    # 初始化认证相关状态
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'user_info' not in st.session_state:
-        st.session_state.user_info = None
-    if 'login_time' not in st.session_state:
-        st.session_state.login_time = None
-    
-    # 初始化分析相关状态
-    if 'analysis_results' not in st.session_state:
-        st.session_state.analysis_results = None
-    if 'analysis_running' not in st.session_state:
-        st.session_state.analysis_running = False
-    if 'last_analysis_time' not in st.session_state:
-        st.session_state.last_analysis_time = None
-    if 'current_analysis_id' not in st.session_state:
-        st.session_state.current_analysis_id = None
-    if 'form_config' not in st.session_state:
-        st.session_state.form_config = None
-
-    # 尝试从最新完成的分析中恢复结果
-    if not st.session_state.analysis_results:
-        try:
-            from utils.async_progress_tracker import get_latest_analysis_id, get_progress_by_id
-            from utils.analysis_runner import format_analysis_results
-
-            latest_id = get_latest_analysis_id()
-            if latest_id:
-                progress_data = get_progress_by_id(latest_id)
-                if (progress_data and
-                    progress_data.get('status') == 'completed' and
-                    'raw_results' in progress_data):
-
-                    # 恢复分析结果
-                    raw_results = progress_data['raw_results']
-                    formatted_results = format_analysis_results(raw_results)
-
-                    if formatted_results:
-                        st.session_state.analysis_results = formatted_results
-                        st.session_state.current_analysis_id = latest_id
-                        # 检查分析状态
-                        analysis_status = progress_data.get('status', 'completed')
-                        st.session_state.analysis_running = (analysis_status == 'running')
-                        # 恢复股票信息
-                        if 'stock_symbol' in raw_results:
-                            st.session_state.last_stock_symbol = raw_results.get('stock_symbol', '')
-                        if 'market_type' in raw_results:
-                            st.session_state.last_market_type = raw_results.get('market_type', '')
-                        logger.info(f"📊 [结果恢复] 从分析 {latest_id} 恢复结果，状态: {analysis_status}")
-
-        except Exception as e:
-            logger.warning(f"⚠️ [结果恢复] 恢复失败: {e}")
-
-    # 使用cookie管理器恢复分析ID（优先级：session state > cookie > Redis/文件）
-    try:
-        persistent_analysis_id = get_persistent_analysis_id()
-        if persistent_analysis_id:
-            # 使用线程检测来检查分析状态
-            from utils.thread_tracker import check_analysis_status
-            actual_status = check_analysis_status(persistent_analysis_id)
-
-            # 只在状态变化时记录日志，避免重复
-            current_session_status = st.session_state.get('last_logged_status')
-            if current_session_status != actual_status:
-                logger.info(f"📊 [状态检查] 分析 {persistent_analysis_id} 实际状态: {actual_status}")
-                st.session_state.last_logged_status = actual_status
-
-            if actual_status == 'running':
-                st.session_state.analysis_running = True
-                st.session_state.current_analysis_id = persistent_analysis_id
-            elif actual_status == 'paused':
-                # 暂停状态：保留analysis_id，但标记为运行中（线程仍活跃）
-                st.session_state.analysis_running = True
-                st.session_state.current_analysis_id = persistent_analysis_id
-            elif actual_status == 'stopped':
-                # 停止状态：保留analysis_id，但标记为未运行
-                st.session_state.analysis_running = False
-                st.session_state.current_analysis_id = persistent_analysis_id
-            elif actual_status in ['completed', 'failed']:
-                st.session_state.analysis_running = False
-                st.session_state.current_analysis_id = persistent_analysis_id
-            else:  # not_found
-                logger.warning(f"📊 [状态检查] 分析 {persistent_analysis_id} 未找到，清理状态")
-                st.session_state.analysis_running = False
-                st.session_state.current_analysis_id = None
-    except Exception as e:
-        # 如果恢复失败，保持默认值
-        logger.warning(f"⚠️ [状态恢复] 恢复分析状态失败: {e}")
-        st.session_state.analysis_running = False
-        st.session_state.current_analysis_id = None
-
-    # 恢复表单配置
-    try:
-        from utils.smart_session_manager import smart_session_manager
-        session_data = smart_session_manager.load_analysis_state()
-
-        if session_data and 'form_config' in session_data:
-            st.session_state.form_config = session_data['form_config']
-            # 只在没有分析运行时记录日志，避免重复
-            if not st.session_state.get('analysis_running', False):
-                logger.info("📊 [配置恢复] 表单配置已恢复")
-    except Exception as e:
-        logger.warning(f"⚠️ [配置恢复] 表单配置恢复失败: {e}")
+# 初始化会话状态函数已迁移到 utils/session_initializer.py
+initialize_session_state = init_session
 
 def check_frontend_auth_cache():
     """检查前端缓存并尝试恢复登录状态"""
     from utils.auth_manager import auth_manager
+    from utils.session_initializer import sync_auth_state
     
     logger.info("🔍 开始检查前端缓存恢复")
     logger.info(f"📊 当前认证状态: {st.session_state.get('authenticated', False)}")
@@ -195,19 +96,7 @@ def check_frontend_auth_cache():
     
     # 如果已经认证，确保状态同步
     if st.session_state.get('authenticated', False):
-        # 确保auth_manager也知道用户已认证
-        if not auth_manager.is_authenticated() and st.session_state.get('user_info'):
-            logger.info("🔄 同步认证状态到auth_manager")
-            try:
-                auth_manager.login_user(
-                    st.session_state.user_info, 
-                    st.session_state.get('login_time', time.time())
-                )
-                logger.info("✅ 认证状态同步成功")
-            except Exception as e:
-                logger.warning(f"⚠️ 认证状态同步失败: {e}")
-        else:
-            logger.info("✅ 用户已认证，跳过缓存检查")
+        sync_auth_state(auth_manager)
         return
     
     # 检查URL参数中是否有恢复信息
@@ -223,11 +112,8 @@ def check_frontend_auth_cache():
             # 兼容旧格式（直接是用户信息）和新格式（包含loginTime）
             if 'userInfo' in auth_data:
                 user_info = auth_data['userInfo']
-                # 使用当前时间作为新的登录时间，避免超时问题
-                # 因为前端已经验证了lastActivity没有超时
-                login_time = time.time()
+                login_time = time.time()  # 使用当前时间作为新的登录时间
             else:
-                # 旧格式兼容
                 user_info = auth_data
                 login_time = time.time()
                 
@@ -236,16 +122,12 @@ def check_frontend_auth_cache():
             
             # 恢复登录状态
             if auth_manager.restore_from_cache(user_info, login_time):
-                # 清除URL参数
                 del st.query_params['restore_auth']
                 logger.info(f"✅ 从前端缓存成功恢复用户 {user_info['username']} 的登录状态")
-                logger.info("🧹 已清除URL恢复参数")
-                # 立即重新运行以应用恢复的状态
                 logger.info("🔄 触发页面重新运行")
                 st.rerun()
             else:
                 logger.error("❌ 恢复登录状态失败")
-                # 恢复失败，清除URL参数
                 del st.query_params['restore_auth']
         else:
             # 如果没有URL参数，注入前端检查脚本
@@ -253,114 +135,8 @@ def check_frontend_auth_cache():
             inject_frontend_cache_check()
     except Exception as e:
         logger.warning(f"⚠️ 处理前端缓存恢复失败: {e}")
-        # 如果恢复失败，清除可能损坏的URL参数
         if 'restore_auth' in st.query_params:
             del st.query_params['restore_auth']
-
-def inject_frontend_cache_check():
-    """注入前端缓存检查脚本"""
-    logger.info("📝 准备注入前端缓存检查脚本")
-    
-    # 如果已经注入过，不重复注入
-    if st.session_state.get('cache_script_injected', False):
-        logger.info("⚠️ 前端脚本已注入，跳过重复注入")
-        return
-    
-    # 标记已注入
-    st.session_state.cache_script_injected = True
-    logger.info("✅ 标记前端脚本已注入")
-    
-    cache_check_js = """
-    <script>
-    // 前端缓存检查和恢复
-    function checkAndRestoreAuth() {
-        console.log('🚀 开始执行前端缓存检查');
-        console.log('📍 当前URL:', window.location.href);
-        
-        try {
-            // 检查URL中是否已经有restore_auth参数
-            const currentUrl = new URL(window.location);
-            if (currentUrl.searchParams.has('restore_auth')) {
-                console.log('🔄 URL中已有restore_auth参数，跳过前端检查');
-                return;
-            }
-            
-            const authData = localStorage.getItem('tradingagents_auth');
-            console.log('🔍 检查localStorage中的认证数据:', authData ? '存在' : '不存在');
-            
-            if (!authData) {
-                console.log('🔍 前端缓存中没有登录状态');
-                return;
-            }
-            
-            const data = JSON.parse(authData);
-            console.log('📊 解析的认证数据:', data);
-            
-            // 验证数据结构
-            if (!data.userInfo || !data.userInfo.username) {
-                console.log('❌ 认证数据结构无效，清除缓存');
-                localStorage.removeItem('tradingagents_auth');
-                return;
-            }
-            
-            const now = Date.now();
-            const timeout = 10 * 60 * 1000; // 10分钟
-            const timeSinceLastActivity = now - data.lastActivity;
-            
-            console.log('⏰ 时间检查:', {
-                now: new Date(now).toLocaleString(),
-                lastActivity: new Date(data.lastActivity).toLocaleString(),
-                timeSinceLastActivity: Math.round(timeSinceLastActivity / 1000) + '秒',
-                timeout: Math.round(timeout / 1000) + '秒'
-            });
-            
-            // 检查是否超时
-            if (timeSinceLastActivity > timeout) {
-                localStorage.removeItem('tradingagents_auth');
-                console.log('⏰ 登录状态已过期，自动清除');
-                return;
-            }
-            
-            // 更新最后活动时间
-            data.lastActivity = now;
-            localStorage.setItem('tradingagents_auth', JSON.stringify(data));
-            console.log('🔄 更新最后活动时间');
-            
-            console.log('✅ 从前端缓存恢复登录状态:', data.userInfo.username);
-            
-            // 保留现有的URL参数，只添加restore_auth参数
-            // 传递完整的认证数据，包括原始登录时间
-            const restoreData = {
-                userInfo: data.userInfo,
-                loginTime: data.loginTime
-            };
-            const restoreParam = btoa(JSON.stringify(restoreData));
-            console.log('📦 生成恢复参数:', restoreParam);
-            
-            // 保留所有现有参数
-            const existingParams = new URLSearchParams(currentUrl.search);
-            existingParams.set('restore_auth', restoreParam);
-            
-            // 构建新URL，保留现有参数
-            const newUrl = currentUrl.origin + currentUrl.pathname + '?' + existingParams.toString();
-            console.log('🔗 准备跳转到:', newUrl);
-            console.log('📋 保留的URL参数:', Object.fromEntries(existingParams));
-            
-            window.location.href = newUrl;
-            
-        } catch (e) {
-            console.error('❌ 前端缓存恢复失败:', e);
-            localStorage.removeItem('tradingagents_auth');
-        }
-    }
-    
-    // 延迟执行，确保页面完全加载
-    console.log('⏱️ 设置1000ms延迟执行前端缓存检查');
-    setTimeout(checkAndRestoreAuth, 1000);
-    </script>
-    """
-    
-    st.components.v1.html(cache_check_js, height=0)
 
 def main():
     """主应用程序"""
@@ -374,18 +150,7 @@ def main():
     # 检查用户认证状态
     if not auth_manager.is_authenticated():
         # 最后一次尝试从session state恢复认证状态
-        if (st.session_state.get('authenticated', False) and 
-            st.session_state.get('user_info') and 
-            st.session_state.get('login_time')):
-            logger.info("🔄 从session state恢复认证状态")
-            try:
-                auth_manager.login_user(
-                    st.session_state.user_info, 
-                    st.session_state.login_time
-                )
-                logger.info(f"✅ 成功从session state恢复用户 {st.session_state.user_info.get('username', 'Unknown')} 的认证状态")
-            except Exception as e:
-                logger.warning(f"⚠️ 从session state恢复认证状态失败: {e}")
+        restore_from_session_state(auth_manager)
         
         # 如果仍然未认证，显示登录页面
         if not auth_manager.is_authenticated():
@@ -574,24 +339,7 @@ def main():
     # 添加状态清理按钮
     st.sidebar.markdown("---")
     if st.sidebar.button("🧹 清理分析状态", help="清理僵尸分析状态，解决页面持续刷新问题"):
-        # 清理session state
-        st.session_state.analysis_running = False
-        st.session_state.current_analysis_id = None
-        st.session_state.analysis_results = None
-
-        # 清理所有自动刷新状态
-        keys_to_remove = []
-        for key in st.session_state.keys():
-            if 'auto_refresh' in key:
-                keys_to_remove.append(key)
-
-        for key in keys_to_remove:
-            del st.session_state[key]
-
-        # 清理死亡线程
-        from utils.thread_tracker import cleanup_dead_analysis_threads
-        cleanup_dead_analysis_threads()
-
+        cleanup_zombie_analysis_state()
         st.sidebar.success("✅ 分析状态已清理")
         st.rerun()
 
@@ -846,50 +594,20 @@ def main():
             from utils.async_progress_tracker import get_progress_by_id
             progress_data = get_progress_by_id(current_analysis_id)
 
-            # 显示任务状态信息（仅显示状态，不包含控制按钮）
+            # 显示任务状态信息（使用组件函数）
             st.markdown("### 📊 任务状态")
             
-            # 根据状态显示不同的状态卡片
+            # 根据状态显示状态卡片
             if is_running and actual_status == 'running':
-                st.markdown("""
-                <div style="background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); 
-                            padding: 1rem; border-radius: 10px; color: white; text-align: center;">
-                    <h4 style="margin: 0; color: white;">🔄 分析进行中</h4>
-                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">分析ID: {}</p>
-                </div>
-                """.format(current_analysis_id[:16] + "..."), unsafe_allow_html=True)
+                render_task_status_card('running', current_analysis_id)
             elif actual_status == 'paused':
-                st.markdown("""
-                <div style="background: linear-gradient(135deg, #FFA726 0%, #FB8C00 100%); 
-                            padding: 1rem; border-radius: 10px; color: white; text-align: center;">
-                    <h4 style="margin: 0; color: white;">⏸️ 分析已暂停</h4>
-                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">使用上方的任务控制按钮</p>
-                </div>
-                """, unsafe_allow_html=True)
+                render_task_status_card('paused')
             elif actual_status == 'stopped':
-                st.markdown("""
-                <div style="background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); 
-                            padding: 1rem; border-radius: 10px; color: white; text-align: center;">
-                    <h4 style="margin: 0; color: white;">⏹️ 分析已停止</h4>
-                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">任务已被用户停止</p>
-                </div>
-                """, unsafe_allow_html=True)
+                render_task_status_card('stopped')
             elif actual_status == 'completed':
-                st.markdown("""
-                <div style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); 
-                            padding: 1rem; border-radius: 10px; color: white; text-align: center;">
-                    <h4 style="margin: 0; color: white;">✅ 分析完成</h4>
-                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">查看下方分析报告</p>
-                </div>
-                """, unsafe_allow_html=True)
+                render_task_status_card('completed')
             elif actual_status == 'failed':
-                st.markdown("""
-                <div style="background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); 
-                            padding: 1rem; border-radius: 10px; color: white; text-align: center;">
-                    <h4 style="margin: 0; color: white;">❌ 分析失败</h4>
-                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">请查看错误信息</p>
-                </div>
-                """, unsafe_allow_html=True)
+                render_task_status_card('failed')
             else:
                 st.warning(f"⚠️ 分析状态未知: {current_analysis_id}")
 
@@ -900,13 +618,8 @@ def main():
 
             is_completed = display_unified_progress(current_analysis_id, show_refresh_controls=is_running)
 
-            # 根据状态显示提示信息
-            if actual_status == 'running':
-                st.info("⏱️ 分析正在进行中，可以使用下方的自动刷新功能查看进度更新...")
-            elif actual_status == 'paused':
-                st.warning("⏸️ 分析已暂停，点击【继续】按钮恢复分析...")
-            elif actual_status == 'stopped':
-                st.error("⏹️ 分析已被停止")
+            # 根据状态显示提示信息（使用组件函数）
+            render_progress_hint(actual_status)
 
             # 如果分析刚完成，尝试恢复结果
             if is_completed and not st.session_state.get('analysis_results') and progress_data:

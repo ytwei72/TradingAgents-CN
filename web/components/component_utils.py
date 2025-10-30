@@ -336,3 +336,27 @@ def log_component_action(component: str, action: str, details: Optional[Dict] = 
         log_msg += f" - {details}"
     logger.info(log_msg)
 
+
+def safe_timestamp_to_datetime(timestamp_value: Any) -> datetime:
+    """
+    安全地将时间戳转换为datetime对象
+    
+    Args:
+        timestamp_value: 时间戳值（可以是datetime对象、数字时间戳等）
+        
+    Returns:
+        datetime对象
+    """
+    if isinstance(timestamp_value, datetime):
+        # 如果已经是datetime对象（来自MongoDB）
+        return timestamp_value
+    elif isinstance(timestamp_value, (int, float)):
+        # 如果是时间戳数字（来自文件系统）
+        try:
+            return datetime.fromtimestamp(timestamp_value)
+        except (ValueError, OSError):
+            # 时间戳无效，使用当前时间
+            return datetime.now()
+    else:
+        # 其他情况，使用当前时间
+        return datetime.now()
