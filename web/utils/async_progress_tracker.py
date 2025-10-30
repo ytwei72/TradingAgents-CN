@@ -87,6 +87,8 @@ class AsyncProgressTracker:
         
         # 初始化状态
         self.current_step = 0
+        self.step_history = []  # 记录每个步骤的实际执行历史
+        self.step_start_times = {0: self.start_time}  # 记录每个步骤的开始时间，第0步从分析开始时计时
         self.progress_data = {
             'analysis_id': analysis_id,
             'status': 'running',
@@ -104,7 +106,8 @@ class AsyncProgressTracker:
             'start_time': self.start_time,
             'pause_start_time': None,
             'total_pause_duration': 0.0,
-            'steps': self.analysis_steps
+            'steps': self.analysis_steps,
+            'step_history': []  # 步骤执行历史
         }
         
         # 尝试初始化Redis，失败则使用文件
@@ -337,12 +340,44 @@ class AsyncProgressTracker:
             step = self._detect_step_from_message(message)
 
         # 更新步骤（防止倒退）
+        old_step = self.current_step
         if step is not None and step >= self.current_step:
+            # 如果步骤发生变化，记录历史
+            if step != old_step:
+                # 记录旧步骤的完成时间
+                if old_step not in [s['step_index'] for s in self.step_history]:
+                    step_start = self.step_start_times.get(old_step, current_time)
+                    step_duration = current_time - step_start
+                    self.step_history.append({
+                        'step_index': old_step,
+                        'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
+                        'start_time': step_start,
+                        'end_time': current_time,
+                        'duration': step_duration,
+                        'message': message
+                    })
+                
+                # 记录新步骤的开始时间
+                self.step_start_times[step] = current_time
+                
             self.current_step = step
             logger.debug(f"📊 [异步进度] 步骤推进到 {self.current_step + 1}/{len(self.analysis_steps)}")
 
         # 如果是完成消息，确保进度为100%
         if "分析完成" in message or "分析成功" in message or "✅ 分析完成" in message:
+            # 记录最后一步的完成时间
+            if self.current_step not in [s['step_index'] for s in self.step_history]:
+                step_start = self.step_start_times.get(self.current_step, current_time)
+                step_duration = current_time - step_start
+                self.step_history.append({
+                    'step_index': self.current_step,
+                    'step_name': self.analysis_steps[self.current_step]['name'] if self.current_step < len(self.analysis_steps) else '未知',
+                    'start_time': step_start,
+                    'end_time': current_time,
+                    'duration': step_duration,
+                    'message': message
+                })
+            
             self.current_step = len(self.analysis_steps) - 1
             logger.info(f"📊 [异步进度] 分析完成，设置为最终步骤")
 
@@ -381,7 +416,8 @@ class AsyncProgressTracker:
             'remaining_time': remaining_time,
             'last_message': message,
             'last_update': current_time,
-            'status': 'completed' if progress_percentage >= 100 else 'running'
+            'status': 'completed' if progress_percentage >= 100 else 'running',
+            'step_history': self.step_history  # 保存步骤执行历史
         })
 
         # 保存到存储

@@ -5,6 +5,8 @@
 import sys
 import os
 import uuid
+import time
+import random
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -97,6 +99,151 @@ def extract_risk_assessment(state):
         logger.info(f"提取风险评估数据时出错: {e}")
         return None
 
+
+def run_mock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None, analysis_id=None, async_tracker=None):
+    """模拟执行股票分析（用于测试进度跟踪功能）
+    
+    不执行实际分析任务，而是随机sleep 2-10秒来模拟各个步骤的执行
+    """
+    
+    def update_progress(message, step=None, total_steps=None):
+        """更新进度"""
+        if progress_callback:
+            progress_callback(message, step, total_steps)
+        logger.info(f"[模拟进度] {message}")
+    
+    def mock_sleep():
+        """随机sleep 2-10秒"""
+        sleep_time = random.uniform(2, 10)
+        logger.info(f"[模拟] 模拟执行中，睡眠 {sleep_time:.1f} 秒...")
+        time.sleep(sleep_time)
+    
+    logger.warning(f"🎭 [模拟模式] 开始模拟分析 {stock_symbol}（不执行实际任务）")
+    
+    try:
+        # 模拟准备阶段
+        update_progress(f"🚀 开始股票分析: {stock_symbol}")
+        mock_sleep()
+        
+        # 模拟验证
+        update_progress("📋 验证股票代码...")
+        mock_sleep()
+        
+        # 模拟环境检查
+        update_progress("🔧 检查API密钥配置...")
+        mock_sleep()
+        
+        # 模拟成本估算
+        update_progress("💰 估算分析成本...")
+        mock_sleep()
+        
+        # 模拟参数设置
+        update_progress("⚙️ 配置分析参数...")
+        mock_sleep()
+        
+        # 模拟引擎初始化
+        update_progress("🚀 初始化分析引擎...")
+        mock_sleep()
+        
+        # 模拟各个分析师
+        analyst_mapping = {
+            'market': 'market_analyst',
+            'fundamentals': 'fundamentals_analyst',
+            'technical': 'technical_analyst',
+            'sentiment': 'sentiment_analyst',
+            'news': 'news_analyst',
+            'social_media': 'social_media_analyst',
+            'risk': 'risk_analyst'
+        }
+        
+        for analyst in analysts:
+            analyst_key = analyst_mapping.get(analyst, f'{analyst}_analyst')
+            # 使用"模块开始"格式，与实际分析保持一致
+            update_progress(f"📊 [模拟] 模块开始: {analyst_key}")
+            mock_sleep()
+            update_progress(f"✅ [模拟] 模块完成: {analyst_key}")
+        
+        # 模拟研究员辩论（根据research_depth）
+        if research_depth >= 2:
+            update_progress("📈 [模拟] 模块开始: bull_researcher")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: bull_researcher")
+            
+            update_progress("📉 [模拟] 模块开始: bear_researcher")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: bear_researcher")
+            
+            update_progress("🤝 [模拟] 模块开始: research_manager")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: research_manager")
+        
+        # 模拟投资建议
+        update_progress("💡 [模拟] 模块开始: trader")
+        mock_sleep()
+        update_progress("✅ [模拟] 模块完成: trader")
+        
+        # 模拟风险评估（根据research_depth）
+        if research_depth >= 3:
+            # 激进策略
+            update_progress("🔥 [模拟] 正在评估激进策略...")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: 激进策略评估")
+            
+            # 保守策略
+            update_progress("🛡️ [模拟] 正在评估保守策略...")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: 保守策略评估")
+            
+            # 平衡策略
+            update_progress("⚖️ [模拟] 正在评估平衡策略...")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: 平衡策略评估")
+            
+            # 风险控制
+            update_progress("🎯 [模拟] 模块开始: risk_manager")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: risk_manager")
+        else:
+            # 风险提示
+            update_progress("⚠️ [模拟] 正在识别投资风险...")
+            mock_sleep()
+            update_progress("✅ [模拟] 模块完成: 风险提示")
+        
+        # 模拟报告生成
+        update_progress("📊 [模拟] 模块开始: graph_signal_processing")
+        mock_sleep()
+        update_progress("✅ [模拟] 模块完成: graph_signal_processing")
+        
+        update_progress("✅ 分析完成！")
+        
+        # 返回模拟结果
+        logger.warning(f"🎭 [模拟模式] 模拟分析完成: {stock_symbol}")
+        
+        return {
+            'success': True,
+            'stock_symbol': stock_symbol,
+            'analysis_date': analysis_date,
+            'market_type': market_type,
+            'session_id': analysis_id or str(uuid.uuid4()),
+            'mock_mode': True,
+            'market_report': f'## 市场分析报告（模拟）\n\n这是 {stock_symbol} 的模拟市场分析报告。',
+            'fundamentals_report': f'## 基本面分析报告（模拟）\n\n这是 {stock_symbol} 的模拟基本面分析报告。',
+            'technical_report': f'## 技术分析报告（模拟）\n\n这是 {stock_symbol} 的模拟技术分析报告。',
+            'sentiment_report': f'## 情绪分析报告（模拟）\n\n这是 {stock_symbol} 的模拟情绪分析报告。',
+            'final_trade_decision': f'## 投资建议（模拟）\n\n**股票代码**: {stock_symbol}\n**分析日期**: {analysis_date}\n**建议**: 模拟测试 - 无实际建议\n\n这是模拟分析生成的测试结果。',
+            'risk_assessment': f'## 风险评估（模拟）\n\n这是模拟的风险评估报告。',
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [模拟模式] 模拟分析失败: {e}")
+        return {
+            'success': False,
+            'error': f'模拟分析失败: {str(e)}',
+            'stock_symbol': stock_symbol,
+            'analysis_date': analysis_date,
+        }
+
+
 def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None, analysis_id=None, async_tracker=None):
     """执行股票分析
 
@@ -111,6 +258,23 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         analysis_id: 分析任务ID（用于任务控制）
         async_tracker: AsyncProgressTracker实例（用于任务控制）
     """
+    
+    # 检查是否启用模拟模式（用于测试进度跟踪功能）
+    mock_mode_enabled = os.getenv('MOCK_ANALYSIS_MODE', 'false').lower() == 'true'
+    if mock_mode_enabled:
+        logger.warning("🎭 [模拟模式] 检测到 MOCK_ANALYSIS_MODE=true，使用模拟分析")
+        return run_mock_analysis(
+            stock_symbol=stock_symbol,
+            analysis_date=analysis_date,
+            analysts=analysts,
+            research_depth=research_depth,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            market_type=market_type,
+            progress_callback=progress_callback,
+            analysis_id=analysis_id,
+            async_tracker=async_tracker
+        )
 
     def update_progress(message, step=None, total_steps=None):
         """更新进度"""

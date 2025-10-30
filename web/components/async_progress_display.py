@@ -633,6 +633,10 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
     analysis_steps = progress_data.get('steps', [])
     current_step = progress_data.get('current_step', 0)
     start_time = progress_data.get('start_time', time.time())
+    step_history = progress_data.get('step_history', [])  # 获取实际的步骤执行历史
+    
+    # 创建步骤索引到历史记录的映射
+    step_history_map = {h['step_index']: h for h in step_history}
     
     # 构建步骤日志
     # 1. 首先添加初始化步骤
@@ -640,6 +644,8 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
         'phase': '系统初始化',
         'message': '分析系统启动，准备数据源和分析引擎',
         'timestamp': start_time,
+        'step_duration': 0,  # 初始化没有步骤用时
+        'total_elapsed': 0,  # 从开始到现在的总用时
         'status': 'completed',
         'icon': '✅'
     })
@@ -649,25 +655,41 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
         step_name = step_info.get('name', f'步骤 {i+1}')
         step_description = step_info.get('description', '')
         
-        # 估算步骤开始时间（基于权重分配）
-        step_start_time = start_time + (i * 60)  # 简化：每步约60秒
-        
-        if i < current_step:
-            # 已完成的步骤
+        # 使用实际的步骤历史记录
+        if i in step_history_map:
+            # 已完成的步骤，使用实际记录的时间
+            history = step_history_map[i]
             steps_history.append({
                 'phase': f'阶段 {i+1}: {step_name}',
                 'message': f'{step_description} - 已完成',
-                'timestamp': step_start_time,
+                'timestamp': history['end_time'],  # 使用实际完成时间
+                'step_duration': history['duration'],  # 步骤执行时长
+                'total_elapsed': history['end_time'] - start_time,  # 从开始到完成该步骤的总用时
                 'status': 'completed',
                 'icon': '✅'
             })
         elif i == current_step:
             # 当前进行中的步骤
             current_message = progress_data.get('last_message', '')
+            current_time = time.time()
+            # 计算当前步骤已运行时长
+            if i in step_history_map:
+                step_start = step_history_map[i]['start_time']
+            else:
+                # 如果没有记录，尝试从上一步的结束时间推算
+                prev_step = i - 1
+                if prev_step in step_history_map:
+                    step_start = step_history_map[prev_step]['end_time']
+                else:
+                    step_start = start_time
+            step_duration = current_time - step_start
+            
             steps_history.append({
                 'phase': f'阶段 {i+1}: {step_name}',
                 'message': f'{step_description}\n💬 {current_message}',
-                'timestamp': time.time(),
+                'timestamp': current_time,  # 使用当前时间
+                'step_duration': step_duration,  # 当前步骤已运行时长
+                'total_elapsed': current_time - start_time,  # 从开始到现在的总用时
                 'status': 'running',
                 'icon': '🔄'
             })
@@ -677,6 +699,8 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
                 'phase': f'阶段 {i+1}: {step_name}',
                 'message': f'{step_description} - 等待执行',
                 'timestamp': None,
+                'step_duration': 0,
+                'total_elapsed': 0,
                 'status': 'pending',
                 'icon': '⏳'
             })
@@ -684,10 +708,13 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
     # 如果分析完成，添加完成记录
     if progress_data.get('status') == 'completed':
         completion_time = progress_data.get('last_update', time.time())
+        total_duration = completion_time - start_time
         steps_history.append({
             'phase': '分析完成',
             'message': '所有分析步骤已完成，报告生成成功',
             'timestamp': completion_time,
+            'step_duration': 0,  # 完成标记没有步骤用时
+            'total_elapsed': total_duration,  # 总用时
             'status': 'completed',
             'icon': '🎉'
         })
@@ -714,11 +741,19 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
             # 格式化时间戳
             if step['timestamp']:
                 time_str = datetime.fromtimestamp(step['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
-                elapsed = step['timestamp'] - start_time
-                elapsed_str = format_time(elapsed)
+                # 步骤用时
+                step_duration_str = format_time(step.get('step_duration', 0))
+                # 总用时
+                total_elapsed_str = format_time(step.get('total_elapsed', 0))
+                # 步骤标题包含用时
+                if step.get('step_duration', 0) > 0:
+                    phase_with_duration = f"{step['phase']} <span style='color: #2196f3; font-weight: normal;'>(用时: {step_duration_str})</span>"
+                else:
+                    phase_with_duration = step['phase']
             else:
                 time_str = '未开始'
-                elapsed_str = '-'
+                total_elapsed_str = '-'
+                phase_with_duration = step['phase']
             
             # 使用HTML渲染美化的步骤卡片
             step_html = f"""
@@ -729,12 +764,12 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
                         border-radius: 5px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="flex: 1;">
-                        <strong style="font-size: 16px;">{step['icon']} {step['phase']}</strong>
+                        <strong style="font-size: 16px;">{step['icon']} {phase_with_duration}</strong>
                         <p style="margin: 5px 0; color: #555; white-space: pre-wrap;">{step['message']}</p>
                     </div>
-                    <div style="text-align: right; margin-left: 15px; min-width: 150px;">
+                    <div style="text-align: right; margin-left: 15px; min-width: 180px;">
                         <div style="font-size: 12px; color: #666;">🕐 {time_str}</div>
-                        <div style="font-size: 12px; color: #666;">⏱️ 用时: {elapsed_str}</div>
+                        <div style="font-size: 12px; color: #666;">📊 总用时: {total_elapsed_str}</div>
                     </div>
                 </div>
             </div>
