@@ -6,8 +6,12 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
 
 def create_bull_researcher(llm, memory):
+    @log_analysis_module("bull_researcher")
     def bull_node(state) -> dict:
         logger.debug(f"🐂 [DEBUG] ===== 看涨研究员节点开始 =====")
 

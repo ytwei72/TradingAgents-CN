@@ -5,8 +5,12 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
 
 def create_research_manager(llm, memory):
+    @log_analysis_module("research_manager")
     def research_manager_node(state) -> dict:
         history = state["investment_debate_state"].get("history", "")
         market_research_report = state["market_report"]

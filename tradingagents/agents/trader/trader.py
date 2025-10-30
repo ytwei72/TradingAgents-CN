@@ -6,8 +6,12 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
 
 def create_trader(llm, memory):
+    @log_analysis_module("trader")
     def trader_node(state, name):
         company_name = state["company_of_interest"]
         investment_plan = state["investment_plan"]

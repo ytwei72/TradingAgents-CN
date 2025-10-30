@@ -6,8 +6,12 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
 
 def create_bear_researcher(llm, memory):
+    @log_analysis_module("bear_researcher")
     def bear_node(state) -> dict:
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")

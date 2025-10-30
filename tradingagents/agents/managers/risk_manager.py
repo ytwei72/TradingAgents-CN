@@ -5,8 +5,12 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# 导入分析模块日志装饰器
+from tradingagents.utils.tool_logging import log_analysis_module
+
 
 def create_risk_manager(llm, memory):
+    @log_analysis_module("risk_manager")
     def risk_manager_node(state) -> dict:
 
         company_name = state["company_of_interest"]
