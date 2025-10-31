@@ -164,17 +164,17 @@ def sync_auth_state(auth_manager):
     
     # 确保auth_manager也知道用户已认证
     if not auth_manager.is_authenticated() and st.session_state.get('user_info'):
-        logger.info("🔄 同步认证状态到auth_manager")
+        logger.debug("🔄 同步认证状态到auth_manager")
         try:
             auth_manager.login_user(
                 st.session_state.user_info, 
                 st.session_state.get('login_time', time.time())
             )
-            logger.info("✅ 认证状态同步成功")
+            logger.debug("✅ 认证状态同步成功")
         except Exception as e:
             logger.warning(f"⚠️ 认证状态同步失败: {e}")
     else:
-        logger.info("✅ 用户已认证，跳过缓存检查")
+        logger.debug("✅ 用户已认证，跳过缓存检查")
 
 
 def restore_from_session_state(auth_manager):

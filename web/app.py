@@ -90,9 +90,9 @@ def check_frontend_auth_cache():
     from utils.auth_manager import auth_manager
     from utils.session_initializer import sync_auth_state
     
-    logger.info("🔍 开始检查前端缓存恢复")
-    logger.info(f"📊 当前认证状态: {st.session_state.get('authenticated', False)}")
-    logger.info(f"🔗 URL参数: {dict(st.query_params)}")
+    logger.debug("🔍 开始检查前端缓存恢复")
+    logger.debug(f"📊 当前认证状态: {st.session_state.get('authenticated', False)}")
+    logger.debug(f"🔗 URL参数: {dict(st.query_params)}")
     
     # 如果已经认证，确保状态同步
     if st.session_state.get('authenticated', False):

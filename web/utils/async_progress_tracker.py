@@ -338,24 +338,33 @@ class AsyncProgressTracker:
         # 自动检测步骤
         if step is None:
             step = self._detect_step_from_message(message)
+            logger.debug(f"📊 [进度监测] 检测到步骤: step={step}, message={message}")
 
         # 更新步骤（防止倒退）
         old_step = self.current_step
         if step is not None and step >= self.current_step:
             # 如果步骤发生变化，记录历史
             if step != old_step:
+                old_step_name = self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知'
+                new_step_name = self.analysis_steps[step]['name'] if step < len(self.analysis_steps) else '未知'
+                
                 # 记录旧步骤的完成时间
                 if old_step not in [s['step_index'] for s in self.step_history]:
                     step_start = self.step_start_times.get(old_step, current_time)
                     step_duration = current_time - step_start
                     self.step_history.append({
                         'step_index': old_step,
-                        'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
+                        'step_name': old_step_name,
                         'start_time': step_start,
                         'end_time': current_time,
                         'duration': step_duration,
                         'message': message
                     })
+                    logger.info(f"📝 [步骤切换-记录] 步骤 {old_step} ({old_step_name}) 完成，用时: {step_duration:.2f}秒")
+                else:
+                    logger.info(f"📝 [步骤切换-跳过] 步骤 {old_step} ({old_step_name}) 已记录")
+                
+                logger.info(f"🔄 [步骤切换] 从步骤 {old_step} ({old_step_name}) → 步骤 {step} ({new_step_name})")
                 
                 # 记录新步骤的开始时间
                 self.step_start_times[step] = current_time
@@ -450,66 +459,105 @@ class AsyncProgressTracker:
         # 引擎初始化阶段
         elif "初始化" in message or "引擎" in message:
             return 4
-        # 模块开始日志 - 只在第一次开始时推进步骤
+        # 模块开始日志 - 推进到对应步骤并记录步骤开始时间
         elif "模块开始" in message:
             # 从日志中提取分析师类型，匹配新的步骤名称
+            detected_step = None
+            module_name = ""
+            
             if "market_analyst" in message or "market" in message:
-                return self._find_step_by_keyword(["市场分析", "市场"])
+                detected_step = self._find_step_by_keyword(["市场分析", "市场"])
+                module_name = "market_analyst"
             elif "fundamentals_analyst" in message or "fundamentals" in message:
-                return self._find_step_by_keyword(["基本面分析", "基本面"])
+                detected_step = self._find_step_by_keyword(["基本面分析", "基本面"])
+                module_name = "fundamentals_analyst"
             elif "technical_analyst" in message or "technical" in message:
-                return self._find_step_by_keyword(["技术分析", "技术"])
+                detected_step = self._find_step_by_keyword(["技术分析", "技术"])
+                module_name = "technical_analyst"
             elif "sentiment_analyst" in message or "sentiment" in message:
-                return self._find_step_by_keyword(["情绪分析", "情绪"])
+                detected_step = self._find_step_by_keyword(["情绪分析", "情绪"])
+                module_name = "sentiment_analyst"
             elif "news_analyst" in message or "news" in message:
-                return self._find_step_by_keyword(["新闻分析", "新闻"])
+                detected_step = self._find_step_by_keyword(["新闻分析", "新闻"])
+                module_name = "news_analyst"
             elif "social_media_analyst" in message or "social" in message:
-                return self._find_step_by_keyword(["社交媒体", "社交"])
+                detected_step = self._find_step_by_keyword(["社交媒体", "社交"])
+                module_name = "social_media_analyst"
             elif "risk_analyst" in message or "risk" in message:
-                return self._find_step_by_keyword(["风险分析", "风险"])
+                detected_step = self._find_step_by_keyword(["风险分析", "风险"])
+                module_name = "risk_analyst"
             elif "bull_researcher" in message or "bull" in message:
-                return self._find_step_by_keyword(["多头观点", "多头", "看涨"])
+                detected_step = self._find_step_by_keyword(["多头观点", "多头", "看涨"])
+                module_name = "bull_researcher"
             elif "bear_researcher" in message or "bear" in message:
-                return self._find_step_by_keyword(["空头观点", "空头", "看跌"])
+                detected_step = self._find_step_by_keyword(["空头观点", "空头", "看跌"])
+                module_name = "bear_researcher"
             elif "research_manager" in message:
-                return self._find_step_by_keyword(["观点整合", "整合"])
+                detected_step = self._find_step_by_keyword(["观点整合", "整合"])
+                module_name = "research_manager"
             elif "trader" in message:
-                return self._find_step_by_keyword(["投资建议", "建议"])
+                detected_step = self._find_step_by_keyword(["投资建议", "建议"])
+                module_name = "trader"
             elif "risky_analyst" in message or "risky" in message:
-                return self._find_step_by_keyword(["激进策略", "激进"])
+                detected_step = self._find_step_by_keyword(["激进策略", "激进"])
+                module_name = "risky_analyst"
             elif "safe_analyst" in message or "safe" in message:
-                return self._find_step_by_keyword(["保守策略", "保守"])
+                detected_step = self._find_step_by_keyword(["保守策略", "保守"])
+                module_name = "safe_analyst"
             elif "neutral_analyst" in message or "neutral" in message:
-                return self._find_step_by_keyword(["平衡策略", "平衡"])
+                detected_step = self._find_step_by_keyword(["平衡策略", "平衡"])
+                module_name = "neutral_analyst"
             elif "risk_manager" in message:
-                return self._find_step_by_keyword(["风险控制", "控制"])
+                detected_step = self._find_step_by_keyword(["风险控制", "控制"])
+                module_name = "risk_manager"
             elif "graph_signal_processing" in message or "signal" in message:
-                return self._find_step_by_keyword(["生成报告", "报告"])
+                detected_step = self._find_step_by_keyword(["生成报告", "报告"])
+                module_name = "graph_signal_processing"
+            
+            # 详细调试日志
+            if detected_step is not None:
+                step_name = self.analysis_steps[detected_step]['name'] if detected_step < len(self.analysis_steps) else "未知"
+                # 记录该步骤的开始时间（如果还没有记录的话）
+                if detected_step not in self.step_start_times:
+                    self.step_start_times[detected_step] = time.time()
+                    logger.info(f"✅ [步骤检测-开始] 模块: {module_name}, 步骤索引: {detected_step}, 步骤名称: {step_name}, 开始时间: {time.time()}")
+                else:
+                    logger.warning(f"⚠️ [步骤检测-重复开始] 模块: {module_name}, 步骤索引: {detected_step}, 步骤名称: {step_name}, 已有开始时间: {self.step_start_times[detected_step]}")
+            else:
+                logger.warning(f"⚠️ [步骤检测-未匹配] 检测到模块开始但未匹配到步骤, 消息: {message[:200]}")
+            
+            return detected_step
         # 工具调用日志 - 不推进步骤，只更新描述
         elif "工具调用" in message:
             # 保持当前步骤，不推进
             return None
         # 模块完成日志 - 确保当前步骤被记录，然后推进到下一步
         elif "模块完成" in message:
+            current_step_info = self.analysis_steps[self.current_step] if self.current_step < len(self.analysis_steps) else {'name': '未知'}
+            current_step_name = current_step_info['name']
+            
             # 检查当前步骤是否已记录，如果没有则记录
             if self.current_step not in [s['step_index'] for s in self.step_history]:
                 step_start = self.step_start_times.get(self.current_step, time.time())
-                step_duration = time.time() - step_start
-                current_step_info = self.analysis_steps[self.current_step] if self.current_step < len(self.analysis_steps) else {'name': '未知'}
+                step_end = time.time()
+                step_duration = step_end - step_start
+                
                 self.step_history.append({
                     'step_index': self.current_step,
-                    'step_name': current_step_info['name'],
+                    'step_name': current_step_name,
                     'start_time': step_start,
-                    'end_time': time.time(),
+                    'end_time': step_end,
                     'duration': step_duration,
                     'message': message
                 })
-                logger.debug(f"📊 [步骤记录] 记录步骤 {self.current_step} ({current_step_info['name']}) 完成")
+                logger.info(f"✅ [步骤检测-完成] 步骤索引: {self.current_step}, 步骤名称: {current_step_name}, 用时: {step_duration:.2f}秒")
+            else:
+                logger.warning(f"⚠️ [步骤检测-重复完成] 步骤索引: {self.current_step}, 步骤名称: {current_step_name}, 已记录在历史中")
             
             # 模块完成时，从当前步骤推进到下一步
             # 不再依赖模块名称，而是基于当前进度推进
             next_step = min(self.current_step + 1, len(self.analysis_steps) - 1)
-            logger.debug(f"📊 [步骤推进] 模块完成，从步骤{self.current_step}推进到步骤{next_step}")
+            logger.info(f"📍 [步骤检测-推进] 从步骤 {self.current_step} ({current_step_name}) 推进到步骤 {next_step}")
             return next_step
 
         return None
@@ -841,11 +889,11 @@ def get_latest_analysis_id() -> Optional[str]:
                         continue
 
                 if latest_id:
-                    logger.info(f"📊 [恢复分析] 找到最新分析ID: {latest_id}")
+                    logger.debug(f"📊 [恢复分析] 找到最新分析ID: {latest_id}")
                     return latest_id
 
             except Exception as e:
-                logger.debug(f"📊 [恢复分析] Redis查找失败: {e}")
+                logger.error(f"📊 [恢复分析] Redis查找失败: {e}")
 
         # 如果Redis失败或未启用，尝试从文件查找
         data_dir = Path("data")

@@ -370,7 +370,7 @@ def render_analysis_form():
         try:
             actual_status = check_analysis_status(form_current_analysis_id)
             
-            logger.info(f"🎮 [任务控制] 分析ID: {form_current_analysis_id}, 状态: {actual_status}")
+            logger.debug(f"🎮 [任务控制] 分析ID: {form_current_analysis_id}, 状态: {actual_status}")
             
             # 调试信息
             # st.info(f"🔍 调试：任务状态 = '{actual_status}'")
