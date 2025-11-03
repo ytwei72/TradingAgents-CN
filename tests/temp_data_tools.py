@@ -330,14 +330,14 @@ def import_analysis_results_to_mongo(results_dir: str = None) -> Tuple[int, int,
             reports = {}
             for key in allowed_report_fields:
                 if key in state:
-                    val = state.get(key)
-                    # 统一为字符串或基础类型；复杂结构转为字符串存储
-                    if isinstance(val, (dict, list)):
-                        try:
-                            val = json.dumps(val, ensure_ascii=False)
-                        except Exception:
-                            val = str(val)
-                    reports[key] = val
+                    reports[key] = state.get(key)
+                    # # 统一为字符串或基础类型；复杂结构转为字符串存储
+                    # if isinstance(val, (dict, list)):
+                    #     try:
+                    #         val = json.dumps(val, ensure_ascii=False)
+                    #     except Exception:
+                    #         val = str(val)
+                    # reports[key] = val
 
             # 时间字段
             created_at = _parse_datetime(data.get("created_at")) if data.get("created_at") else datetime.now()

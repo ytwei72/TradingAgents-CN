@@ -32,6 +32,7 @@ from utils.favorites_tags_manager import (
     toggle_favorite as favorites_toggle_favorite
 )
 from config.report_constants import REPORT_DISPLAY_NAMES, get_report_display_name
+from web.components.results_display import render_detailed_analysis as _render_detailed_analysis_ref
 
 # 设置日志
 logger = logging.getLogger(__name__)
@@ -1535,83 +1536,35 @@ def show_expanded_detail(result):
     # 创建详情容器
     with st.container():
         st.markdown("---")
-        st.markdown("### 📊 详细分析报告")
 
-        # 检查是否有报告数据
-        if 'reports' not in result or not result['reports']:
-            # 如果没有reports字段，检查是否有其他分析数据
+        # 统一转换为 results_display.render_detailed_analysis 期望的 state 结构
+        state: Dict[str, Any] = {}
+
+        if isinstance(result.get('reports'), dict) and result['reports']:
+            # 直接使用 reports 作为 state
+            state = result['reports']
+        elif isinstance(result.get('full_data'), dict) and result['full_data']:
+            state = result['full_data']
+        else:
+            # 回退：将 result 自身可用的分析键收集为 state
+            candidate_keys = [
+                'market_report', 'fundamentals_report', 'sentiment_report', 'news_report',
+                'risk_assessment', 'investment_plan', 'investment_debate_state',
+                'trader_investment_plan', 'risk_debate_state', 'final_trade_decision'
+            ]
+            for k in candidate_keys:
+                if k in result and result[k]:
+                    state[k] = result[k]
+
+        if not state:
+            # 没有任何可展示的详细内容
             if result.get('summary'):
                 st.subheader("📝 分析摘要")
                 st.markdown(result['summary'])
-
-            # 检查是否有full_data中的报告
-            if 'full_data' in result and result['full_data']:
-                full_data = result['full_data']
-                if isinstance(full_data, dict):
-                    # 显示full_data中的分析内容
-                    analysis_fields = [
-                        ('market_report', '📈 市场分析'),
-                        ('fundamentals_report', '💰 基本面分析'),
-                        ('sentiment_report', '💭 情感分析'),
-                        ('news_report', '📰 新闻分析'),
-                        ('risk_assessment', '⚠️ 风险评估'),
-                        ('investment_plan', '📋 投资建议'),
-                        ('final_trade_decision', '🎯 最终决策')
-                    ]
-
-                    available_reports = []
-                    for field_key, field_name in analysis_fields:
-                        if field_key in full_data and full_data[field_key]:
-                            available_reports.append((field_key, field_name, full_data[field_key]))
-
-                    if available_reports:
-                        # 创建标签页显示分析内容
-                        tab_names = [name for _, name, _ in available_reports]
-                        tabs = st.tabs(tab_names)
-
-                        for i, (tab, (field_key, field_name, content)) in enumerate(zip(tabs, available_reports)):
-                            with tab:
-                                if isinstance(content, str):
-                                    st.markdown(content)
-                                elif isinstance(content, dict):
-                                    for key, value in content.items():
-                                        if value:
-                                            st.subheader(key.replace('_', ' ').title())
-                                            st.markdown(str(value))
-                                else:
-                                    st.write(content)
-                    else:
-                        st.info("暂无详细分析报告")
-                else:
-                    st.info("暂无详细分析报告")
-            else:
-                st.info("暂无详细分析报告")
+            st.info("暂无详细分析报告")
             return
 
-        # 获取报告数据
-        reports = result['reports']
-
-        # 创建标签页显示不同的报告（使用配置文件中的常量）
-        report_tabs = list(reports.keys())
-        tab_names = []
-        for report_key in report_tabs:
-            display_name = get_report_display_name(report_key)
-            tab_names.append(display_name)
-
-        if len(tab_names) == 1:
-            # 只有一个报告，直接显示内容（不添加额外标题，避免重复）
-            report_content = reports[report_tabs[0]]
-            # 如果报告内容已经包含标题，直接显示；否则添加标题
-            if not report_content.strip().startswith('#'):
-                st.markdown(f"### {tab_names[0]}")
-                st.markdown("---")
-            st.markdown(report_content)
-        else:
-            # 多个报告，使用标签页
-            tabs = st.tabs(tab_names)
-
-            for i, (tab, report_key) in enumerate(zip(tabs, report_tabs)):
-                with tab:
-                    st.markdown(reports[report_key])
+        # 使用标准的详细分析渲染方法，避免重复标题
+        _render_detailed_analysis_ref(state)
 
         st.markdown("---")
