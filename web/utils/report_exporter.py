@@ -638,35 +638,6 @@ def _format_team_decision_content(content: Dict[str, Any], module_key: str) -> s
     return formatted_content
 
 
-def _convert_analysis_id_for_mongodb(analysis_id: str, stock_symbol: str) -> Optional[str]:
-    """
-    将analysis_id转换为MongoDB格式
-    
-    Args:
-        analysis_id: 原始analysis_id（格式如：analysis_xxx_YYYYMMDD_HHMMSS）
-        stock_symbol: 股票代码
-    
-    Returns:
-        MongoDB格式的analysis_id（格式：stock_symbol_YYYYMMDD_HHMMSS），如果无法转换则返回None
-    """
-    if not analysis_id:
-        return None
-    
-    # 如果analysis_id已经是MongoDB格式（以stock_symbol开头），直接返回
-    if analysis_id.startswith(f"{stock_symbol}_"):
-        return analysis_id
-    
-    # 尝试从analysis_xxx_YYYYMMDD_HHMMSS格式提取时间戳
-    import re
-    match = re.search(r'(\d{8}_\d{6})$', analysis_id)
-    if match:
-        timestamp_part = match.group(1)
-        return f"{stock_symbol}_{timestamp_part}"
-    
-    # 如果无法提取，返回None，让MongoDB自动生成
-    return None
-
-
 def save_modular_reports_to_results_dir(results: Dict[str, Any], stock_symbol: str, analysis_id: str = None) -> Dict[str, str]:
     """保存分模块报告到results目录（CLI版本格式）"""
     try:
@@ -850,14 +821,11 @@ def save_modular_reports_to_results_dir(results: Dict[str, Any], stock_symbol: s
                     logger.info(f"🔍 [MongoDB调试] 准备保存到MongoDB，报告数量: {len(reports_content)}")
                     logger.info(f"🔍 [MongoDB调试] 报告类型: {list(reports_content.keys())}")
 
-                    # 转换analysis_id格式
-                    mongodb_analysis_id = _convert_analysis_id_for_mongodb(analysis_id, stock_symbol)
-                    
                     success = mongodb_report_manager.save_analysis_report(
                         stock_symbol=stock_symbol,
                         analysis_results=results,
                         reports=reports_content,
-                        analysis_id=mongodb_analysis_id
+                        analysis_id=analysis_id
                     )
 
                     if success:
@@ -1218,9 +1186,6 @@ def save_analysis_report(stock_symbol: str, analysis_results: Dict[str, Any],
         if report_content is None:
             report_content = report_exporter.generate_markdown_report(analysis_results)
         
-        # 转换analysis_id格式（从analysis_xxx格式转换为stock_symbol_YYYYMMDD_HHMMSS格式）
-        mongodb_analysis_id = _convert_analysis_id_for_mongodb(analysis_id, stock_symbol)
-        
         # 调用MongoDB报告管理器保存报告
         # 将报告内容包装成字典格式
         reports_dict = {
@@ -1232,7 +1197,7 @@ def save_analysis_report(stock_symbol: str, analysis_results: Dict[str, Any],
             stock_symbol=stock_symbol,
             analysis_results=analysis_results,
             reports=reports_dict,
-            analysis_id=mongodb_analysis_id
+            analysis_id=analysis_id
         )
         
         if success:

@@ -1494,7 +1494,11 @@ def render_risk_debate_content(content):
 
 def save_analysis_result(analysis_id: str, stock_symbol: str, analysts: List[str],
                         research_depth: int, result_data: Dict, status: str = "completed"):
-    """保存分析结果"""
+    """保存分析结果
+    仅保留：保存到文件系统，mongo数据库保存功能移除，在此前流程中已保存
+    TODO： 需要合并两个保存结果的函数，避免重复代码
+    """
+
     try:
         from web.utils.async_progress_tracker import safe_serialize
 
@@ -1513,101 +1517,10 @@ def save_analysis_result(analysis_id: str, stock_symbol: str, analysts: List[str
 
         # 1. 保存到文件系统（保持兼容性）
         results_dir = get_analysis_results_dir()
-        result_file = results_dir / f"analysis_{analysis_id}.json"
+        result_file = results_dir / f"{analysis_id}.json"
 
         with open(result_file, 'w', encoding='utf-8') as f:
             json.dump(result_entry, f, ensure_ascii=False, indent=2)
-
-        # 2. 保存到MongoDB（如果可用）
-        if MONGODB_AVAILABLE:
-            try:
-                print(f"💾 [MongoDB保存] 开始保存分析结果: {analysis_id}")
-                mongodb_manager = MongoDBReportManager()
-
-                # 使用标准的save_analysis_report方法，确保数据结构一致
-                # 从full_data中提取formatted_decision（如果存在）
-                full_data = result_entry.get('full_data', {})
-                decision_data = full_data.get('decision', {}) if isinstance(full_data, dict) else {}
-                
-                analysis_results = {
-                    'stock_symbol': result_entry.get('stock_symbol', ''),
-                    'analysts': result_entry.get('analysts', []),
-                    'research_depth': result_entry.get('research_depth', 1),
-                    'summary': result_entry.get('summary', ''),
-                    'decision': decision_data  # 包含formatted_decision数据
-                }
-
-                # 尝试从文件系统读取报告内容
-                reports = {}
-                try:
-                    # 构建报告目录路径
-                    from pathlib import Path
-                    import os
-
-                    # 获取当前日期
-                    current_date = datetime.now().strftime('%Y-%m-%d')
-
-                    # 构建报告路径
-                    project_root = Path(__file__).parent.parent.parent
-                    reports_dir = project_root / "data" / "analysis_results" / stock_symbol / current_date / "reports"
-
-                    # 确保路径在Windows上正确显示（避免双反斜杠）
-                    reports_dir_str = os.path.normpath(str(reports_dir))
-                    print(f"🔍 [MongoDB保存] 查找报告目录: {reports_dir_str}")
-
-                    if reports_dir.exists():
-                        # 读取所有报告文件
-                        for report_file in reports_dir.glob("*.md"):
-                            try:
-                                with open(report_file, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                                    report_name = report_file.stem
-                                    reports[report_name] = content
-                                    print(f"✅ [MongoDB保存] 读取报告: {report_name} ({len(content)} 字符)")
-                            except Exception as e:
-                                print(f"⚠️ [MongoDB保存] 读取报告文件失败 {report_file}: {e}")
-
-                        print(f"📊 [MongoDB保存] 共读取 {len(reports)} 个报告文件")
-                    else:
-                        print(f"⚠️ [MongoDB保存] 报告目录不存在: {reports_dir_str}")
-
-                except Exception as e:
-                    print(f"⚠️ [MongoDB保存] 读取报告文件异常: {e}")
-                    reports = {}
-
-                # 转换analysis_id格式为MongoDB格式
-                # MongoDB格式：stock_symbol_YYYYMMDD_HHMMSS
-                # analysis_id格式：analysis_xxx_YYYYMMDD_HHMMSS
-                import re
-                mongodb_analysis_id = None
-                if analysis_id:
-                    # 如果analysis_id已经是MongoDB格式（以stock_symbol开头），直接使用
-                    if analysis_id.startswith(f"{stock_symbol}_"):
-                        mongodb_analysis_id = analysis_id
-                    else:
-                        # 尝试从analysis_xxx_YYYYMMDD_HHMMSS格式提取时间戳
-                        match = re.search(r'(\d{8}_\d{6})$', analysis_id)
-                        if match:
-                            timestamp_part = match.group(1)
-                            mongodb_analysis_id = f"{stock_symbol}_{timestamp_part}"
-                
-                # 使用标准保存方法，确保字段结构一致
-                # 注意：这里使用analysis_id进行upsert，确保与analysis_runner保存的记录合并
-                success = mongodb_manager.save_analysis_report(
-                    stock_symbol=result_entry.get('stock_symbol', ''),
-                    analysis_results=analysis_results,
-                    reports=reports,
-                    analysis_id=mongodb_analysis_id  # 传递转换后的analysis_id以支持upsert合并
-                )
-
-                if success:
-                    print(f"✅ [MongoDB保存] 分析结果已保存到MongoDB: {analysis_id} (包含 {len(reports)} 个报告)")
-                else:
-                    print(f"❌ [MongoDB保存] 保存失败: {analysis_id}")
-
-            except Exception as e:
-                print(f"❌ [MongoDB保存] 保存异常: {e}")
-                logger.error(f"MongoDB保存异常: {e}")
 
         return True
 
