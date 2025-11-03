@@ -107,51 +107,120 @@ class MongoDBReportManager:
             logger.error(f"❌ MongoDB索引创建失败: {e}")
     
     def save_analysis_report(self, stock_symbol: str, analysis_results: Dict[str, Any],
-                           reports: Dict[str, str]) -> bool:
-        """保存分析报告到MongoDB"""
+                           reports: Dict[str, str], analysis_id: str = None) -> bool:
+        """
+        保存分析报告到MongoDB（使用upsert模式，支持合并更新）
+        
+        Args:
+            stock_symbol: 股票代码
+            analysis_results: 分析结果字典
+            reports: 报告内容字典
+            analysis_id: 分析ID（可选），如果不提供则自动生成
+                        如果提供，将使用此ID进行upsert操作
+        """
         if not self.connected:
             logger.warning("MongoDB未连接，跳过保存")
             return False
 
         try:
-            # 生成分析ID
             timestamp = datetime.now()
-            analysis_id = f"{stock_symbol}_{timestamp.strftime('%Y%m%d_%H%M%S')}"
-
-            # 构建文档
-            document = {
-                "analysis_id": analysis_id,
-                "stock_symbol": stock_symbol,
-                "analysis_date": timestamp.strftime('%Y-%m-%d'),
-                "timestamp": timestamp,
-                "status": "completed",
-                "source": "mongodb",
-
-                # 分析结果摘要
-                "summary": analysis_results.get("summary", ""),
-                "analysts": analysis_results.get("analysts", []),
-                "research_depth": analysis_results.get("research_depth", 1),  # 修正：从分析结果中获取真实的研究深度
-
-                # 报告内容
-                "reports": reports,
-
-                # 元数据
-                "created_at": timestamp,
-                "updated_at": timestamp
-            }
             
-            # 插入文档
-            result = self.collection.insert_one(document)
+            # 如果未提供analysis_id，则生成一个
+            if analysis_id is None:
+                analysis_id = f"{stock_symbol}_{timestamp.strftime('%Y%m%d_%H%M%S')}"
             
-            if result.inserted_id:
-                logger.info(f"✅ 分析报告已保存到MongoDB: {analysis_id}")
-                return True
+            # 查询是否已存在该analysis_id的记录
+            existing_doc = self.collection.find_one({"analysis_id": analysis_id})
+            
+            if existing_doc:
+                # 如果记录已存在，合并reports字段
+                existing_reports = existing_doc.get("reports", {})
+                
+                # 合并reports：新报告覆盖旧报告，但保留旧报告中新报告没有的字段
+                merged_reports = {**existing_reports, **reports}
+                
+                # 构建更新文档
+                update_doc = {
+                    "$set": {
+                        "stock_symbol": stock_symbol,
+                        "analysis_date": timestamp.strftime('%Y-%m-%d'),
+                        "status": "completed",
+                        "source": "mongodb",
+                        
+                        # 分析结果摘要（使用新数据更新，但保留已有的有效数据）
+                        "summary": analysis_results.get("summary", existing_doc.get("summary", "")),
+                        "analysts": analysis_results.get("analysts", existing_doc.get("analysts", [])),
+                        "research_depth": analysis_results.get("research_depth", existing_doc.get("research_depth", 1)),
+                        
+                        # 保存formatted_decision（决策信息）
+                        "formatted_decision": analysis_results.get("decision", existing_doc.get("formatted_decision", {})),
+                        
+                        # 合并后的报告内容
+                        "reports": merged_reports,
+                        
+                        # 更新时间戳
+                        "updated_at": timestamp
+                    }
+                }
+                
+                # 执行upsert更新
+                result = self.collection.update_one(
+                    {"analysis_id": analysis_id},
+                    update_doc,
+                    upsert=True
+                )
+                
+                if result.modified_count > 0 or result.upserted_id:
+                    logger.info(f"✅ 分析报告已更新到MongoDB: {analysis_id} (合并了 {len(reports)} 个新报告字段)")
+                    logger.debug(f"🔍 [MongoDB更新] 合并前报告字段数: {len(existing_reports)}, 合并后: {len(merged_reports)}")
+                    return True
+                else:
+                    logger.warning(f"⚠️ MongoDB更新无变化: {analysis_id}")
+                    return True  # 即使无变化也返回True，因为记录已存在
             else:
-                logger.error("❌ MongoDB插入失败")
-                return False
+                # 如果记录不存在，创建新文档
+                document = {
+                    "analysis_id": analysis_id,
+                    "stock_symbol": stock_symbol,
+                    "analysis_date": timestamp.strftime('%Y-%m-%d'),
+                    "timestamp": timestamp,
+                    "status": "completed",
+                    "source": "mongodb",
+
+                    # 分析结果摘要
+                    "summary": analysis_results.get("summary", ""),
+                    "analysts": analysis_results.get("analysts", []),
+                    "research_depth": analysis_results.get("research_depth", 1),
+
+                    # 保存formatted_decision（决策信息）
+                    "formatted_decision": analysis_results.get("decision", {}),
+
+                    # 报告内容
+                    "reports": reports,
+
+                    # 元数据
+                    "created_at": timestamp,
+                    "updated_at": timestamp
+                }
+                
+                # 使用upsert插入
+                result = self.collection.update_one(
+                    {"analysis_id": analysis_id},
+                    {"$set": document},
+                    upsert=True
+                )
+                
+                if result.upserted_id or result.modified_count > 0:
+                    logger.info(f"✅ 分析报告已保存到MongoDB: {analysis_id}")
+                    return True
+                else:
+                    logger.error("❌ MongoDB upsert失败")
+                    return False
                 
         except Exception as e:
             logger.error(f"❌ 保存分析报告到MongoDB失败: {e}")
+            import traceback
+            logger.error(f"❌ 详细错误: {traceback.format_exc()}")
             return False
     
     def get_analysis_reports(self, limit: int = 100, stock_symbol: str = None,

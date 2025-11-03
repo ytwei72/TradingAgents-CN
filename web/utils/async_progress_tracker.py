@@ -338,7 +338,7 @@ class AsyncProgressTracker:
         # 自动检测步骤
         if step is None:
             step = self._detect_step_from_message(message)
-            logger.debug(f"📊 [进度监测] 检测到步骤: step={step}, message={message}")
+            logger.info(f"📊 [进度监测] 检测到步骤: step={step}, message={message}")
 
         # 更新步骤（防止倒退）
         old_step = self.current_step

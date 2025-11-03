@@ -794,9 +794,12 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             update_progress("💾 正在保存分析报告...")
             from .report_exporter import save_analysis_report, save_modular_reports_to_results_dir
             
+            # 先格式化结果，确保decision字段包含formatted_decision
+            formatted_results = format_analysis_results(results)
+            
             # 1. 保存分模块报告到本地目录
             logger.info(f"📁 [本地保存] 开始保存分模块报告到本地目录")
-            local_files = save_modular_reports_to_results_dir(results, stock_symbol)
+            local_files = save_modular_reports_to_results_dir(formatted_results, stock_symbol, analysis_id=analysis_id)
             if local_files:
                 logger.info(f"✅ [本地保存] 已保存 {len(local_files)} 个本地报告文件")
                 for module, path in local_files.items():
@@ -804,11 +807,14 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             else:
                 logger.warning(f"⚠️ [本地保存] 本地报告文件保存失败")
             
-            # 2. 保存分析报告到MongoDB
+            # 2. 保存分析报告到MongoDB（使用相同的analysis_id以确保记录合并）
+            # 先格式化结果，确保decision字段包含formatted_decision
+            formatted_results = format_analysis_results(results)
             logger.info(f"🗄️ [MongoDB保存] 开始保存分析报告到MongoDB")
             save_success = save_analysis_report(
                 stock_symbol=stock_symbol,
-                analysis_results=results
+                analysis_results=formatted_results,  # 使用格式化后的结果，包含formatted_decision
+                analysis_id=analysis_id
             )
             
             if save_success:
