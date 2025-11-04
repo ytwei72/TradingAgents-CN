@@ -90,12 +90,12 @@ class TushareDataAdapter:
             logger.debug(f"🔄 获取{symbol}数据 (类型: {data_type})...")
 
             # 添加详细的股票代码追踪日志
-            logger.info(f"🔍 [股票代码追踪] TushareAdapter.get_stock_data 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
-            logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
-            logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
+            logger.debug(f"🔍 [股票代码追踪] TushareAdapter.get_stock_data 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
+            logger.debug(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
+            logger.debug(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
 
             if data_type == "daily":
-                logger.info(f"🔍 [股票代码追踪] 调用 _get_daily_data，传入参数: symbol='{symbol}'")
+                logger.debug(f"🔍 [股票代码追踪] 调用 _get_daily_data，传入参数: symbol='{symbol}'")
                 return self._get_daily_data(symbol, start_date, end_date)
             elif data_type == "realtime":
                 return self._get_realtime_data(symbol)
@@ -111,14 +111,14 @@ class TushareDataAdapter:
         """获取日线数据"""
 
         # 记录详细的调用信息
-        logger.info(f"🔍 [TushareAdapter详细日志] _get_daily_data 开始执行")
-        logger.info(f"🔍 [TushareAdapter详细日志] 输入参数: symbol='{symbol}', start_date='{start_date}', end_date='{end_date}'")
-        logger.info(f"🔍 [TushareAdapter详细日志] 缓存启用状态: {self.enable_cache}")
+        logger.debug(f"🔍 [TushareAdapter详细日志] _get_daily_data 开始执行")
+        logger.debug(f"🔍 [TushareAdapter详细日志] 输入参数: symbol='{symbol}', start_date='{start_date}', end_date='{end_date}'")
+        logger.debug(f"🔍 [TushareAdapter详细日志] 缓存启用状态: {self.enable_cache}")
 
         # 1. 尝试从缓存获取
         if self.enable_cache:
             try:
-                logger.info(f"🔍 [TushareAdapter详细日志] 开始查找缓存数据...")
+                logger.debug(f"🔍 [TushareAdapter详细日志] 开始查找缓存数据...")
                 cache_key = self.cache_manager.find_cached_stock_data(
                     symbol=symbol,
                     start_date=start_date,
@@ -127,59 +127,59 @@ class TushareDataAdapter:
                 )
 
                 if cache_key:
-                    logger.info(f"🔍 [TushareAdapter详细日志] 找到缓存键: {cache_key}")
+                    logger.debug(f"🔍 [TushareAdapter详细日志] 找到缓存键: {cache_key}")
                     cached_data = self.cache_manager.load_stock_data(cache_key)
                     if cached_data is not None:
                         # 检查是否为DataFrame且不为空
                         if hasattr(cached_data, 'empty') and not cached_data.empty:
                             logger.debug(f"📦 从缓存获取{symbol}数据: {len(cached_data)}条")
-                            logger.info(f"🔍 [TushareAdapter详细日志] 缓存数据有效，确保标准化后返回")
+                            logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据有效，确保标准化后返回")
                             # 确保缓存数据也经过标准化验证（修复KeyError: 'volume'问题）
                             return self._validate_and_standardize_data(cached_data)
                         elif isinstance(cached_data, str) and cached_data.strip():
                             logger.debug(f"📦 从缓存获取{symbol}数据: 字符串格式")
-                            logger.info(f"🔍 [TushareAdapter详细日志] 缓存数据为字符串格式")
+                            logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据为字符串格式")
                             return cached_data
                         else:
-                            logger.info(f"🔍 [TushareAdapter详细日志] 缓存数据无效: {type(cached_data)}")
+                            logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据无效: {type(cached_data)}")
                     else:
-                        logger.info(f"🔍 [TushareAdapter详细日志] 缓存数据为None")
+                        logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据为None")
                 else:
-                    logger.info(f"🔍 [TushareAdapter详细日志] 未找到有效缓存")
+                    logger.debug(f"🔍 [TushareAdapter详细日志] 未找到有效缓存")
             except Exception as e:
                 logger.warning(f"⚠️ 缓存获取失败: {e}")
                 logger.warning(f"⚠️ [TushareAdapter详细日志] 缓存异常类型: {type(e).__name__}")
         else:
-            logger.info(f"🔍 [TushareAdapter详细日志] 缓存未启用，直接从API获取")
+            logger.debug(f"🔍 [TushareAdapter详细日志] 缓存未启用，直接从API获取")
 
         # 2. 从Tushare获取数据
-        logger.info(f"🔍 [股票代码追踪] _get_daily_data 调用 provider.get_stock_daily，传入参数: symbol='{symbol}'")
-        logger.info(f"🔍 [TushareAdapter详细日志] 开始调用Tushare Provider...")
+        logger.debug(f"🔍 [股票代码追踪] _get_daily_data 调用 provider.get_stock_daily，传入参数: symbol='{symbol}'")
+        logger.debug(f"🔍 [TushareAdapter详细日志] 开始调用Tushare Provider...")
 
         import time
         provider_start_time = time.time()
         data = self.provider.get_stock_daily(symbol, start_date, end_date)
         provider_duration = time.time() - provider_start_time
 
-        logger.info(f"🔍 [TushareAdapter详细日志] Provider调用完成，耗时: {provider_duration:.3f}秒")
-        logger.info(f"🔍 [股票代码追踪] adapter.get_stock_data 返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
+        logger.debug(f"🔍 [TushareAdapter详细日志] Provider调用完成，耗时: {provider_duration:.3f}秒")
+        logger.debug(f"🔍 [股票代码追踪] adapter.get_stock_data 返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
 
         if data is not None and not data.empty:
             logger.debug(f"✅ 从Tushare获取{symbol}数据成功: {len(data)}条")
-            logger.info(f"🔍 [股票代码追踪] provider.get_stock_daily 返回数据形状: {data.shape}")
-            logger.info(f"🔍 [TushareAdapter详细日志] 数据获取成功，开始检查数据内容...")
+            logger.debug(f"🔍 [股票代码追踪] provider.get_stock_daily 返回数据形状: {data.shape}")
+            logger.debug(f"🔍 [TushareAdapter详细日志] 数据获取成功，开始检查数据内容...")
 
             # 检查数据中的股票代码列
             if 'ts_code' in data.columns:
                 unique_codes = data['ts_code'].unique()
-                logger.info(f"🔍 [股票代码追踪] 返回数据中的股票代码: {unique_codes}")
+                logger.debug(f"🔍 [股票代码追踪] 返回数据中的股票代码: {unique_codes}")
             if 'symbol' in data.columns:
                 unique_symbols = data['symbol'].unique()
-                logger.info(f"🔍 [股票代码追踪] 返回数据中的symbol: {unique_symbols}")
+                logger.debug(f"🔍 [股票代码追踪] 返回数据中的symbol: {unique_symbols}")
 
-            logger.info(f"🔍 [TushareAdapter详细日志] 开始标准化数据...")
+            logger.debug(f"🔍 [TushareAdapter详细日志] 开始标准化数据...")
             standardized_data = self._standardize_data(data)
-            logger.info(f"🔍 [TushareAdapter详细日志] 数据标准化完成")
+            logger.debug(f"🔍 [TushareAdapter详细日志] 数据标准化完成")
             return standardized_data
         else:
             logger.warning(f"⚠️ Tushare返回空数据")

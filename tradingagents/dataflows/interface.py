@@ -1107,8 +1107,8 @@ def get_china_stock_data_tushare(
         logger.debug(f"📊 [Tushare] 获取{ticker}股票数据...")
 
         # 添加详细的股票代码追踪日志
-        logger.info(f"🔍 [股票代码追踪] get_china_stock_data_tushare 接收到的股票代码: '{ticker}' (类型: {type(ticker)})")
-        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
+        logger.debug(f"🔍 [股票代码追踪] get_china_stock_data_tushare 接收到的股票代码: '{ticker}' (类型: {type(ticker)})")
+        logger.debug(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
         manager = get_data_source_manager()
         return manager.get_china_stock_data_tushare(ticker, start_date, end_date)
@@ -1135,7 +1135,7 @@ def search_china_stocks_tushare(
         from .data_source_manager import get_data_source_manager
 
         logger.debug(f"🔍 [Tushare] 搜索股票: {keyword}")
-        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
+        logger.debug(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
         manager = get_data_source_manager()
         return manager.search_china_stocks_tushare(keyword)
@@ -1162,7 +1162,7 @@ def get_china_stock_fundamentals_tushare(
         from .data_source_manager import get_data_source_manager
 
         logger.debug(f"📊 [Tushare] 获取{ticker}基本面数据...")
-        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
+        logger.debug(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
         manager = get_data_source_manager()
         return manager.get_china_stock_fundamentals_tushare(ticker)
@@ -1189,7 +1189,7 @@ def get_china_stock_info_tushare(
         from .data_source_manager import get_data_source_manager
 
         logger.debug(f"📊 [Tushare] 获取{ticker}基本信息...")
-        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
+        logger.debug(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
         manager = get_data_source_manager()
         return manager.get_china_stock_info_tushare(ticker)
@@ -1229,9 +1229,9 @@ def get_china_stock_data_unified(
                })
 
     # 添加详细的股票代码追踪日志
-    logger.info(f"🔍 [股票代码追踪] get_china_stock_data_unified 接收到的原始股票代码: '{ticker}' (类型: {type(ticker)})")
-    logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(ticker))}")
-    logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(ticker))}")
+    logger.debug(f"🔍 [股票代码追踪] get_china_stock_data_unified 接收到的原始股票代码: '{ticker}' (类型: {type(ticker)})")
+    logger.debug(f"🔍 [股票代码追踪] 股票代码长度: {len(str(ticker))}")
+    logger.debug(f"🔍 [股票代码追踪] 股票代码字符: {list(str(ticker))}")
 
     start_time = time.time()
 

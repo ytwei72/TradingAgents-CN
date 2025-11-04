@@ -731,9 +731,9 @@ class Toolkit:
         logger.info(f"📊 [统一基本面工具] 分析股票: {ticker}")
 
         # 添加详细的股票代码追踪日志
-        logger.info(f"🔍 [股票代码追踪] 统一基本面工具接收到的原始股票代码: '{ticker}' (类型: {type(ticker)})")
-        logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(ticker))}")
-        logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(ticker))}")
+        logger.debug(f"🔍 [股票代码追踪] 统一基本面工具接收到的原始股票代码: '{ticker}' (类型: {type(ticker)})")
+        logger.debug(f"🔍 [股票代码追踪] 股票代码长度: {len(str(ticker))}")
+        logger.debug(f"🔍 [股票代码追踪] 股票代码字符: {list(str(ticker))}")
 
         # 保存原始ticker用于对比
         original_ticker = ticker
@@ -748,13 +748,13 @@ class Toolkit:
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
 
-            logger.info(f"🔍 [股票代码追踪] StockUtils.get_market_info 返回的市场信息: {market_info}")
+            logger.debug(f"🔍 [股票代码追踪] StockUtils.get_market_info 返回的市场信息: {market_info}")
             logger.info(f"📊 [统一基本面工具] 股票类型: {market_info['market_name']}")
             logger.info(f"📊 [统一基本面工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']})")
 
             # 检查ticker是否在处理过程中发生了变化
             if str(ticker) != str(original_ticker):
-                logger.warning(f"🔍 [股票代码追踪] 警告：股票代码发生了变化！原始: '{original_ticker}' -> 当前: '{ticker}'")
+                logger.debug(f"🔍 [股票代码追踪] 警告：股票代码发生了变化！原始: '{original_ticker}' -> 当前: '{ticker}'")
 
             # 设置默认日期
             if not curr_date:
@@ -769,29 +769,29 @@ class Toolkit:
             if is_china:
                 # 中国A股：获取股票数据 + 基本面数据
                 logger.info(f"🇨🇳 [统一基本面工具] 处理A股数据...")
-                logger.info(f"🔍 [股票代码追踪] 进入A股处理分支，ticker: '{ticker}'")
+                logger.debug(f"🔍 [股票代码追踪] 进入A股处理分支，ticker: '{ticker}'")
 
                 try:
                     # 获取股票价格数据
                     from tradingagents.dataflows.interface import get_china_stock_data_unified
-                    logger.info(f"🔍 [股票代码追踪] 调用 get_china_stock_data_unified，传入参数: ticker='{ticker}', start_date='{start_date}', end_date='{end_date}'")
+                    logger.debug(f"🔍 [股票代码追踪] 调用 get_china_stock_data_unified，传入参数: ticker='{ticker}', start_date='{start_date}', end_date='{end_date}'")
                     stock_data = get_china_stock_data_unified(ticker, start_date, end_date)
-                    logger.info(f"🔍 [股票代码追踪] get_china_stock_data_unified 返回结果前200字符: {stock_data[:200] if stock_data else 'None'}")
+                    logger.debug(f"🔍 [股票代码追踪] get_china_stock_data_unified 返回结果前200字符: {stock_data[:200] if stock_data else 'None'}")
                     result_data.append(f"## A股价格数据\n{stock_data}")
                 except Exception as e:
-                    logger.error(f"🔍 [股票代码追踪] get_china_stock_data_unified 调用失败: {e}")
+                    logger.debug(f"🔍 [股票代码追踪] get_china_stock_data_unified 调用失败: {e}")
                     result_data.append(f"## A股价格数据\n获取失败: {e}")
 
                 try:
                     # 获取基本面数据
                     from tradingagents.dataflows.optimized_china_data import OptimizedChinaDataProvider
                     analyzer = OptimizedChinaDataProvider()
-                    logger.info(f"🔍 [股票代码追踪] 调用 OptimizedChinaDataProvider._generate_fundamentals_report，传入参数: ticker='{ticker}'")
+                    logger.debug(f"🔍 [股票代码追踪] 调用 OptimizedChinaDataProvider._generate_fundamentals_report，传入参数: ticker='{ticker}'")
                     fundamentals_data = analyzer._generate_fundamentals_report(ticker, stock_data if 'stock_data' in locals() else "")
-                    logger.info(f"🔍 [股票代码追踪] _generate_fundamentals_report 返回结果前200字符: {fundamentals_data[:200] if fundamentals_data else 'None'}")
+                    logger.debug(f"🔍 [股票代码追踪] _generate_fundamentals_report 返回结果前200字符: {fundamentals_data[:200] if fundamentals_data else 'None'}")
                     result_data.append(f"## A股基本面数据\n{fundamentals_data}")
                 except Exception as e:
-                    logger.error(f"🔍 [股票代码追踪] _generate_fundamentals_report 调用失败: {e}")
+                    logger.debug(f"🔍 [股票代码追踪] _generate_fundamentals_report 调用失败: {e}")
                     result_data.append(f"## A股基本面数据\n获取失败: {e}")
 
             elif is_hk:

@@ -183,7 +183,7 @@ def main():
 
     page = st.sidebar.selectbox(
         "切换功能模块",
-        ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "💰 Token统计", "📋 操作日志", "📈 分析结果", "🔧 系统状态"],
+        ["📊 股票分析", "📈 分析结果回测", "⚙️ 配置管理", "💾 缓存管理", "💰 Token统计", "📋 操作日志", "📈 分析结果", "🔧 系统状态"],
         label_visibility="collapsed"
     )
     
@@ -245,6 +245,17 @@ def main():
             render_operation_logs()
         except ImportError as e:
             st.error(f"操作日志模块加载失败: {e}")
+            st.info("请确保已安装所有依赖包")
+        return
+    elif page == "📈 分析结果回测":
+        # 检查分析权限
+        if not require_permission("analysis"):
+            return
+        try:
+            from components.backtest_page import render_backtest_page
+            render_backtest_page()
+        except ImportError as e:
+            st.error(f"回测页面模块加载失败: {e}")
             st.info("请确保已安装所有依赖包")
         return
     elif page == "📈 分析结果":
