@@ -13,7 +13,7 @@ from datetime import datetime
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
-logger = get_logger('agents')
+logger = get_logger('tools')  # 使用tools日志器，与正常节点执行保持一致，便于ProgressLogHandler统一捕获
 
 # 全局变量存储graph实例（用于访问模拟模式功能）
 _graph_instance = None
@@ -44,8 +44,6 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
     if not _graph_instance._should_use_mock_mode(node_name):
         return None
     
-    logger.info(f"🎭 [模拟模式] 节点 {node_name} 启用模拟模式")
-    
     # 获取股票代码和交易日期
     ticker = state.get('company_of_interest', '')
     trade_date = state.get('trade_date', '')
@@ -53,6 +51,10 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
     if not ticker or not trade_date:
         logger.warning(f"⚠️ [模拟模式] 无法获取股票代码或日期，跳过模拟模式")
         return None
+    
+    # 记录模块开始（用于进度追踪）
+    logger.info(f"📊 [模块开始] {node_name} - 股票: {ticker}")
+    logger.info(f"🎭 [模拟模式] 节点 {node_name} 启用模拟模式")
     
     # 尝试加载历史输出
     historical_state = _graph_instance._load_historical_step_output(node_name, ticker, trade_date)
@@ -68,12 +70,21 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
             _graph_instance.mock_sleep_max
         )
         logger.info(f"🎭 [模拟模式] 节点 {node_name} 使用历史数据，sleep {sleep_time:.2f} 秒")
+        
+        # 记录sleep开始时间
+        start_time = time.time()
         time.sleep(sleep_time)
+        duration = time.time() - start_time
+        
+        # 记录模块完成（用于进度追踪）
+        logger.info(f"📊 [模块完成] {node_name} - 模拟模式完成 - 股票: {ticker}, 耗时: {duration:.2f}s")
         
         return merged_state
     else:
         # 如果没有找到历史数据，记录警告但继续正常执行
+        # 注意：即使没有历史数据，也输出模块完成日志，确保进度追踪系统能检测到节点执行
         logger.warning(f"⚠️ [模拟模式] 节点 {node_name} 未找到历史数据，使用正常模式")
+        logger.info(f"📊 [模块完成] {node_name} - 未找到历史数据，使用正常执行 - 股票: {ticker}")
         return None
 
 

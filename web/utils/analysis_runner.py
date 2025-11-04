@@ -437,6 +437,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         }
 
         # ========== 步骤11: 记录完成日志 ==========
+        update_progress("✅ 记录完成日志...")
         analysis_duration = time.time() - analysis_start_time
         
         total_cost = 0.0
@@ -462,6 +463,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                        'success': True,
                        'event_type': 'web_analysis_complete'
                    })
+        
+        update_progress(f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}")
 
         # ========== 步骤12: 保存分析结果 ==========
         save_analysis_results(results, stock_symbol, analysis_id, update_progress)

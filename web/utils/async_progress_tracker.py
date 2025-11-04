@@ -426,6 +426,7 @@ class AsyncProgressTracker:
             
             self.current_step = len(self.analysis_steps) - 1
             logger.info(f"📊 [异步进度] 分析完成，设置为最终步骤")
+        
 
         # 计算进度
         progress_percentage = self._calculate_weighted_progress() * 100
@@ -481,6 +482,8 @@ class AsyncProgressTracker:
         1-8: 配置与准备阶段
         9: 多智能体分析执行阶段（包含所有智能体节点）
         10-12: 结果处理与保存阶段
+        
+        注意：检测顺序很重要，更具体的条件应该放在前面
         """
         message_lower = message.lower()
 
@@ -488,7 +491,11 @@ class AsyncProgressTracker:
         if "🚀 开始股票分析" in message or ("开始" in message and "分析" in message and "股票" in message):
             return self._find_step_by_keyword(["分析启动", "启动"])
         
-        # 步骤2: 成本估算
+        # 步骤11: 记录完成日志（必须在"成本"检测之前，因为完成日志消息可能包含"成本"）
+        elif "记录完成" in message or ("完成" in message and "日志" in message) or "完成日志已记录" in message:
+            return self._find_step_by_keyword(["记录完成日志", "完成日志"])
+        
+        # 步骤2: 成本估算（放在记录完成日志之后，避免完成日志消息被误匹配）
         elif "成本" in message or "预估" in message or "估算" in message:
             return self._find_step_by_keyword(["成本估算", "成本"])
         
@@ -563,9 +570,13 @@ class AsyncProgressTracker:
             elif "neutral_analyst" in message or "neutral" in message:
                 detected_step = self._find_step_by_keyword(["中性风险分析师", "平衡策略", "平衡"])
                 module_name = "neutral_analyst"
+            # risk_manager必须在risk_analyst之前，因为risk_manager包含"risk"
             elif "risk_manager" in message or "risk_judge" in message:
                 detected_step = self._find_step_by_keyword(["风险经理", "风险控制", "控制"])
                 module_name = "risk_manager"
+            elif "risk_analyst" in message or ("risk" in message and "analyst" in message):
+                detected_step = self._find_step_by_keyword(["风险分析", "风险"])
+                module_name = "risk_analyst"
             elif "graph_signal_processing" in message or ("signal" in message and "处理" in message):
                 detected_step = self._find_step_by_keyword(["信号处理", "处理信号"])
                 module_name = "graph_signal_processing"
@@ -588,11 +599,7 @@ class AsyncProgressTracker:
         elif "处理分析结果" in message or ("处理" in message and "结果" in message and "分析" in message):
             return self._find_step_by_keyword(["处理分析结果", "处理结果"])
         
-        # 步骤11: 记录完成日志
-        elif "记录完成" in message or ("完成" in message and "日志" in message):
-            return self._find_step_by_keyword(["记录完成日志", "完成日志"])
-        
-        # 步骤12: 保存分析结果
+        # 步骤12: 保存分析结果（已在上面处理步骤11，这里不再重复）
         elif "保存分析结果" in message or ("保存" in message and ("结果" in message or "报告" in message)):
             return self._find_step_by_keyword(["保存分析结果", "保存结果", "保存报告"])
         

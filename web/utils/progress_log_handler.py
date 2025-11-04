@@ -95,11 +95,12 @@ def setup_progress_log_integration():
         _progress_handler = ProgressLogHandler()
         _progress_handler.setLevel(logging.INFO)
         
-        # 添加到tools日志器（模块完成消息来自这里）
+        # 添加到tools日志器（统一捕获所有节点执行消息，包括模拟模式）
+        # 注意：模拟模式现在也使用tools日志器，与正常节点执行保持一致
         tools_logger = logging.getLogger('tools')
         tools_logger.addHandler(_progress_handler)
         
-        print("✅ [进度集成] 日志处理器已设置")
+        print("✅ [进度集成] 日志处理器已设置（监听tools日志器）")
     
     return _progress_handler
 

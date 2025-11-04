@@ -14,27 +14,42 @@
 
 在项目根目录的 `.env` 文件中配置：
 
-### 1. 启用所有节点的模拟模式
+### 1. 启用所有12个节点的模拟模式（推荐）
 
 ```bash
+# 使用标准名称（推荐，更明确）
+MOCK_ANALYSIS_MODE=market_analyst,fundamentals_analyst,news_analyst,social_media_analyst,bull_researcher,bear_researcher,research_manager,trader,risky_analyst,safe_analyst,neutral_analyst,risk_manager
+
+# 或使用别名（更简洁）
+MOCK_ANALYSIS_MODE=market,fundamentals,news,social,bull,bear,research_manager,trader,risky,safe,neutral,risk_manager
+
+# 同时配置sleep时间（可选）
+MOCK_SLEEP_MIN=2   # 最小sleep时间，默认2秒
+MOCK_SLEEP_MAX=10  # 最大sleep时间，默认10秒
+```
+
+### 2. 启用所有节点的模拟模式（全局模式，旧版兼容）
+
+```bash
+# 注意：这会启用全局模拟模式（旧版行为），与节点级别模拟模式不同
 MOCK_ANALYSIS_MODE=true
 ```
 
-### 2. 只启用特定节点的模拟模式
+### 3. 只启用特定节点的模拟模式
 
 ```bash
 # 只启用市场分析师和新闻分析师的模拟模式
 MOCK_ANALYSIS_MODE=market,news
 ```
 
-### 3. 使用节点完整名称
+### 4. 使用节点完整名称
 
 ```bash
 # 支持多种命名方式
 MOCK_ANALYSIS_MODE=market_analyst,bull_researcher,trader
 ```
 
-### 4. 禁用模拟模式
+### 5. 禁用模拟模式
 
 ```bash
 MOCK_ANALYSIS_MODE=false

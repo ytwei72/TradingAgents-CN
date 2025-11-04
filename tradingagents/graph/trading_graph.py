@@ -565,6 +565,23 @@ class TradingAgentsGraph:
         Returns:
             如果匹配返回True
         """
+        # 特殊处理：risk_manager节点，优先检查其特定输出字段
+        if node_name == 'risk_manager':
+            # risk_manager的主要输出字段是risk_debate_state.judge_decision和final_trade_decision
+            risk_debate_state = step.get('risk_debate_state', {})
+            if isinstance(risk_debate_state, dict):
+                judge_decision = risk_debate_state.get('judge_decision', '')
+                if judge_decision and len(str(judge_decision).strip()) > 0:
+                    return True
+            
+            # 检查final_trade_decision字段（risk_manager的输出）
+            final_decision = step.get('final_trade_decision', '')
+            if final_decision and len(str(final_decision).strip()) > 0:
+                # 进一步确认：final_trade_decision通常包含风险评级信息
+                final_decision_str = str(final_decision).lower()
+                if any(keyword in final_decision_str for keyword in ['风险', 'risk', '风险评级', '风险等级']):
+                    return True
+        
         # 节点名称到关键词的映射
         node_keywords = {
             'market_analyst': ['市场', '技术', '价格', 'market', '技术分析', '技术指标'],
@@ -578,7 +595,7 @@ class TradingAgentsGraph:
             'risky_analyst': ['激进', 'risky', '高风险'],
             'safe_analyst': ['保守', 'safe', '低风险'],
             'neutral_analyst': ['中性', 'neutral', '平衡'],
-            'risk_manager': ['风险', 'risk', '风险管理', '风险决策'],
+            'risk_manager': ['风险经理', '风险决策', '风险评级', '风险等级', 'risk_manager', 'risk judge'],
         }
         
         keywords = node_keywords.get(node_name, [])
@@ -615,6 +632,22 @@ class TradingAgentsGraph:
             匹配分数（越高越好）
         """
         score = 0
+        
+        # 特殊处理：risk_manager节点，优先检查其特定输出字段（给予高分）
+        if node_name == 'risk_manager':
+            risk_debate_state = step.get('risk_debate_state', {})
+            if isinstance(risk_debate_state, dict):
+                judge_decision = risk_debate_state.get('judge_decision', '')
+                if judge_decision and len(str(judge_decision).strip()) > 0:
+                    score += 10  # 高风险特征，优先匹配
+            
+            # final_trade_decision是risk_manager的主要输出
+            final_decision = step.get('final_trade_decision', '')
+            if final_decision and len(str(final_decision).strip()) > 0:
+                final_decision_str = str(final_decision).lower()
+                if any(keyword in final_decision_str for keyword in ['风险', 'risk', '风险评级', '风险等级']):
+                    score += 10  # 高风险特征，优先匹配
+        
         node_keywords = {
             'market_analyst': ['市场', '技术', '价格', 'market', '技术分析', '技术指标'],
             'fundamentals_analyst': ['基本面', '财务', 'fundamental', '财务指标', '财务报表'],
@@ -627,7 +660,7 @@ class TradingAgentsGraph:
             'risky_analyst': ['激进', 'risky', '高风险'],
             'safe_analyst': ['保守', 'safe', '低风险'],
             'neutral_analyst': ['中性', 'neutral', '平衡'],
-            'risk_manager': ['风险', 'risk', '风险管理', '风险决策'],
+            'risk_manager': ['风险经理', '风险决策', '风险评级', '风险等级', 'risk_manager', 'risk judge'],
         }
         
         keywords = node_keywords.get(node_name, [])
