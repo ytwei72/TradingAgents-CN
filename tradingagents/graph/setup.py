@@ -22,6 +22,9 @@ except ImportError:
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# 导入模拟模式辅助工具
+from .mock_mode_helper import create_mock_mode_wrapper
+
 
 class GraphSetup:
     """Handles the setup and configuration of the agent graph."""
@@ -96,23 +99,27 @@ class GraphSetup:
                 logger.debug(f"📈 [DEBUG] 使用标准市场分析师")
 
             # 所有LLM都使用标准分析师
-            analyst_nodes["market"] = create_market_analyst(
+            market_analyst_func = create_market_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
+            # 包装节点函数以支持模拟模式
+            analyst_nodes["market"] = create_mock_mode_wrapper(market_analyst_func, "market_analyst")
             delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
 
         if "social" in selected_analysts:
-            analyst_nodes["social"] = create_social_media_analyst(
+            social_analyst_func = create_social_media_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
+            analyst_nodes["social"] = create_mock_mode_wrapper(social_analyst_func, "social_media_analyst")
             delete_nodes["social"] = create_msg_delete()
             tool_nodes["social"] = self.tool_nodes["social"]
 
         if "news" in selected_analysts:
-            analyst_nodes["news"] = create_news_analyst(
+            news_analyst_func = create_news_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
+            analyst_nodes["news"] = create_mock_mode_wrapper(news_analyst_func, "news_analyst")
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]
 
@@ -137,31 +144,42 @@ class GraphSetup:
                 logger.debug(f"📊 [DEBUG] 使用标准基本面分析师")
 
             # 所有LLM都使用标准分析师（包含强制工具调用机制）
-            analyst_nodes["fundamentals"] = create_fundamentals_analyst(
+            fundamentals_analyst_func = create_fundamentals_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
+            analyst_nodes["fundamentals"] = create_mock_mode_wrapper(fundamentals_analyst_func, "fundamentals_analyst")
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
         # Create researcher and manager nodes
-        bull_researcher_node = create_bull_researcher(
+        bull_researcher_func = create_bull_researcher(
             self.quick_thinking_llm, self.bull_memory
         )
-        bear_researcher_node = create_bear_researcher(
+        bear_researcher_func = create_bear_researcher(
             self.quick_thinking_llm, self.bear_memory
         )
-        research_manager_node = create_research_manager(
+        research_manager_func = create_research_manager(
             self.deep_thinking_llm, self.invest_judge_memory
         )
-        trader_node = create_trader(self.quick_thinking_llm, self.trader_memory)
+        trader_func = create_trader(self.quick_thinking_llm, self.trader_memory)
 
         # Create risk analysis nodes
-        risky_analyst = create_risky_debator(self.quick_thinking_llm)
-        neutral_analyst = create_neutral_debator(self.quick_thinking_llm)
-        safe_analyst = create_safe_debator(self.quick_thinking_llm)
-        risk_manager_node = create_risk_manager(
+        risky_analyst_func = create_risky_debator(self.quick_thinking_llm)
+        neutral_analyst_func = create_neutral_debator(self.quick_thinking_llm)
+        safe_analyst_func = create_safe_debator(self.quick_thinking_llm)
+        risk_manager_func = create_risk_manager(
             self.deep_thinking_llm, self.risk_manager_memory
         )
+        
+        # 包装所有节点以支持模拟模式
+        bull_researcher_node = create_mock_mode_wrapper(bull_researcher_func, "bull_researcher")
+        bear_researcher_node = create_mock_mode_wrapper(bear_researcher_func, "bear_researcher")
+        research_manager_node = create_mock_mode_wrapper(research_manager_func, "research_manager")
+        trader_node = create_mock_mode_wrapper(trader_func, "trader")
+        risky_analyst = create_mock_mode_wrapper(risky_analyst_func, "risky_analyst")
+        neutral_analyst = create_mock_mode_wrapper(neutral_analyst_func, "neutral_analyst")
+        safe_analyst = create_mock_mode_wrapper(safe_analyst_func, "safe_analyst")
+        risk_manager_node = create_mock_mode_wrapper(risk_manager_func, "risk_manager")
 
         # Create workflow
         workflow = StateGraph(AgentState)

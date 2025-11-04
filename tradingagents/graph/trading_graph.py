@@ -3,8 +3,10 @@
 import os
 from pathlib import Path
 import json
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, Any, Tuple, List, Optional
+import time
+import random
 
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
@@ -133,7 +135,6 @@ class TradingAgentsGraph:
                 google_api_key=google_api_key,
                 temperature=0.1,
                 max_tokens=2000,
-                client_options=client_options,
                 transport="rest"
             )
             
@@ -280,9 +281,23 @@ class TradingAgentsGraph:
         self.curr_state = None
         self.ticker = None
         self.log_states_dict = {}  # date to full state dict
+        
+        # Step-by-step output tracking (内存保存)
+        self.step_traces = []  # List of all chunks during execution
+        self.enable_step_tracking = self.config.get("enable_step_tracking", True)  # 默认启用
+        
+        # 模拟模式配置
+        self.mock_mode_config = self._load_mock_mode_config()
+        # 从环境变量读取sleep时间配置，如果没有则使用默认值
+        self.mock_sleep_min = float(os.getenv('MOCK_SLEEP_MIN', '2'))  # 默认2秒
+        self.mock_sleep_max = float(os.getenv('MOCK_SLEEP_MAX', '10'))  # 默认10秒
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
+        
+        # 设置graph实例到模拟模式辅助工具中
+        from .mock_mode_helper import set_graph_instance
+        set_graph_instance(self)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
         """Create tool nodes for different data sources."""
@@ -351,20 +366,46 @@ class TradingAgentsGraph:
         logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的trade_date: '{init_agent_state.get('trade_date', 'NOT_FOUND')}'")
         args = self.propagator.get_graph_args()
 
-        if self.debug:
-            # Debug mode with tracing
-            trace = []
-            for chunk in self.graph.stream(init_agent_state, **args):
-                if len(chunk["messages"]) == 0:
-                    pass
-                else:
-                    chunk["messages"][-1].pretty_print()
-                    trace.append(chunk)
+        # 清空之前的步骤追踪
+        self.step_traces = []
 
-            final_state = trace[-1]
-        else:
-            # Standard mode without tracing
-            final_state = self.graph.invoke(init_agent_state, **args)
+        # 创建步骤输出保存目录
+        step_output_dir = self._prepare_step_output_directory(trade_date)
+
+        # 使用stream模式收集所有步骤（无论debug模式与否）
+        trace = []
+        step_count = 0
+        
+        logger.info(f"📊 [步骤追踪] 开始收集每步输出，保存目录: {step_output_dir}")
+        
+        for chunk in self.graph.stream(init_agent_state, **args):
+            step_count += 1
+            
+            # 序列化chunk以便保存
+            serialized_chunk = self._serialize_chunk(chunk, step_count)
+            
+            # 保存到内存
+            trace.append(chunk)
+            self.step_traces.append(serialized_chunk)
+            
+            # 保存每个chunk到文件
+            if self.enable_step_tracking:
+                self._save_chunk_to_file(serialized_chunk, step_count, step_output_dir)
+            
+            # Debug模式下打印
+            if self.debug and len(chunk.get("messages", [])) > 0:
+                chunk["messages"][-1].pretty_print()
+            
+            logger.debug(f"📝 [步骤追踪] 已保存步骤 {step_count}")
+
+        # 获取最终状态
+        final_state = trace[-1] if trace else self.graph.invoke(init_agent_state, **args)
+        
+        # 保存所有步骤的汇总文件
+        if self.enable_step_tracking:
+            self._save_steps_summary(trace, step_output_dir)
+        
+        logger.info(f"✅ [步骤追踪] 完成，共收集 {step_count} 个步骤")
 
         # Store current state for reflection
         self.curr_state = final_state
@@ -374,6 +415,441 @@ class TradingAgentsGraph:
 
         # Return decision and processed signal
         return final_state, self.process_signal(final_state["final_trade_decision"], company_name)
+
+    def _load_mock_mode_config(self) -> Dict[str, bool]:
+        """加载模拟模式配置，支持节点级别的配置
+        
+        支持的配置格式：
+        - MOCK_ANALYSIS_MODE=true: 所有节点启用模拟模式
+        - MOCK_ANALYSIS_MODE=false: 所有节点禁用模拟模式
+        - MOCK_ANALYSIS_MODE=market,news: 只对market和news节点启用模拟模式
+        - MOCK_ANALYSIS_MODE=market_analyst,bull_researcher: 支持节点名称
+        """
+        mock_config = os.getenv('MOCK_ANALYSIS_MODE', 'false').strip().lower()
+        
+        # 如果配置为false，所有节点都不启用
+        if mock_config == 'false' or mock_config == '':
+            return {}
+        
+        # 如果配置为true，所有节点都启用
+        if mock_config == 'true':
+            return {'all': True}
+        
+        # 解析节点列表
+        node_list = [node.strip() for node in mock_config.split(',')]
+        config = {}
+        
+        # 节点名称映射（支持多种命名方式）
+        node_mapping = {
+            'market': 'market_analyst',
+            'market_analyst': 'market_analyst',
+            'fundamentals': 'fundamentals_analyst',
+            'fundamentals_analyst': 'fundamentals_analyst',
+            'news': 'news_analyst',
+            'news_analyst': 'news_analyst',
+            'social': 'social_media_analyst',
+            'social_media_analyst': 'social_media_analyst',
+            'bull': 'bull_researcher',
+            'bull_researcher': 'bull_researcher',
+            'bear': 'bear_researcher',
+            'bear_researcher': 'bear_researcher',
+            'research_manager': 'research_manager',
+            'trader': 'trader',
+            'risky': 'risky_analyst',
+            'risky_analyst': 'risky_analyst',
+            'safe': 'safe_analyst',
+            'safe_analyst': 'safe_analyst',
+            'neutral': 'neutral_analyst',
+            'neutral_analyst': 'neutral_analyst',
+            'risk_manager': 'risk_manager',
+            'risk_judge': 'risk_manager',
+        }
+        
+        for node in node_list:
+            normalized_node = node_mapping.get(node, node)
+            config[normalized_node] = True
+        
+        logger.info(f"🎭 [模拟模式配置] 已加载: {config}")
+        return config
+    
+    def _should_use_mock_mode(self, node_name: str) -> bool:
+        """检查某个节点是否应该使用模拟模式
+        
+        Args:
+            node_name: 节点名称，如 'market_analyst', 'bull_researcher' 等
+            
+        Returns:
+            如果应该使用模拟模式返回True，否则返回False
+        """
+        if not self.mock_mode_config:
+            return False
+        
+        # 如果配置了'all'，所有节点都启用
+        if self.mock_mode_config.get('all', False):
+            return True
+        
+        # 检查节点是否在配置列表中
+        return self.mock_mode_config.get(node_name, False)
+    
+    def _load_historical_step_output(self, node_name: str, ticker: str, trade_date: str) -> Optional[Dict[str, Any]]:
+        """从历史步骤文件中加载指定节点的输出
+        
+        Args:
+            node_name: 节点名称
+            ticker: 股票代码
+            trade_date: 交易日期
+            
+        Returns:
+            如果找到历史输出则返回状态字典，否则返回None
+        """
+        # 查找历史步骤文件
+        step_output_dir = Path(f"eval_results/{ticker}/TradingAgentsStrategy_logs/step_outputs")
+        
+        # 尝试多个可能的日期格式
+        possible_dates = [
+            trade_date,
+            trade_date.replace('-', ''),
+            str(datetime.strptime(trade_date, '%Y-%m-%d').strftime('%Y%m%d')) if '-' in trade_date else None
+        ]
+        
+        for date_str in possible_dates:
+            if not date_str:
+                continue
+            
+            date_dir = step_output_dir / date_str
+            
+            # 检查all_steps.json文件
+            all_steps_file = date_dir / "all_steps.json"
+            if all_steps_file.exists():
+                try:
+                    with open(all_steps_file, 'r', encoding='utf-8') as f:
+                        all_steps = json.load(f)
+                    
+                    # 查找匹配的节点输出（找到最匹配的步骤）
+                    best_match = None
+                    best_match_score = 0
+                    
+                    for step in all_steps:
+                        # 检查消息内容中是否包含节点标识
+                        messages = step.get('messages', [])
+                        match_score = 0
+                        
+                        for msg in messages:
+                            content = str(msg.get('content', ''))
+                            # 根据节点名称和内容特征匹配，计算匹配分数
+                            if self._match_node_output(node_name, content, step):
+                                # 计算匹配分数（关键词匹配数量）
+                                match_score = self._calculate_match_score(node_name, content, step)
+                                if match_score > best_match_score:
+                                    best_match = step
+                                    best_match_score = match_score
+                    
+                    if best_match:
+                        logger.info(f"🎭 [模拟模式] 找到历史输出: {node_name} (步骤 {best_match.get('step_number', '?')}, 匹配分数: {best_match_score})")
+                        return self._convert_historical_to_state(best_match, node_name)
+                except Exception as e:
+                    logger.debug(f"🔍 [模拟模式] 读取历史文件失败: {e}")
+                    continue
+        
+        logger.warning(f"⚠️ [模拟模式] 未找到节点 {node_name} 的历史输出")
+        return None
+    
+    def _match_node_output(self, node_name: str, content: str, step: Dict[str, Any]) -> bool:
+        """检查步骤是否匹配指定的节点
+        
+        Args:
+            node_name: 节点名称
+            content: 消息内容
+            step: 步骤数据
+            
+        Returns:
+            如果匹配返回True
+        """
+        # 节点名称到关键词的映射
+        node_keywords = {
+            'market_analyst': ['市场', '技术', '价格', 'market', '技术分析', '技术指标'],
+            'fundamentals_analyst': ['基本面', '财务', 'fundamental', '财务指标', '财务报表'],
+            'news_analyst': ['新闻', 'news', '事件', '新闻事件'],
+            'social_media_analyst': ['社交', '情绪', 'sentiment', '社交媒体'],
+            'bull_researcher': ['看涨', 'bull', '多头', '乐观'],
+            'bear_researcher': ['看跌', 'bear', '空头', '悲观'],
+            'research_manager': ['研究经理', '综合', '综合判断'],
+            'trader': ['交易', 'trader', '交易计划', '投资建议'],
+            'risky_analyst': ['激进', 'risky', '高风险'],
+            'safe_analyst': ['保守', 'safe', '低风险'],
+            'neutral_analyst': ['中性', 'neutral', '平衡'],
+            'risk_manager': ['风险', 'risk', '风险管理', '风险决策'],
+        }
+        
+        keywords = node_keywords.get(node_name, [])
+        if not keywords:
+            return False
+        
+        # 检查内容或字段是否包含关键词
+        content_lower = content.lower()
+        for keyword in keywords:
+            if keyword.lower() in content_lower:
+                return True
+        
+        # 检查步骤中的报告字段
+        report_fields = ['market_report', 'fundamentals_report', 'news_report', 
+                        'sentiment_report', 'investment_plan', 'final_trade_decision']
+        for field in report_fields:
+            field_content = step.get(field, '')
+            if field_content:
+                for keyword in keywords:
+                    if keyword.lower() in str(field_content).lower():
+                        return True
+        
+        return False
+    
+    def _calculate_match_score(self, node_name: str, content: str, step: Dict[str, Any]) -> int:
+        """计算匹配分数
+        
+        Args:
+            node_name: 节点名称
+            content: 消息内容
+            step: 步骤数据
+            
+        Returns:
+            匹配分数（越高越好）
+        """
+        score = 0
+        node_keywords = {
+            'market_analyst': ['市场', '技术', '价格', 'market', '技术分析', '技术指标'],
+            'fundamentals_analyst': ['基本面', '财务', 'fundamental', '财务指标', '财务报表'],
+            'news_analyst': ['新闻', 'news', '事件', '新闻事件'],
+            'social_media_analyst': ['社交', '情绪', 'sentiment', '社交媒体'],
+            'bull_researcher': ['看涨', 'bull', '多头', '乐观'],
+            'bear_researcher': ['看跌', 'bear', '空头', '悲观'],
+            'research_manager': ['研究经理', '综合', '综合判断'],
+            'trader': ['交易', 'trader', '交易计划', '投资建议'],
+            'risky_analyst': ['激进', 'risky', '高风险'],
+            'safe_analyst': ['保守', 'safe', '低风险'],
+            'neutral_analyst': ['中性', 'neutral', '平衡'],
+            'risk_manager': ['风险', 'risk', '风险管理', '风险决策'],
+        }
+        
+        keywords = node_keywords.get(node_name, [])
+        content_lower = content.lower()
+        
+        # 计算关键词匹配数量
+        for keyword in keywords:
+            if keyword.lower() in content_lower:
+                score += 1
+        
+        # 检查报告字段
+        report_fields = ['market_report', 'fundamentals_report', 'news_report', 
+                        'sentiment_report', 'investment_plan', 'final_trade_decision']
+        for field in report_fields:
+            field_content = step.get(field, '')
+            if field_content:
+                for keyword in keywords:
+                    if keyword.lower() in str(field_content).lower():
+                        score += 1
+        
+        return score
+    
+    def _convert_historical_to_state(self, historical_step: Dict[str, Any], node_name: str) -> Dict[str, Any]:
+        """将历史步骤数据转换为状态字典
+        
+        Args:
+            historical_step: 历史步骤数据
+            node_name: 节点名称
+            
+        Returns:
+            状态字典
+        """
+        # 创建基础状态
+        state = {
+            'company_of_interest': historical_step.get('company_of_interest', ''),
+            'trade_date': historical_step.get('trade_date', ''),
+            'messages': []
+        }
+        
+        # 转换消息
+        for msg in historical_step.get('messages', []):
+            if isinstance(msg, dict):
+                msg_type = msg.get('type', '')
+                content = msg.get('content', '')
+                if msg_type == 'tuple':
+                    state['messages'].append((msg.get('role', 'human'), content))
+                else:
+                    # 创建简单的消息对象
+                    from langchain_core.messages import AIMessage
+                    state['messages'].append(AIMessage(content=content))
+        
+        # 复制报告字段
+        report_fields = ['market_report', 'fundamentals_report', 'news_report', 
+                        'sentiment_report', 'investment_plan', 'trader_investment_plan',
+                        'final_trade_decision']
+        for field in report_fields:
+            if field in historical_step:
+                state[field] = historical_step[field]
+        
+        # 复制辩论状态
+        if 'investment_debate_state' in historical_step:
+            state['investment_debate_state'] = historical_step['investment_debate_state']
+        if 'risk_debate_state' in historical_step:
+            state['risk_debate_state'] = historical_step['risk_debate_state']
+        
+        return state
+    
+    def _prepare_step_output_directory(self, trade_date: str) -> Path:
+        """准备步骤输出保存目录"""
+        directory = Path(f"eval_results/{self.ticker}/TradingAgentsStrategy_logs/step_outputs/{trade_date}")
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+    
+    def _serialize_chunk(self, chunk: Dict[str, Any], step_number: int) -> Dict[str, Any]:
+        """序列化chunk，将LangChain消息对象转换为可序列化的格式"""
+        serialized = {
+            "step_number": step_number,
+            "timestamp": datetime.now().isoformat(),
+            "company_of_interest": chunk.get("company_of_interest", ""),
+            "trade_date": chunk.get("trade_date", ""),
+        }
+        
+        # 序列化消息列表
+        messages = []
+        for msg in chunk.get("messages", []):
+            if hasattr(msg, "content"):
+                # LangChain消息对象
+                msg_dict = {
+                    "type": type(msg).__name__,
+                    "content": str(msg.content) if msg.content else "",
+                }
+                # 添加工具调用信息
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    msg_dict["tool_calls"] = []
+                    for tool_call in msg.tool_calls:
+                        if isinstance(tool_call, dict):
+                            msg_dict["tool_calls"].append(tool_call)
+                        else:
+                            msg_dict["tool_calls"].append({
+                                "name": getattr(tool_call, "name", ""),
+                                "args": getattr(tool_call, "args", {}),
+                                "id": getattr(tool_call, "id", "")
+                            })
+            elif isinstance(msg, tuple):
+                # 元组格式的消息 (role, content)
+                msg_dict = {
+                    "type": "tuple",
+                    "role": msg[0],
+                    "content": str(msg[1]) if len(msg) > 1 else ""
+                }
+            else:
+                # 其他格式
+                msg_dict = {
+                    "type": type(msg).__name__,
+                    "content": str(msg)
+                }
+            messages.append(msg_dict)
+        
+        serialized["messages"] = messages
+        
+        # 保存所有报告字段
+        report_fields = [
+            "market_report", "fundamentals_report", "sentiment_report", 
+            "news_report", "investment_plan", "trader_investment_plan",
+            "final_trade_decision"
+        ]
+        for field in report_fields:
+            if field in chunk:
+                serialized[field] = chunk[field]
+        
+        # 保存辩论状态
+        if "investment_debate_state" in chunk:
+            debate_state = chunk["investment_debate_state"]
+            serialized["investment_debate_state"] = {
+                "bull_history": debate_state.get("bull_history", ""),
+                "bear_history": debate_state.get("bear_history", ""),
+                "history": debate_state.get("history", ""),
+                "current_response": debate_state.get("current_response", ""),
+                "judge_decision": debate_state.get("judge_decision", ""),
+                "count": debate_state.get("count", 0)
+            }
+        
+        if "risk_debate_state" in chunk:
+            risk_state = chunk["risk_debate_state"]
+            serialized["risk_debate_state"] = {
+                "risky_history": risk_state.get("risky_history", ""),
+                "safe_history": risk_state.get("safe_history", ""),
+                "neutral_history": risk_state.get("neutral_history", ""),
+                "history": risk_state.get("history", ""),
+                "judge_decision": risk_state.get("judge_decision", ""),
+                "count": risk_state.get("count", 0)
+            }
+        
+        return serialized
+    
+    def _save_chunk_to_file(self, serialized_chunk: Dict[str, Any], step_number: int, output_dir: Path):
+        """保存单个chunk到文件"""
+        filename = output_dir / f"step_{step_number:04d}.json"
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(serialized_chunk, f, ensure_ascii=False, indent=2)
+            logger.debug(f"💾 [步骤保存] 已保存步骤 {step_number} 到 {filename}")
+        except Exception as e:
+            logger.error(f"❌ [步骤保存] 保存步骤 {step_number} 失败: {e}")
+    
+    def _save_steps_summary(self, trace: List[Dict[str, Any]], output_dir: Path):
+        """保存所有步骤的汇总文件"""
+        summary = {
+            "total_steps": len(trace),
+            "company_of_interest": self.ticker,
+            "trade_date": trace[0].get("trade_date", "") if trace else "",
+            "generated_at": datetime.now().isoformat(),
+            "steps_summary": []
+        }
+        
+        for i, chunk in enumerate(trace, 1):
+            step_info = {
+                "step_number": i,
+                "has_messages": len(chunk.get("messages", [])) > 0,
+                "message_count": len(chunk.get("messages", [])),
+                "updated_fields": []
+            }
+            
+            # 检测哪些字段被更新了
+            for field in ["market_report", "fundamentals_report", "sentiment_report", 
+                         "news_report", "investment_plan", "trader_investment_plan",
+                         "final_trade_decision"]:
+                if field in chunk and chunk[field]:
+                    step_info["updated_fields"].append(field)
+            
+            # 检测是否有工具调用
+            tool_calls = []
+            for msg in chunk.get("messages", []):
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    for tool_call in msg.tool_calls:
+                        if isinstance(tool_call, dict):
+                            tool_calls.append(tool_call.get("name", "unknown"))
+                        else:
+                            tool_calls.append(getattr(tool_call, "name", "unknown"))
+            
+            if tool_calls:
+                step_info["tool_calls"] = tool_calls
+            
+            summary["steps_summary"].append(step_info)
+        
+        # 保存汇总文件
+        summary_file = output_dir / "steps_summary.json"
+        try:
+            with open(summary_file, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, ensure_ascii=False, indent=2)
+            logger.info(f"📊 [步骤汇总] 已保存汇总文件: {summary_file}")
+        except Exception as e:
+            logger.error(f"❌ [步骤汇总] 保存汇总文件失败: {e}")
+        
+        # 同时保存所有序列化的chunk到一个文件（便于查看）
+        all_steps_file = output_dir / "all_steps.json"
+        try:
+            with open(all_steps_file, 'w', encoding='utf-8') as f:
+                json.dump(self.step_traces, f, ensure_ascii=False, indent=2)
+            logger.info(f"📊 [步骤汇总] 已保存所有步骤到: {all_steps_file}")
+        except Exception as e:
+            logger.error(f"❌ [步骤汇总] 保存所有步骤失败: {e}")
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""

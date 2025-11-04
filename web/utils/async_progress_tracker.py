@@ -196,56 +196,89 @@ class AsyncProgressTracker:
             return False
     
     def _generate_dynamic_steps(self) -> List[Dict]:
-        """根据分析师数量和研究深度动态生成分析步骤"""
-        steps = [
-            {"name": "📋 准备阶段", "description": "验证股票代码，检查数据源可用性", "weight": 0.05},
-            {"name": "🔧 环境检查", "description": "检查API密钥配置，确保数据获取正常", "weight": 0.02},
-            {"name": "💰 成本估算", "description": "根据分析深度预估API调用成本", "weight": 0.01},
-            {"name": "⚙️ 参数设置", "description": "配置分析参数和AI模型选择", "weight": 0.02},
-            {"name": "🚀 启动引擎", "description": "初始化AI分析引擎，准备开始分析", "weight": 0.05},
-        ]
-
+        """根据分析师数量和研究深度动态生成分析步骤
+        
+        按照新的12步流程生成步骤：
+        1-8: 配置与准备阶段
+        9: 多智能体分析执行阶段（包含所有智能体节点）
+        10-12: 结果处理与保存阶段
+        """
+        steps = []
+        
+        # ========== 第一阶段：配置与准备 (步骤1-8) ==========
+        steps.extend([
+            {"name": "🚀 分析启动", "description": "记录分析开始日志，初始化分析会话ID", "weight": 0.01},
+            {"name": "💰 成本估算", "description": "根据选择的分析师和研究深度估算分析成本，显示预估Token使用量和费用", "weight": 0.01},
+            {"name": "🔍 数据预获取和验证", "description": "验证股票代码格式和有效性，预获取股票基础数据（30天历史数据），缓存数据以提高效率", "weight": 0.03},
+            {"name": "🔧 环境验证", "description": "检查API密钥配置（DASHSCOPE_API_KEY、FINNHUB_API_KEY等），验证必要的环境变量", "weight": 0.01},
+            {"name": "⚙️ 构建配置", "description": "根据选择的LLM提供商和模型构建配置，设置研究深度、市场类型等参数", "weight": 0.01},
+            {"name": "📝 格式化股票代码", "description": "根据市场类型格式化股票代码（A股/港股/美股），确保代码格式符合数据源要求", "weight": 0.01},
+            {"name": "🏗️ 初始化分析引擎", "description": "创建TradingAgentsGraph实例，初始化所有智能体和工具节点，配置模拟模式（如果启用）", "weight": 0.02},
+            {"name": "📁 步骤输出目录准备", "description": "创建步骤输出保存目录，准备保存每步执行结果", "weight": 0.01},
+        ])
+        
+        # ========== 第二阶段：多智能体分析执行 (步骤9) ==========
         # 为每个分析师添加专门的步骤
-        analyst_base_weight = 0.6 / len(self.analysts)  # 60%的时间用于分析师工作
+        analyst_base_weight = 0.5 / max(len(self.analysts), 1)  # 50%的时间用于分析师工作
         for analyst in self.analysts:
             analyst_info = self._get_analyst_step_info(analyst)
             steps.append({
                 "name": analyst_info["name"],
-                "description": analyst_info["description"],
+                "description": analyst_info["description"] + "（每个节点的输出都会被实时保存到步骤文件）",
                 "weight": analyst_base_weight
             })
 
-        # 根据研究深度添加后续步骤
+        # 根据研究深度添加研究员辩论阶段
         if self.research_depth >= 2:
             # 标准和深度分析包含研究员辩论
             steps.extend([
-                {"name": "📈 多头观点", "description": "从乐观角度分析投资机会和上涨潜力", "weight": 0.06},
-                {"name": "📉 空头观点", "description": "从谨慎角度分析投资风险和下跌可能", "weight": 0.06},
-                {"name": "🤝 观点整合", "description": "综合多空观点，形成平衡的投资建议", "weight": 0.05},
+                {"name": "🐂 看涨研究员", "description": "从乐观角度分析投资机会，输出看涨观点和投资理由。输出保存：investment_debate_state.bull_history", "weight": 0.04},
+                {"name": "🐻 看跌研究员", "description": "从谨慎角度分析投资风险，输出看跌观点和风险提醒。输出保存：investment_debate_state.bear_history", "weight": 0.04},
+                {"name": "👔 研究经理", "description": "综合多头和空头观点，做出综合投资判断。输出保存：investment_debate_state.judge_decision、investment_plan", "weight": 0.03},
             ])
 
         # 所有深度都包含交易决策
-        steps.append({"name": "💡 投资建议", "description": "基于分析结果制定具体的买卖建议", "weight": 0.06})
+        steps.append({
+            "name": "💼 交易员", 
+            "description": "基于研究结果制定交易计划，输出具体的投资建议和执行策略。输出保存：trader_investment_plan", 
+            "weight": 0.03
+        })
 
         if self.research_depth >= 3:
             # 深度分析包含详细风险评估
             steps.extend([
-                {"name": "🔥 激进策略", "description": "评估高风险高收益的投资策略", "weight": 0.03},
-                {"name": "🛡️ 保守策略", "description": "评估低风险稳健的投资策略", "weight": 0.03},
-                {"name": "⚖️ 平衡策略", "description": "评估风险收益平衡的投资策略", "weight": 0.03},
-                {"name": "🎯 风险控制", "description": "制定风险控制措施和止损策略", "weight": 0.04},
+                {"name": "🔥 激进风险分析师", "description": "从高风险高收益角度分析，输出激进策略建议。输出保存：risk_debate_state.risky_history", "weight": 0.02},
+                {"name": "🛡️ 保守风险分析师", "description": "从风险控制角度分析，输出保守策略建议。输出保存：risk_debate_state.safe_history", "weight": 0.02},
+                {"name": "⚖️ 中性风险分析师", "description": "从平衡角度分析风险，输出平衡策略建议。输出保存：risk_debate_state.neutral_history", "weight": 0.02},
+                {"name": "🎯 风险经理", "description": "综合各方风险评估，做出最终风险决策和风险评级。输出保存：risk_debate_state.judge_decision、final_trade_decision", "weight": 0.03},
             ])
         else:
             # 快速和标准分析的简化风险评估
-            steps.append({"name": "⚠️ 风险提示", "description": "识别主要投资风险并提供风险提示", "weight": 0.05})
+            steps.append({
+                "name": "⚠️ 风险提示", 
+                "description": "识别主要投资风险并提供风险提示（快速和标准分析模式）", 
+                "weight": 0.02
+            })
 
-        # 最后的整理步骤
-        steps.append({"name": "📊 生成报告", "description": "整理所有分析结果，生成最终投资报告", "weight": 0.04})
+        # 信号处理
+        steps.append({
+            "name": "📡 信号处理", 
+            "description": "处理最终交易决策信号，提取结构化的投资建议（买入/持有/卖出）", 
+            "weight": 0.02
+        })
+        
+        # ========== 第三阶段：结果处理与保存 (步骤10-12) ==========
+        steps.extend([
+            {"name": "📊 处理分析结果", "description": "提取风险评估数据，记录Token使用情况，格式化分析结果用于显示", "weight": 0.02},
+            {"name": "✅ 记录完成日志", "description": "记录分析完成时间，计算总耗时和总成本", "weight": 0.01},
+            {"name": "💾 保存分析结果", "description": "保存分模块报告到本地目录，保存分析报告到MongoDB，步骤输出已实时保存到eval_results目录", "weight": 0.02},
+        ])
 
         # 重新平衡权重，确保总和为1.0
         total_weight = sum(step["weight"] for step in steps)
-        for step in steps:
-            step["weight"] = step["weight"] / total_weight
+        if total_weight > 0:
+            for step in steps:
+                step["weight"] = step["weight"] / total_weight
 
         return steps
     
@@ -264,38 +297,42 @@ class AsyncProgressTracker:
         """获取分析师步骤信息（名称和描述）"""
         analyst_info = {
             'market': {
-                "name": "📊 市场分析",
-                "description": "分析股价走势、成交量、市场热度等市场表现"
+                "name": "📈 市场分析师",
+                "description": "技术面分析：K线形态、均线系统、价格趋势。技术指标分析：MACD、RSI、KDJ、布林带等。支撑阻力位分析、成交量分析。输出保存：market_report字段"
             },
             'fundamentals': {
-                "name": "💼 基本面分析",
-                "description": "分析公司财务状况、盈利能力、成长性等基本面"
+                "name": "💰 基本面分析师",
+                "description": "财务数据分析：营收、利润、现金流、财务比率。公司基本面研究：业务模式、竞争优势。估值水平评估：PE、PB、PS、ROE等估值指标。输出保存：fundamentals_report字段"
             },
             'technical': {
-                "name": "📈 技术分析",
+                "name": "📈 技术分析师",
                 "description": "分析K线图形、技术指标、支撑阻力等技术面"
             },
             'sentiment': {
-                "name": "💭 情绪分析",
+                "name": "💭 情绪分析师",
                 "description": "分析市场情绪、投资者心理、舆论倾向等"
             },
             'news': {
-                "name": "📰 新闻分析",
-                "description": "分析相关新闻、公告、行业动态对股价的影响"
+                "name": "📰 新闻分析师",
+                "description": "新闻事件收集：相关新闻抓取和筛选。事件影响分析：重大事件对股价的影响评估。市场动态追踪：行业动态、政策变化。输出保存：news_report字段"
+            },
+            'social': {
+                "name": "💭 社交媒体分析师",
+                "description": "社交媒体数据采集：Reddit、Twitter等平台。投资者情绪分析：散户情绪、机构观点。热度指标监测：讨论热度、关注度变化。输出保存：sentiment_report字段（非A股市场）"
             },
             'social_media': {
-                "name": "🌐 社交媒体",
-                "description": "分析社交媒体讨论、网络热度、散户情绪等"
+                "name": "💭 社交媒体分析师",
+                "description": "社交媒体数据采集：Reddit、Twitter等平台。投资者情绪分析：散户情绪、机构观点。热度指标监测：讨论热度、关注度变化。输出保存：sentiment_report字段（非A股市场）"
             },
             'risk': {
-                "name": "⚠️ 风险分析",
+                "name": "⚠️ 风险分析师",
                 "description": "识别投资风险、评估风险等级、制定风控措施"
             }
         }
 
         return analyst_info.get(analyst, {
-            "name": f"🔍 {analyst}分析",
-            "description": f"进行{analyst}相关的专业分析"
+            "name": f"🔍 {analyst}分析师",
+            "description": f"进行{analyst}相关的专业分析，每个节点的输出都会被实时保存"
         })
     
     def _estimate_total_duration(self) -> float:
@@ -438,27 +475,46 @@ class AsyncProgressTracker:
         logger.debug(f"📊 [进度详情] 步骤{self.current_step + 1}/{len(self.analysis_steps)} ({step_name}), 进度{progress_percentage:.1f}%, 耗时{elapsed_time:.1f}s")
     
     def _detect_step_from_message(self, message: str) -> Optional[int]:
-        """根据消息内容智能检测当前步骤"""
+        """根据消息内容智能检测当前步骤
+        
+        按照新的12步流程进行匹配：
+        1-8: 配置与准备阶段
+        9: 多智能体分析执行阶段（包含所有智能体节点）
+        10-12: 结果处理与保存阶段
+        """
         message_lower = message.lower()
 
-        # 开始分析阶段 - 只匹配最初的开始消息
-        if "🚀 开始股票分析" in message:
-            return 0
-        # 数据验证阶段
-        elif "验证" in message or "预获取" in message or "数据准备" in message:
-            return 0
-        # 环境准备阶段
-        elif "环境" in message or "api" in message_lower or "密钥" in message:
-            return 1
-        # 成本预估阶段
-        elif "成本" in message or "预估" in message:
-            return 2
-        # 参数配置阶段
-        elif "配置" in message or "参数" in message:
-            return 3
-        # 引擎初始化阶段
-        elif "初始化" in message or "引擎" in message:
-            return 4
+        # 步骤1: 分析启动
+        if "🚀 开始股票分析" in message or ("开始" in message and "分析" in message and "股票" in message):
+            return self._find_step_by_keyword(["分析启动", "启动"])
+        
+        # 步骤2: 成本估算
+        elif "成本" in message or "预估" in message or "估算" in message:
+            return self._find_step_by_keyword(["成本估算", "成本"])
+        
+        # 步骤3: 数据预获取和验证
+        elif "验证" in message or "预获取" in message or "数据准备" in message or "验证股票代码" in message:
+            return self._find_step_by_keyword(["数据预获取", "验证", "数据准备"])
+        
+        # 步骤4: 环境验证
+        elif "环境" in message or "api" in message_lower or "密钥" in message or "环境变量" in message:
+            return self._find_step_by_keyword(["环境验证", "环境检查", "环境"])
+        
+        # 步骤5: 构建配置
+        elif ("配置" in message or "参数" in message) and ("构建" in message or "设置" in message):
+            return self._find_step_by_keyword(["构建配置", "配置"])
+        
+        # 步骤6: 格式化股票代码
+        elif "格式化" in message or "代码" in message or "股票代码" in message:
+            return self._find_step_by_keyword(["格式化股票代码", "格式化"])
+        
+        # 步骤7: 初始化分析引擎
+        elif "初始化" in message and ("引擎" in message or "分析引擎" in message):
+            return self._find_step_by_keyword(["初始化分析引擎", "初始化引擎", "引擎"])
+        
+        # 步骤8: 步骤输出目录准备
+        elif "步骤输出" in message or "目录准备" in message or "保存目录" in message:
+            return self._find_step_by_keyword(["步骤输出目录", "目录准备"])
         # 模块开始日志 - 推进到对应步骤并记录步骤开始时间
         elif "模块开始" in message:
             # 从日志中提取分析师类型，匹配新的步骤名称
@@ -487,31 +543,31 @@ class AsyncProgressTracker:
                 detected_step = self._find_step_by_keyword(["风险分析", "风险"])
                 module_name = "risk_analyst"
             elif "bull_researcher" in message or "bull" in message:
-                detected_step = self._find_step_by_keyword(["多头观点", "多头", "看涨"])
+                detected_step = self._find_step_by_keyword(["看涨研究员", "多头观点", "多头", "看涨"])
                 module_name = "bull_researcher"
             elif "bear_researcher" in message or "bear" in message:
-                detected_step = self._find_step_by_keyword(["空头观点", "空头", "看跌"])
+                detected_step = self._find_step_by_keyword(["看跌研究员", "空头观点", "空头", "看跌"])
                 module_name = "bear_researcher"
             elif "research_manager" in message:
-                detected_step = self._find_step_by_keyword(["观点整合", "整合"])
+                detected_step = self._find_step_by_keyword(["研究经理", "观点整合", "整合"])
                 module_name = "research_manager"
             elif "trader" in message:
-                detected_step = self._find_step_by_keyword(["投资建议", "建议"])
+                detected_step = self._find_step_by_keyword(["交易员", "投资建议", "建议"])
                 module_name = "trader"
             elif "risky_analyst" in message or "risky" in message:
-                detected_step = self._find_step_by_keyword(["激进策略", "激进"])
+                detected_step = self._find_step_by_keyword(["激进风险分析师", "激进策略", "激进"])
                 module_name = "risky_analyst"
             elif "safe_analyst" in message or "safe" in message:
-                detected_step = self._find_step_by_keyword(["保守策略", "保守"])
+                detected_step = self._find_step_by_keyword(["保守风险分析师", "保守策略", "保守"])
                 module_name = "safe_analyst"
             elif "neutral_analyst" in message or "neutral" in message:
-                detected_step = self._find_step_by_keyword(["平衡策略", "平衡"])
+                detected_step = self._find_step_by_keyword(["中性风险分析师", "平衡策略", "平衡"])
                 module_name = "neutral_analyst"
-            elif "risk_manager" in message:
-                detected_step = self._find_step_by_keyword(["风险控制", "控制"])
+            elif "risk_manager" in message or "risk_judge" in message:
+                detected_step = self._find_step_by_keyword(["风险经理", "风险控制", "控制"])
                 module_name = "risk_manager"
-            elif "graph_signal_processing" in message or "signal" in message:
-                detected_step = self._find_step_by_keyword(["生成报告", "报告"])
+            elif "graph_signal_processing" in message or ("signal" in message and "处理" in message):
+                detected_step = self._find_step_by_keyword(["信号处理", "处理信号"])
                 module_name = "graph_signal_processing"
             
             # 详细调试日志
@@ -527,6 +583,23 @@ class AsyncProgressTracker:
                 logger.warning(f"⚠️ [步骤检测-未匹配] 检测到模块开始但未匹配到步骤, 消息: {message[:200]}")
             
             return detected_step
+        
+        # 步骤10: 处理分析结果
+        elif "处理分析结果" in message or ("处理" in message and "结果" in message and "分析" in message):
+            return self._find_step_by_keyword(["处理分析结果", "处理结果"])
+        
+        # 步骤11: 记录完成日志
+        elif "记录完成" in message or ("完成" in message and "日志" in message):
+            return self._find_step_by_keyword(["记录完成日志", "完成日志"])
+        
+        # 步骤12: 保存分析结果
+        elif "保存分析结果" in message or ("保存" in message and ("结果" in message or "报告" in message)):
+            return self._find_step_by_keyword(["保存分析结果", "保存结果", "保存报告"])
+        
+        # 信号处理
+        elif "信号处理" in message or "处理信号" in message:
+            return self._find_step_by_keyword(["信号处理", "处理信号"])
+        
         # 工具调用日志 - 不推进步骤，只更新描述
         elif "工具调用" in message:
             # 保持当前步骤，不推进

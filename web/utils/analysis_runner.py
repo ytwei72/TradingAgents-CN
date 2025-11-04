@@ -246,6 +246,21 @@ def run_mock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm
 
 def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None, analysis_id=None, async_tracker=None):
     """执行股票分析
+    
+    主函数结构：
+    - 步骤1: 记录分析开始日志
+    - 步骤2: 成本估算
+    - 步骤3-8: 准备分析步骤（封装在prepare_analysis_steps中）
+      * 准备步骤1: 任务控制检查
+      * 准备步骤2: 数据预获取和验证
+      * 准备步骤3: 环境验证
+      * 准备步骤4: 构建配置
+      * 准备步骤5: 格式化股票代码
+      * 准备步骤6: 初始化分析引擎
+    - 步骤9: 执行分析
+    - 步骤10: 处理分析结果
+    - 步骤11: 记录完成日志
+    - 步骤12: 保存分析结果
 
     Args:
         stock_symbol: 股票代码
@@ -258,6 +273,15 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         analysis_id: 分析任务ID（用于任务控制）
         async_tracker: AsyncProgressTracker实例（用于任务控制）
     """
+    
+    # 导入辅助模块
+    from .analysis_helpers import (
+        prepare_analysis_steps,
+        estimate_analysis_cost,
+        check_task_control as check_task_control_helper,
+        track_token_usage,
+        save_analysis_results
+    )
     
     # 检查是否启用模拟模式（用于测试进度跟踪功能）
     mock_mode_enabled = os.getenv('MOCK_ANALYSIS_MODE', 'false').lower() == 'true'
@@ -281,115 +305,49 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         if progress_callback:
             progress_callback(message, step, total_steps)
         logger.info(f"[进度] {message}")
-    
-    def check_task_control():
-        """检查任务控制信号（暂停/停止）"""
-        if not analysis_id:
-            return True  # 没有analysis_id，继续执行
-        
-        try:
-            from .task_control_manager import should_stop, should_pause, wait_if_paused
-            
-            # 检查停止信号
-            if should_stop(analysis_id):
-                logger.info(f"⏹️ [任务控制] 收到停止信号: {analysis_id}")
-                if async_tracker:
-                    async_tracker.mark_stopped("用户停止了分析任务")
-                return False
-            
-            # 检查暂停信号
-            if should_pause(analysis_id):
-                logger.info(f"⏸️ [任务控制] 收到暂停信号: {analysis_id}")
-                if async_tracker:
-                    async_tracker.mark_paused()
-                
-                # 等待直到恢复或停止
-                wait_if_paused(analysis_id)
-                
-                # 检查是否在暂停期间被停止
-                if should_stop(analysis_id):
-                    logger.info(f"⏹️ [任务控制] 暂停期间收到停止信号: {analysis_id}")
-                    if async_tracker:
-                        async_tracker.mark_stopped("用户停止了分析任务")
-                    return False
-                
-                # 恢复执行
-                logger.info(f"▶️ [任务控制] 任务恢复执行: {analysis_id}")
-                if async_tracker:
-                    async_tracker.mark_resumed()
-            
-            return True  # 继续执行
-        
-        except Exception as e:
-            logger.error(f"❌ [任务控制] 检查任务控制状态失败: {e}")
-            return True  # 出错时继续执行
 
-    # 生成会话ID用于Token跟踪和日志关联
-    session_id = f"analysis_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-    # 1. 数据预获取和验证阶段
-    update_progress("🔍 验证股票代码并预获取数据...", 1, 10)
-    
-    # 检查任务控制（在开始前检查）
-    if not check_task_control():
-        return {
-            'success': False,
-            'error': '任务已被停止',
-            'stock_symbol': stock_symbol,
-            'analysis_date': analysis_date,
-            'session_id': session_id if analysis_id else None
-        }
-
-    try:
-        from tradingagents.utils.stock_validator import prepare_stock_data
-
-        # 预获取股票数据（默认30天历史数据）
-        preparation_result = prepare_stock_data(
-            stock_code=stock_symbol,
-            market_type=market_type,
-            period_days=30,  # 可以根据research_depth调整
-            analysis_date=analysis_date
-        )
-
-        if not preparation_result.is_valid:
-            error_msg = f"❌ 股票数据验证失败: {preparation_result.error_message}"
-            update_progress(error_msg)
-            logger.error(f"[{session_id}] {error_msg}")
-
-            return {
-                'success': False,
-                'error': preparation_result.error_message,
-                'suggestion': preparation_result.suggestion,
-                'stock_symbol': stock_symbol,
-                'analysis_date': analysis_date,
-                'session_id': session_id
-            }
-
-        # 数据预获取成功
-        success_msg = f"✅ 数据准备完成: {preparation_result.stock_name} ({preparation_result.market_type})"
-        update_progress(success_msg)  # 使用智能检测，不再硬编码步骤
-        logger.info(f"[{session_id}] {success_msg}")
-        logger.info(f"[{session_id}] 缓存状态: {preparation_result.cache_status}")
-
-    except Exception as e:
-        error_msg = f"❌ 数据预获取过程中发生错误: {str(e)}"
-        update_progress(error_msg)
-        logger.error(f"[{session_id}] {error_msg}")
-
-        return {
-            'success': False,
-            'error': error_msg,
-            'suggestion': "请检查网络连接或稍后重试",
-            'stock_symbol': stock_symbol,
-            'analysis_date': analysis_date,
-            'session_id': session_id
-        }
-
-    # 记录分析开始的详细日志
+    # ========== 步骤1: 记录分析开始日志 ==========
     logger_manager = get_logger_manager()
     import time
     analysis_start_time = time.time()
 
+    update_progress("🚀 开始股票分析...")
+
+    # ========== 步骤2: 成本估算 ==========
+    estimate_analysis_cost(llm_provider, llm_model, analysts, research_depth, update_progress)
+
+    # ========== 准备步骤3-8: 准备分析步骤 ==========
+    prep_success, prep_result, prep_error = prepare_analysis_steps(
+        stock_symbol=stock_symbol,
+        analysis_date=analysis_date,
+        market_type=market_type,
+        analysts=analysts,
+        research_depth=research_depth,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        analysis_id=analysis_id,
+        async_tracker=async_tracker,
+        update_progress=update_progress
+    )
+    
+    if not prep_success:
+        # 生成临时session_id用于错误返回
+        session_id = f"analysis_error_{uuid.uuid4().hex[:8]}"
+        return {
+            'success': False,
+            'error': prep_error or '准备分析步骤失败',
+            'stock_symbol': stock_symbol,
+            'analysis_date': analysis_date,
+            'session_id': session_id if analysis_id else None
+        }
+    
+    # 从准备结果中提取必要信息
+    config = prep_result['config']
+    formatted_symbol = prep_result['formatted_symbol']
+    graph = prep_result['graph']
+    session_id = prep_result['session_id']
+    
+    # 记录分析开始日志
     logger_manager.log_analysis_start(
         logger, stock_symbol, "comprehensive_analysis", session_id
     )
@@ -407,285 +365,19 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                    'event_type': 'web_analysis_start'
                })
 
-    update_progress("🚀 开始股票分析...")
-
-    # 估算Token使用（用于成本预估）
-    if TOKEN_TRACKING_ENABLED:
-        estimated_input = 2000 * len(analysts)  # 估算每个分析师2000个输入token
-        estimated_output = 1000 * len(analysts)  # 估算每个分析师1000个输出token
-        estimated_cost = token_tracker.estimate_cost(llm_provider, llm_model, estimated_input, estimated_output)
-
-        update_progress(f"💰 预估分析成本: ¥{estimated_cost:.4f}")
-
-    # 验证环境变量
-    update_progress("检查环境变量配置...")
-    dashscope_key = os.getenv("DASHSCOPE_API_KEY")
-    finnhub_key = os.getenv("FINNHUB_API_KEY")
-
-    logger.info(f"环境变量检查:")
-    logger.info(f"  DASHSCOPE_API_KEY: {'已设置' if dashscope_key else '未设置'}")
-    logger.info(f"  FINNHUB_API_KEY: {'已设置' if finnhub_key else '未设置'}")
-
-    if not dashscope_key:
-        raise ValueError("DASHSCOPE_API_KEY 环境变量未设置")
-    if not finnhub_key:
-        raise ValueError("FINNHUB_API_KEY 环境变量未设置")
-
-    update_progress("环境变量验证通过")
-
     try:
-        # 导入必要的模块
-        from tradingagents.graph.trading_graph import TradingAgentsGraph
-        from tradingagents.default_config import DEFAULT_CONFIG
 
-        # 创建配置
-        update_progress("配置分析参数...")
-        config = DEFAULT_CONFIG.copy()
-        config["llm_provider"] = llm_provider
-        config["deep_think_llm"] = llm_model
-        config["quick_think_llm"] = llm_model
-        # 根据研究深度调整配置
-        if research_depth == 1:  # 1级 - 快速分析
-            config["max_debate_rounds"] = 1
-            config["max_risk_discuss_rounds"] = 1
-            # 保持内存功能启用，因为内存操作开销很小但能显著提升分析质量
-            config["memory_enabled"] = True
-
-            # 统一使用在线工具，避免离线工具的各种问题
-            config["online_tools"] = True  # 所有市场都使用统一工具
-            logger.info(f"🔧 [快速分析] {market_type}使用统一工具，确保数据源正确和稳定性")
-            if llm_provider == "dashscope":
-                config["quick_think_llm"] = "qwen-turbo"  # 使用最快模型
-                config["deep_think_llm"] = "qwen-plus"
-            elif llm_provider == "deepseek":
-                config["quick_think_llm"] = "deepseek-chat"  # DeepSeek只有一个模型
-                config["deep_think_llm"] = "deepseek-chat"
-        elif research_depth == 2:  # 2级 - 基础分析
-            config["max_debate_rounds"] = 1
-            config["max_risk_discuss_rounds"] = 1
-            config["memory_enabled"] = True
-            config["online_tools"] = True
-            if llm_provider == "dashscope":
-                config["quick_think_llm"] = "qwen-plus"
-                config["deep_think_llm"] = "qwen-plus"
-            elif llm_provider == "deepseek":
-                config["quick_think_llm"] = "deepseek-chat"
-                config["deep_think_llm"] = "deepseek-chat"
-            elif llm_provider == "openai":
-                config["quick_think_llm"] = llm_model
-                config["deep_think_llm"] = llm_model
-            elif llm_provider == "openai":
-                config["quick_think_llm"] = llm_model
-                config["deep_think_llm"] = llm_model
-            elif llm_provider == "openai":
-                config["quick_think_llm"] = llm_model
-                config["deep_think_llm"] = llm_model
-            elif llm_provider == "openai":
-                config["quick_think_llm"] = llm_model
-                config["deep_think_llm"] = llm_model
-            elif llm_provider == "openai":
-                config["quick_think_llm"] = llm_model
-                config["deep_think_llm"] = llm_model
-        elif research_depth == 3:  # 3级 - 标准分析 (默认)
-            config["max_debate_rounds"] = 1
-            config["max_risk_discuss_rounds"] = 2
-            config["memory_enabled"] = True
-            config["online_tools"] = True
-            if llm_provider == "dashscope":
-                config["quick_think_llm"] = "qwen-plus"
-                config["deep_think_llm"] = "qwen3-max"
-            elif llm_provider == "deepseek":
-                config["quick_think_llm"] = "deepseek-chat"
-                config["deep_think_llm"] = "deepseek-chat"
-        elif research_depth == 4:  # 4级 - 深度分析
-            config["max_debate_rounds"] = 2
-            config["max_risk_discuss_rounds"] = 2
-            config["memory_enabled"] = True
-            config["online_tools"] = True
-            if llm_provider == "dashscope":
-                config["quick_think_llm"] = "qwen-plus"
-                config["deep_think_llm"] = "qwen3-max"
-            elif llm_provider == "deepseek":
-                config["quick_think_llm"] = "deepseek-chat"
-                config["deep_think_llm"] = "deepseek-chat"
-        else:  # 5级 - 全面分析
-            config["max_debate_rounds"] = 3
-            config["max_risk_discuss_rounds"] = 3
-            config["memory_enabled"] = True
-            config["online_tools"] = True
-            if llm_provider == "dashscope":
-                config["quick_think_llm"] = "qwen3-max"
-                config["deep_think_llm"] = "qwen3-max"
-            elif llm_provider == "deepseek":
-                config["quick_think_llm"] = "deepseek-chat"
-                config["deep_think_llm"] = "deepseek-chat"
-
-        # 根据LLM提供商设置不同的配置
-        if llm_provider == "dashscope":
-            config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
-        elif llm_provider == "deepseek":
-            config["backend_url"] = "https://api.deepseek.com"
-        elif llm_provider == "qianfan":
-            # 千帆（文心一言）配置
-            config["backend_url"] = "https://aip.baidubce.com"
-            # 根据研究深度设置千帆模型
-            if research_depth <= 2:  # 快速和基础分析
-                config["quick_think_llm"] = "ernie-3.5-8k"
-                config["deep_think_llm"] = "ernie-3.5-8k"
-            elif research_depth <= 4:  # 标准和深度分析
-                config["quick_think_llm"] = "ernie-3.5-8k"
-                config["deep_think_llm"] = "ernie-4.0-turbo-8k"
-            else:  # 全面分析
-                config["quick_think_llm"] = "ernie-4.0-turbo-8k"
-                config["deep_think_llm"] = "ernie-4.0-turbo-8k"
-            
-            logger.info(f"🤖 [千帆] 快速模型: {config['quick_think_llm']}")
-            logger.info(f"🤖 [千帆] 深度模型: {config['deep_think_llm']}")
-        elif llm_provider == "google":
-            # Google AI不需要backend_url，使用默认的OpenAI格式
-            config["backend_url"] = "https://api.openai.com/v1"
-            
-            # 根据研究深度优化Google模型选择
-            if research_depth == 1:  # 快速分析 - 使用最快模型
-                config["quick_think_llm"] = "gemini-2.5-flash-lite-preview-06-17"  # 1.45s
-                config["deep_think_llm"] = "gemini-2.0-flash"  # 1.87s
-            elif research_depth == 2:  # 基础分析 - 使用快速模型
-                config["quick_think_llm"] = "gemini-2.0-flash"  # 1.87s
-                config["deep_think_llm"] = "gemini-1.5-pro"  # 2.25s
-            elif research_depth == 3:  # 标准分析 - 平衡性能
-                config["quick_think_llm"] = "gemini-1.5-pro"  # 2.25s
-                config["deep_think_llm"] = "gemini-2.5-flash"  # 2.73s
-            elif research_depth == 4:  # 深度分析 - 使用强大模型
-                config["quick_think_llm"] = "gemini-2.5-flash"  # 2.73s
-                config["deep_think_llm"] = "gemini-2.5-pro"  # 16.68s
-            else:  # 全面分析 - 使用最强模型
-                config["quick_think_llm"] = "gemini-2.5-pro"  # 16.68s
-                config["deep_think_llm"] = "gemini-2.5-pro"  # 16.68s
-            
-            logger.info(f"🤖 [Google AI] 快速模型: {config['quick_think_llm']}")
-            logger.info(f"🤖 [Google AI] 深度模型: {config['deep_think_llm']}")
-        elif llm_provider == "openai":
-            # OpenAI官方API
-            config["backend_url"] = "https://api.openai.com/v1"
-            logger.info(f"🤖 [OpenAI] 使用模型: {llm_model}")
-            logger.info(f"🤖 [OpenAI] API端点: https://api.openai.com/v1")
-        elif llm_provider == "openrouter":
-            # OpenRouter使用OpenAI兼容API
-            config["backend_url"] = "https://openrouter.ai/api/v1"
-            logger.info(f"🌐 [OpenRouter] 使用模型: {llm_model}")
-            logger.info(f"🌐 [OpenRouter] API端点: https://openrouter.ai/api/v1")
-        elif llm_provider == "siliconflow":
-            config["backend_url"] = "https://api.siliconflow.cn/v1"
-            logger.info(f"🌐 [SiliconFlow] 使用模型: {llm_model}")
-            logger.info(f"🌐 [SiliconFlow] API端点: https://api.siliconflow.cn/v1")
-        elif llm_provider == "custom_openai":
-            # 自定义OpenAI端点
-            custom_base_url = st.session_state.get("custom_openai_base_url", "https://api.openai.com/v1")
-            config["backend_url"] = custom_base_url
-            config["custom_openai_base_url"] = custom_base_url
-            logger.info(f"🔧 [自定义OpenAI] 使用模型: {llm_model}")
-            logger.info(f"🔧 [自定义OpenAI] API端点: {custom_base_url}")
-
-        # 修复路径问题 - 优先使用环境变量配置
-        # 数据目录：优先使用环境变量，否则使用默认路径
-        if not config.get("data_dir") or config["data_dir"] == "./data":
-            env_data_dir = os.getenv("TRADINGAGENTS_DATA_DIR")
-            if env_data_dir:
-                # 如果环境变量是相对路径，相对于项目根目录解析
-                if not os.path.isabs(env_data_dir):
-                    config["data_dir"] = str(project_root / env_data_dir)
-                else:
-                    config["data_dir"] = env_data_dir
-            else:
-                config["data_dir"] = str(project_root / "data")
-
-        # 结果目录：优先使用环境变量，否则使用默认路径
-        if not config.get("results_dir") or config["results_dir"] == "./results":
-            env_results_dir = os.getenv("TRADINGAGENTS_RESULTS_DIR")
-            if env_results_dir:
-                # 如果环境变量是相对路径，相对于项目根目录解析
-                if not os.path.isabs(env_results_dir):
-                    config["results_dir"] = str(project_root / env_results_dir)
-                else:
-                    config["results_dir"] = env_results_dir
-            else:
-                config["results_dir"] = str(project_root / "results")
-
-        # 缓存目录：优先使用环境变量，否则使用默认路径
-        if not config.get("data_cache_dir"):
-            env_cache_dir = os.getenv("TRADINGAGENTS_CACHE_DIR")
-            if env_cache_dir:
-                # 如果环境变量是相对路径，相对于项目根目录解析
-                if not os.path.isabs(env_cache_dir):
-                    config["data_cache_dir"] = str(project_root / env_cache_dir)
-                else:
-                    config["data_cache_dir"] = env_cache_dir
-            else:
-                config["data_cache_dir"] = str(project_root / "tradingagents" / "dataflows" / "data_cache")
-
-        # 确保目录存在
-        update_progress("📁 创建必要的目录...")
-        os.makedirs(config["data_dir"], exist_ok=True)
-        os.makedirs(config["results_dir"], exist_ok=True)
-        os.makedirs(config["data_cache_dir"], exist_ok=True)
-
-        logger.info(f"📁 目录配置:")
-        logger.info(f"  - 数据目录: {config['data_dir']}")
-        logger.info(f"  - 结果目录: {config['results_dir']}")
-        logger.info(f"  - 缓存目录: {config['data_cache_dir']}")
-        logger.info(f"  - 环境变量 TRADINGAGENTS_RESULTS_DIR: {os.getenv('TRADINGAGENTS_RESULTS_DIR', '未设置')}")
-
-        logger.info(f"使用配置: {config}")
-        logger.info(f"分析师列表: {analysts}")
-        logger.info(f"股票代码: {stock_symbol}")
-        logger.info(f"分析日期: {analysis_date}")
-
-        # 根据市场类型调整股票代码格式
-        logger.debug(f"🔍 [RUNNER DEBUG] ===== 股票代码格式化 =====")
-        logger.debug(f"🔍 [RUNNER DEBUG] 原始股票代码: '{stock_symbol}'")
-        logger.debug(f"🔍 [RUNNER DEBUG] 市场类型: '{market_type}'")
-
-        if market_type == "A股":
-            # A股代码不需要特殊处理，保持原样
-            formatted_symbol = stock_symbol
-            logger.debug(f"🔍 [RUNNER DEBUG] A股代码保持原样: '{formatted_symbol}'")
-            update_progress(f"🇨🇳 准备分析A股: {formatted_symbol}")
-        elif market_type == "港股":
-            # 港股代码转为大写，确保.HK后缀
-            formatted_symbol = stock_symbol.upper()
-            if not formatted_symbol.endswith('.HK'):
-                # 如果是纯数字，添加.HK后缀
-                if formatted_symbol.isdigit():
-                    formatted_symbol = f"{formatted_symbol.zfill(4)}.HK"
-            update_progress(f"🇭🇰 准备分析港股: {formatted_symbol}")
-        else:
-            # 美股代码转为大写
-            formatted_symbol = stock_symbol.upper()
-            logger.debug(f"🔍 [RUNNER DEBUG] 美股代码转大写: '{stock_symbol}' -> '{formatted_symbol}'")
-            update_progress(f"🇺🇸 准备分析美股: {formatted_symbol}")
-
-        logger.debug(f"🔍 [RUNNER DEBUG] 最终传递给分析引擎的股票代码: '{formatted_symbol}'")
-
-        # 初始化交易图
-        update_progress("🔧 初始化分析引擎...")
+        # ========== 步骤8: 步骤输出目录准备 ==========
+        update_progress("📁 准备步骤输出目录...")
+        from pathlib import Path
+        step_output_base_dir = Path("eval_results") / formatted_symbol / "TradingAgentsStrategy_logs" / "step_outputs" / analysis_date
+        step_output_base_dir.mkdir(parents=True, exist_ok=True)
+        update_progress(f"✅ 步骤输出目录已准备: {step_output_base_dir}")
         
-        # 检查任务控制（初始化前）
-        if not check_task_control():
-            return {
-                'success': False,
-                'error': '任务已被停止',
-                'stock_symbol': stock_symbol,
-                'analysis_date': analysis_date,
-                'session_id': session_id
-            }
-        
-        graph = TradingAgentsGraph(analysts, config=config, debug=False)
-
-        # 执行分析
+        # ========== 步骤9: 执行分析 ==========
         update_progress(f"📊 开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
         
-        # 检查任务控制（分析前）
-        if not check_task_control():
+        if not check_task_control_helper(analysis_id, async_tracker):
             return {
                 'success': False,
                 'error': '任务已被停止',
@@ -701,9 +393,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
 
         state, decision = graph.propagate(formatted_symbol, analysis_date)
         
-        # 检查任务控制（分析后）
-        if not check_task_control():
-            # 分析完成但被停止，返回部分结果
+        if not check_task_control_helper(analysis_id, async_tracker):
             logger.warning(f"⚠️ [任务控制] 分析完成后检测到停止信号")
             return {
                 'success': False,
@@ -715,38 +405,22 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                 'decision': decision
             }
 
-        # 调试信息
+        # ========== 步骤10: 处理分析结果 ==========
         logger.debug(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")
         logger.debug(f"🔍 [DEBUG] decision内容: {decision}")
 
-        # 格式化结果
         update_progress("📋 分析完成，正在整理结果...")
 
         # 提取风险评估数据
         risk_assessment = extract_risk_assessment(state)
-
-        # 将风险评估添加到状态中
         if risk_assessment:
             state['risk_assessment'] = risk_assessment
 
-        # 记录Token使用（实际使用量，这里使用估算值）
-        if TOKEN_TRACKING_ENABLED:
-            # 在实际应用中，这些值应该从LLM响应中获取
-            # 这里使用基于分析师数量和研究深度的估算
-            actual_input_tokens = len(analysts) * (1500 if research_depth == "快速" else 2500 if research_depth == "标准" else 4000)
-            actual_output_tokens = len(analysts) * (800 if research_depth == "快速" else 1200 if research_depth == "标准" else 2000)
-
-            usage_record = token_tracker.track_usage(
-                provider=llm_provider,
-                model_name=llm_model,
-                input_tokens=actual_input_tokens,
-                output_tokens=actual_output_tokens,
-                session_id=session_id,
-                analysis_type=f"{market_type}_analysis"
-            )
-
-            if usage_record:
-                update_progress(f"💰 记录使用成本: ¥{usage_record.cost:.4f}")
+        # 记录Token使用
+        track_token_usage(
+            llm_provider, llm_model, session_id, analysts, 
+            research_depth, market_type, update_progress
+        )
 
         results = {
             'stock_symbol': stock_symbol,
@@ -762,13 +436,13 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             'session_id': session_id if TOKEN_TRACKING_ENABLED else None
         }
 
-        # 记录分析完成的详细日志
+        # ========== 步骤11: 记录完成日志 ==========
         analysis_duration = time.time() - analysis_start_time
-
-        # 计算总成本（如果有Token跟踪）
+        
         total_cost = 0.0
         if TOKEN_TRACKING_ENABLED:
             try:
+                from tradingagents.config.config_manager import token_tracker
                 total_cost = token_tracker.get_session_cost(session_id)
             except:
                 pass
@@ -789,47 +463,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                        'event_type': 'web_analysis_complete'
                    })
 
-        # 保存分析报告到本地和MongoDB
-        try:
-            update_progress("💾 正在保存分析报告...")
-            from .report_exporter import save_analysis_report, save_modular_reports_to_results_dir
-            
-            # 先格式化结果，确保decision字段包含formatted_decision
-            formatted_results = format_analysis_results(results)
-            
-            # 1. 保存分模块报告到本地目录
-            logger.info(f"📁 [本地保存] 开始保存分模块报告到本地目录")
-            local_files = save_modular_reports_to_results_dir(formatted_results, stock_symbol, analysis_id=analysis_id)
-            if local_files:
-                logger.info(f"✅ [本地保存] 已保存 {len(local_files)} 个本地报告文件")
-                for module, path in local_files.items():
-                    logger.info(f"  - {module}: {path}")
-            else:
-                logger.warning(f"⚠️ [本地保存] 本地报告文件保存失败")
-            
-            # 2. 保存分析报告到MongoDB（使用相同的analysis_id以确保记录合并）
-            # 先格式化结果，确保decision字段包含formatted_decision
-            formatted_results = format_analysis_results(results)
-            logger.info(f"🗄️ [MongoDB保存] 开始保存分析报告到MongoDB")
-            save_success = save_analysis_report(
-                stock_symbol=stock_symbol,
-                analysis_results=formatted_results,  # 使用格式化后的结果，包含formatted_decision
-                analysis_id=analysis_id
-            )
-            
-            if save_success:
-                logger.info(f"✅ [MongoDB保存] 分析报告已成功保存到MongoDB")
-                update_progress("✅ 分析报告已保存到数据库和本地文件")
-            else:
-                logger.warning(f"⚠️ [MongoDB保存] MongoDB报告保存失败")
-                if local_files:
-                    update_progress("✅ 本地报告已保存，但数据库保存失败")
-                else:
-                    update_progress("⚠️ 报告保存失败，但分析已完成")
-                
-        except Exception as save_error:
-            logger.error(f"❌ [报告保存] 保存分析报告时发生错误: {str(save_error)}")
-            update_progress("⚠️ 报告保存出错，但分析已完成")
+        # ========== 步骤12: 保存分析结果 ==========
+        save_analysis_results(results, stock_symbol, analysis_id, update_progress)
 
         update_progress("✅ 分析成功完成！")
         return results
@@ -837,16 +472,19 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     except Exception as e:
         # 记录分析失败的详细日志
         analysis_duration = time.time() - analysis_start_time
+        
+        # 如果session_id未定义（异常发生在准备阶段之前），使用临时ID
+        error_session_id = session_id if 'session_id' in locals() else f"analysis_error_{uuid.uuid4().hex[:8]}"
 
         logger_manager.log_module_error(
-            logger, "comprehensive_analysis", stock_symbol, session_id,
+            logger, "comprehensive_analysis", stock_symbol, error_session_id,
             analysis_duration, str(e)
         )
 
         logger.error(f"❌ [分析失败] 股票分析执行失败",
                     extra={
                         'stock_symbol': stock_symbol,
-                        'session_id': session_id,
+                        'session_id': error_session_id,
                         'duration': analysis_duration,
                         'error': str(e),
                         'error_type': type(e).__name__,
@@ -868,7 +506,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             'success': False,
             'error': str(e),
             'is_demo': False,
-            'error_reason': f"分析失败: {str(e)}"
+            'error_reason': f"分析失败: {str(e)}",
+            'session_id': error_session_id if analysis_id else None
         }
 
 def format_analysis_results(results):
@@ -1429,6 +1068,7 @@ def generate_demo_results_deprecated(stock_symbol, analysis_date, analysts, rese
         """.strip()
     }
 
+    confidence = demo_decision.get('confidence', 0.7)
     demo_state['final_trade_decision'] = f"""
 ## 🎯 最终投资决策
 
