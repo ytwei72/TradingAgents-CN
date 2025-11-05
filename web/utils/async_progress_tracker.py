@@ -124,31 +124,57 @@ class AsyncProgressTracker:
         
         logger.info(f"📊 [异步进度] 初始化完成: {analysis_id}, 存储方式: {'Redis' if self.use_redis else '文件'}")
 
-        # 注册到日志系统进行自动进度更新
+        # 初始化消息机制（如果启用）
+        self.message_producer = None
+        self._init_message_system()
+
+        # 注册到日志系统进行自动进度更新（兼容模式）
+        if not self.message_producer:
+            try:
+                from .progress_log_handler import register_analysis_tracker
+                import threading
+
+                # 使用超时机制避免死锁
+                def register_with_timeout():
+                    try:
+                        register_analysis_tracker(self.analysis_id, self)
+                        print(f"✅ [进度集成] 跟踪器注册成功: {self.analysis_id}")
+                    except Exception as e:
+                        print(f"❌ [进度集成] 跟踪器注册失败: {e}")
+
+                # 在单独线程中注册，避免阻塞主线程
+                register_thread = threading.Thread(target=register_with_timeout, daemon=True)
+                register_thread.start()
+                register_thread.join(timeout=2.0)  # 2秒超时
+
+                if register_thread.is_alive():
+                    print(f"⚠️ [进度集成] 跟踪器注册超时，继续执行: {self.analysis_id}")
+
+            except ImportError:
+                logger.debug("📊 [异步进度] 日志集成不可用")
+            except Exception as e:
+                print(f"❌ [进度集成] 跟踪器注册异常: {e}")
+    
+    def _init_message_system(self):
+        """初始化消息系统"""
         try:
-            from .progress_log_handler import register_analysis_tracker
-            import threading
-
-            # 使用超时机制避免死锁
-            def register_with_timeout():
-                try:
-                    register_analysis_tracker(self.analysis_id, self)
-                    print(f"✅ [进度集成] 跟踪器注册成功: {self.analysis_id}")
-                except Exception as e:
-                    print(f"❌ [进度集成] 跟踪器注册失败: {e}")
-
-            # 在单独线程中注册，避免阻塞主线程
-            register_thread = threading.Thread(target=register_with_timeout, daemon=True)
-            register_thread.start()
-            register_thread.join(timeout=2.0)  # 2秒超时
-
-            if register_thread.is_alive():
-                print(f"⚠️ [进度集成] 跟踪器注册超时，继续执行: {self.analysis_id}")
-
-        except ImportError:
-            logger.debug("📊 [异步进度] 日志集成不可用")
+            from tradingagents.messaging.config import get_progress_handler, is_message_mode_enabled
+            
+            if is_message_mode_enabled():
+                progress_handler = get_progress_handler()
+                if progress_handler:
+                    # 注册跟踪器到消息系统
+                    progress_handler.register_tracker(self.analysis_id, self)
+                    self.message_producer = progress_handler.get_producer()
+                    logger.info(f"📊 [消息系统] 跟踪器已注册到消息系统: {self.analysis_id}")
+                else:
+                    logger.debug("📊 [消息系统] 消息处理器未初始化")
+            else:
+                logger.debug("📊 [消息系统] 消息模式未启用")
+        except ImportError as e:
+            logger.debug(f"📊 [消息系统] 消息模块不可用: {e}")
         except Exception as e:
-            print(f"❌ [进度集成] 跟踪器注册异常: {e}")
+            logger.warning(f"📊 [消息系统] 初始化失败: {e}")
     
     def _init_redis(self) -> bool:
         """初始化Redis连接"""
@@ -470,10 +496,228 @@ class AsyncProgressTracker:
         # 保存到存储
         self._save_progress()
 
+        # 注意：消息生产已完全解耦
+        # - 消息模式：消息由装饰器直接发布，进度更新通过消息消费（update_progress_from_message/handle_module_*）处理
+        # - 日志模式：update_progress只负责状态更新和保存，不发布消息
+        # 这样可以避免循环依赖：update_progress -> publish -> consumer -> update_progress_from_message
+
         # 详细的更新日志
         step_name = current_step_info.get('name', '未知')
         logger.info(f"📊 [进度更新] {self.analysis_id}: {message[:50]}...")
         logger.debug(f"📊 [进度详情] 步骤{self.current_step + 1}/{len(self.analysis_steps)} ({step_name}), 进度{progress_percentage:.1f}%, 耗时{elapsed_time:.1f}s")
+    
+    def _publish_progress_message(self):
+        """发布进度消息"""
+        if self.message_producer:
+            try:
+                from tradingagents.messaging.business.messages import TaskProgressMessage
+                
+                current_step_info = self.analysis_steps[self.current_step] if self.current_step < len(self.analysis_steps) else self.analysis_steps[-1]
+                
+                progress_msg = TaskProgressMessage(
+                    analysis_id=self.analysis_id,
+                    current_step=self.current_step,
+                    total_steps=len(self.analysis_steps),
+                    progress_percentage=self.progress_data.get('progress_percentage', 0.0),
+                    current_step_name=current_step_info.get('name', '未知'),
+                    current_step_description=self.progress_data.get('current_step_description', ''),
+                    elapsed_time=self.get_effective_elapsed_time(),
+                    remaining_time=self.progress_data.get('remaining_time', 0.0),
+                    last_message=self.progress_data.get('last_message', '')
+                )
+                self.message_producer.publish_progress(progress_msg)
+            except Exception as e:
+                logger.warning(f"📊 [消息系统] 发布进度消息失败: {e}")
+    
+    def update_progress_from_message(self, message: Dict[str, Any]):
+        """从消息更新进度（替代关键字匹配）
+        
+        Args:
+            message: 消息负载字典
+        """
+        current_time = time.time()
+        
+        # 直接使用消息中的结构化数据
+        if 'current_step' in message:
+            old_step = self.current_step
+            new_step = message['current_step']
+            
+            if new_step != old_step and new_step >= old_step:
+                # 记录步骤切换
+                if old_step not in [s['step_index'] for s in self.step_history]:
+                    step_start = self.step_start_times.get(old_step, current_time)
+                    step_duration = current_time - step_start
+                    self.step_history.append({
+                        'step_index': old_step,
+                        'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
+                        'start_time': step_start,
+                        'end_time': current_time,
+                        'duration': step_duration,
+                        'message': message.get('last_message', '')
+                    })
+                
+                self.current_step = new_step
+                if new_step not in self.step_start_times:
+                    self.step_start_times[new_step] = current_time
+        
+        # 更新进度数据
+        self.progress_data.update({
+            'current_step': message.get('current_step', self.current_step),
+            'progress_percentage': message.get('progress_percentage', self.progress_data.get('progress_percentage', 0.0)),
+            'current_step_name': message.get('current_step_name', self.progress_data.get('current_step_name', '')),
+            'current_step_description': message.get('current_step_description', self.progress_data.get('current_step_description', '')),
+            'elapsed_time': message.get('elapsed_time', self.get_effective_elapsed_time()),
+            'remaining_time': message.get('remaining_time', self.progress_data.get('remaining_time', 0.0)),
+            'last_message': message.get('last_message', self.progress_data.get('last_message', '')),
+            'last_update': current_time,
+        })
+        
+        # 保存到存储
+        self._save_progress()
+        logger.debug(f"📊 [消息更新] 从消息更新进度: {self.analysis_id} - {message.get('progress_percentage', 0):.1f}%")
+    
+    def handle_module_start(self, message: Dict[str, Any]):
+        """处理模块开始消息
+        
+        Args:
+            message: 消息负载字典，包含 module_name, stock_symbol 等
+        """
+        module_name = message.get('module_name', '')
+        step = self._find_step_by_module_name(module_name)
+        
+        if step is not None:
+            old_step = self.current_step
+            if step >= old_step:
+                # 记录步骤切换
+                if old_step not in [s['step_index'] for s in self.step_history]:
+                    step_start = self.step_start_times.get(old_step, time.time())
+                    step_duration = time.time() - step_start
+                    self.step_history.append({
+                        'step_index': old_step,
+                        'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
+                        'start_time': step_start,
+                        'end_time': time.time(),
+                        'duration': step_duration,
+                        'message': f"模块开始: {module_name}"
+                    })
+                
+                self.current_step = step
+                if step not in self.step_start_times:
+                    self.step_start_times[step] = time.time()
+                
+                self._update_progress_data()
+                self._save_progress()
+                
+                # 注意：消息发布已解耦，由消息装饰器直接发布模块事件消息
+                # 这里只负责更新内部状态，不发布消息
+                
+                logger.info(f"📊 [模块开始] {self.analysis_id} - {module_name} -> 步骤 {step + 1}")
+    
+    def handle_module_complete(self, message: Dict[str, Any]):
+        """处理模块完成消息
+        
+        Args:
+            message: 消息负载字典，包含 module_name, duration 等
+        """
+        current_time = time.time()
+        
+        # 记录当前步骤的完成时间
+        if self.current_step not in [s['step_index'] for s in self.step_history]:
+            step_start = self.step_start_times.get(self.current_step, current_time)
+            step_duration = current_time - step_start
+            self.step_history.append({
+                'step_index': self.current_step,
+                'step_name': self.analysis_steps[self.current_step]['name'] if self.current_step < len(self.analysis_steps) else '未知',
+                'start_time': step_start,
+                'end_time': current_time,
+                'duration': step_duration,
+                'message': f"模块完成: {message.get('module_name', '')}"
+            })
+        
+        # 推进到下一步
+        next_step = min(self.current_step + 1, len(self.analysis_steps) - 1)
+        if next_step != self.current_step:
+            self.current_step = next_step
+            if next_step not in self.step_start_times:
+                self.step_start_times[next_step] = current_time
+            
+            self._update_progress_data()
+            self._save_progress()
+            
+            # 注意：消息发布已解耦，由消息装饰器直接发布模块事件消息
+            # 这里只负责更新内部状态，不发布消息
+            
+            logger.info(f"📊 [模块完成] {self.analysis_id} - {message.get('module_name', '')} -> 步骤 {next_step + 1}")
+    
+    def handle_module_error(self, message: Dict[str, Any]):
+        """处理模块错误消息
+        
+        Args:
+            message: 消息负载字典，包含 module_name, error_message 等
+        """
+        error_msg = message.get('error_message', '未知错误')
+        module_name = message.get('module_name', '')
+        
+        self.progress_data.update({
+            'last_message': f"模块错误: {module_name} - {error_msg}",
+            'last_update': time.time(),
+        })
+        self._save_progress()
+        
+        logger.warning(f"📊 [模块错误] {self.analysis_id} - {module_name}: {error_msg}")
+    
+    def _find_step_by_module_name(self, module_name: str) -> Optional[int]:
+        """根据模块名称查找步骤（替代关键字匹配）
+        
+        Args:
+            module_name: 模块名称
+            
+        Returns:
+            Optional[int]: 步骤索引，如果未找到则返回None
+        """
+        # 使用映射表，而不是关键字匹配
+        module_step_map = {
+            'market_analyst': self._find_step_by_keyword(['市场分析', '市场']),
+            'fundamentals_analyst': self._find_step_by_keyword(['基本面分析', '基本面']),
+            'technical_analyst': self._find_step_by_keyword(['技术分析', '技术']),
+            'sentiment_analyst': self._find_step_by_keyword(['情绪分析', '情绪']),
+            'news_analyst': self._find_step_by_keyword(['新闻分析', '新闻']),
+            'social_media_analyst': self._find_step_by_keyword(['社交媒体', '社交']),
+            'risk_analyst': self._find_step_by_keyword(['风险分析', '风险']),
+            'bull_researcher': self._find_step_by_keyword(['看涨研究员', '多头观点', '多头', '看涨']),
+            'bear_researcher': self._find_step_by_keyword(['看跌研究员', '空头观点', '空头', '看跌']),
+            'research_manager': self._find_step_by_keyword(['研究经理', '观点整合', '整合']),
+            'trader': self._find_step_by_keyword(['交易员', '投资建议', '建议']),
+            'risky_analyst': self._find_step_by_keyword(['激进风险分析师', '激进策略', '激进']),
+            'safe_analyst': self._find_step_by_keyword(['保守风险分析师', '保守策略', '保守']),
+            'neutral_analyst': self._find_step_by_keyword(['中性风险分析师', '平衡策略', '平衡']),
+            'risk_manager': self._find_step_by_keyword(['风险经理', '风险控制', '控制']),
+            'graph_signal_processing': self._find_step_by_keyword(['信号处理', '处理信号']),
+        }
+        
+        return module_step_map.get(module_name)
+    
+    def _update_progress_data(self):
+        """更新进度数据（内部方法）"""
+        current_time = time.time()
+        elapsed_time = self.get_effective_elapsed_time()
+        
+        progress_percentage = self._calculate_weighted_progress() * 100
+        remaining_time = self._estimate_remaining_time(progress_percentage / 100, elapsed_time)
+        
+        current_step_info = self.analysis_steps[self.current_step] if self.current_step < len(self.analysis_steps) else self.analysis_steps[-1]
+        
+        self.progress_data.update({
+            'current_step': self.current_step,
+            'progress_percentage': progress_percentage,
+            'current_step_name': current_step_info.get('name', '未知'),
+            'current_step_description': current_step_info.get('description', ''),
+            'elapsed_time': elapsed_time,
+            'remaining_time': remaining_time,
+            'last_update': current_time,
+            'status': 'completed' if progress_percentage >= 100 else 'running',
+            'step_history': self.step_history
+        })
     
     def _detect_step_from_message(self, message: str) -> Optional[int]:
         """根据消息内容智能检测当前步骤
@@ -767,14 +1011,38 @@ class AsyncProgressTracker:
                 self.progress_data['raw_results'] = str(results)  # 最后的fallback
 
         self._save_progress()
+        
+        # 发送完成状态消息
+        if self.message_producer:
+            try:
+                from tradingagents.messaging.business.messages import TaskStatus
+                self.message_producer.publish_status(
+                    self.analysis_id, 
+                    TaskStatus.COMPLETED, 
+                    message
+                )
+            except Exception as e:
+                logger.warning(f"📊 [消息系统] 发布完成状态失败: {e}")
+        
         logger.info(f"📊 [异步进度] 分析完成: {self.analysis_id}")
 
-        # 从日志系统注销
-        try:
-            from .progress_log_handler import unregister_analysis_tracker
-            unregister_analysis_tracker(self.analysis_id)
-        except ImportError:
-            pass
+        # 从日志系统注销（兼容模式）
+        if not self.message_producer:
+            try:
+                from .progress_log_handler import unregister_analysis_tracker
+                unregister_analysis_tracker(self.analysis_id)
+            except ImportError:
+                pass
+        
+        # 从消息系统注销
+        if self.message_producer:
+            try:
+                from tradingagents.messaging.config import get_progress_handler
+                progress_handler = get_progress_handler()
+                if progress_handler:
+                    progress_handler.unregister_tracker(self.analysis_id)
+            except Exception as e:
+                logger.warning(f"📊 [消息系统] 注销跟踪器失败: {e}")
     
     def mark_failed(self, error_message: str):
         """标记分析失败"""
@@ -783,14 +1051,38 @@ class AsyncProgressTracker:
         self.progress_data['last_message'] = f"分析失败: {error_message}"
         self.progress_data['last_update'] = time.time()
         self._save_progress()
+        
+        # 发送失败状态消息
+        if self.message_producer:
+            try:
+                from tradingagents.messaging.business.messages import TaskStatus
+                self.message_producer.publish_status(
+                    self.analysis_id, 
+                    TaskStatus.FAILED, 
+                    f"分析失败: {error_message}"
+                )
+            except Exception as e:
+                logger.warning(f"📊 [消息系统] 发布失败状态失败: {e}")
+        
         logger.error(f"📊 [异步进度] 分析失败: {self.analysis_id}, 错误: {error_message}")
 
-        # 从日志系统注销
-        try:
-            from .progress_log_handler import unregister_analysis_tracker
-            unregister_analysis_tracker(self.analysis_id)
-        except ImportError:
-            pass
+        # 从日志系统注销（兼容模式）
+        if not self.message_producer:
+            try:
+                from .progress_log_handler import unregister_analysis_tracker
+                unregister_analysis_tracker(self.analysis_id)
+            except ImportError:
+                pass
+        
+        # 从消息系统注销
+        if self.message_producer:
+            try:
+                from tradingagents.messaging.config import get_progress_handler
+                progress_handler = get_progress_handler()
+                if progress_handler:
+                    progress_handler.unregister_tracker(self.analysis_id)
+            except Exception as e:
+                logger.warning(f"📊 [消息系统] 注销跟踪器失败: {e}")
     
     def mark_paused(self):
         """标记任务暂停"""
@@ -825,14 +1117,38 @@ class AsyncProgressTracker:
         self.progress_data['last_message'] = f"⏹️ {message}"
         self.progress_data['last_update'] = time.time()
         self._save_progress()
+        
+        # 发送停止状态消息
+        if self.message_producer:
+            try:
+                from tradingagents.messaging.business.messages import TaskStatus
+                self.message_producer.publish_status(
+                    self.analysis_id, 
+                    TaskStatus.STOPPED, 
+                    message
+                )
+            except Exception as e:
+                logger.warning(f"📊 [消息系统] 发布停止状态失败: {e}")
+        
         logger.info(f"⏹️ [异步进度] 任务已停止: {self.analysis_id}")
         
-        # 从日志系统注销
-        try:
-            from .progress_log_handler import unregister_analysis_tracker
-            unregister_analysis_tracker(self.analysis_id)
-        except ImportError:
-            pass
+        # 从日志系统注销（兼容模式）
+        if not self.message_producer:
+            try:
+                from .progress_log_handler import unregister_analysis_tracker
+                unregister_analysis_tracker(self.analysis_id)
+            except ImportError:
+                pass
+        
+        # 从消息系统注销
+        if self.message_producer:
+            try:
+                from tradingagents.messaging.config import get_progress_handler
+                progress_handler = get_progress_handler()
+                if progress_handler:
+                    progress_handler.unregister_tracker(self.analysis_id)
+            except Exception as e:
+                logger.warning(f"📊 [消息系统] 注销跟踪器失败: {e}")
     
     def get_effective_elapsed_time(self) -> float:
         """获取有效已用时间（排除暂停时长）"""

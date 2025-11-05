@@ -8,6 +8,8 @@ from langchain_core.messages import AIMessage
 
 # 导入分析模块日志装饰器
 from tradingagents.utils.tool_logging import log_analyst_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
@@ -82,7 +84,8 @@ def _get_company_name_for_fundamentals(ticker: str, market_info: dict) -> str:
 
 
 def create_fundamentals_analyst(llm, toolkit):
-    @log_analyst_module("fundamentals")
+    @message_analysis_module("fundamentals_analyst")
+    @log_analyst_module("fundamentals")  # 保留日志装饰器作为后备
     def fundamentals_analyst_node(state):
         logger.debug(f"📊 [DEBUG] ===== 基本面分析师节点开始 =====")
 

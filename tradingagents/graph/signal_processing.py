@@ -5,6 +5,8 @@ from langchain_openai import ChatOpenAI
 # 导入统一日志系统和图处理模块日志装饰器
 from tradingagents.utils.logging_init import get_logger
 from tradingagents.utils.tool_logging import log_graph_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 logger = get_logger("graph.signal_processing")
 
 
@@ -15,7 +17,8 @@ class SignalProcessor:
         """Initialize with an LLM for processing."""
         self.quick_thinking_llm = quick_thinking_llm
 
-    @log_graph_module("signal_processing")
+    @message_analysis_module("graph_signal_processing")
+    @log_graph_module("signal_processing")  # 保留日志装饰器作为后备
     def process_signal(self, full_signal: str, stock_symbol: str = None) -> dict:
         """
         Process a full trading signal to extract structured decision information.

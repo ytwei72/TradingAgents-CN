@@ -5,6 +5,8 @@ import json
 # 导入统一日志系统和分析模块日志装饰器
 from tradingagents.utils.logging_init import get_logger
 from tradingagents.utils.tool_logging import log_analyst_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 logger = get_logger("analysts.social_media")
 
 # 导入Google工具调用处理器
@@ -76,7 +78,8 @@ def _get_company_name_for_social_media(ticker: str, market_info: dict) -> str:
 
 
 def create_social_media_analyst(llm, toolkit):
-    @log_analyst_module("social_media")
+    @message_analysis_module("social_media_analyst")
+    @log_analyst_module("social_media")  # 保留日志装饰器作为后备
     def social_media_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]

@@ -445,6 +445,20 @@ def main():
                     research_depth=form_data['research_depth'],
                     llm_provider=config['llm_provider']
                 )
+                
+                # 确保消息订阅已注册（AsyncProgressTracker会自动注册，这里作为双重保障）
+                try:
+                    from components.message_subscriber import register_analysis_tracker, is_message_subscription_enabled
+                    if is_message_subscription_enabled():
+                        # 注册到消息订阅管理器（用于UI更新回调）
+                        register_analysis_tracker(
+                            analysis_id=analysis_id,
+                            tracker=async_tracker,
+                            progress_callback=None  # UI更新由进度显示组件处理
+                        )
+                        logger.info(f"📡 [消息订阅] 已注册分析任务到消息订阅系统: {analysis_id}")
+                except Exception as e:
+                    logger.debug(f"注册消息订阅失败（可能未启用消息模式）: {e}")
 
                 # 创建进度回调函数
                 def progress_callback(message: str, step: int = None, total_steps: int = None):

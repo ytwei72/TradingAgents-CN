@@ -2,6 +2,7 @@
 """
 异步进度显示组件
 支持定时刷新，从Redis或文件获取进度状态
+支持消息驱动的实时更新（如果消息模式启用）
 """
 
 import streamlit as st
@@ -12,6 +13,16 @@ from web.utils.async_progress_tracker import get_progress_by_id, format_time
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('async_display')
+
+# 导入消息订阅组件
+try:
+    from web.components.message_subscriber import (
+        is_message_subscription_enabled,
+        get_message_subscriber_manager
+    )
+    MESSAGE_SUBSCRIPTION_AVAILABLE = True
+except ImportError:
+    MESSAGE_SUBSCRIPTION_AVAILABLE = False
 
 class AsyncProgressDisplay:
     """异步进度显示组件"""
@@ -191,9 +202,22 @@ def auto_refresh_progress(display: AsyncProgressDisplay, max_duration: float = 1
 
 # Streamlit专用的自动刷新组件
 def streamlit_auto_refresh_progress(analysis_id: str, refresh_interval: int = 2):
-    """Streamlit专用的自动刷新进度显示"""
+    """Streamlit专用的自动刷新进度显示
+    支持消息驱动的实时更新（如果消息模式启用）
+    """
 
-    # 获取进度数据
+    # 检查消息订阅是否启用并已注册
+    use_message_subscription = False
+    if MESSAGE_SUBSCRIPTION_AVAILABLE and is_message_subscription_enabled():
+        try:
+            manager = get_message_subscriber_manager()
+            if manager.is_registered(analysis_id):
+                use_message_subscription = True
+                logger.debug(f"📡 [消息订阅] 使用消息驱动更新: {analysis_id}")
+        except Exception as e:
+            logger.debug(f"检查消息订阅状态失败: {e}")
+
+    # 获取进度数据（消息订阅模式下，数据已通过消息更新，这里获取最新状态）
     progress_data = get_progress_by_id(analysis_id)
 
     if not progress_data:
@@ -309,6 +333,7 @@ def streamlit_auto_refresh_progress(analysis_id: str, refresh_interval: int = 2)
 def display_static_progress(analysis_id: str) -> bool:
     """
     显示静态进度（不自动刷新）
+    支持消息驱动的实时更新（如果消息模式启用）
     返回是否已完成
     """
     import streamlit as st
@@ -317,8 +342,17 @@ def display_static_progress(analysis_id: str) -> bool:
     progress_key = f"progress_display_{analysis_id}"
     if progress_key not in st.session_state:
         st.session_state[progress_key] = True
+    
+    # 检查消息订阅是否启用并已注册
+    if MESSAGE_SUBSCRIPTION_AVAILABLE and is_message_subscription_enabled():
+        try:
+            manager = get_message_subscriber_manager()
+            if manager.is_registered(analysis_id):
+                logger.debug(f"📡 [消息订阅] 使用消息驱动更新显示: {analysis_id}")
+        except Exception as e:
+            logger.debug(f"检查消息订阅状态失败: {e}")
 
-    # 获取进度数据
+    # 获取进度数据（消息订阅模式下，数据已通过消息更新，这里获取最新状态）
     progress_data = get_progress_by_id(analysis_id)
 
     if not progress_data:
@@ -469,11 +503,23 @@ def display_unified_progress(analysis_id: str, show_refresh_controls: bool = Tru
 def display_static_progress_with_controls(analysis_id: str, show_refresh_controls: bool = True) -> bool:
     """
     显示静态进度，可控制是否显示刷新控件
+    支持消息驱动的实时更新（如果消息模式启用）
     """
     import streamlit as st
     from web.utils.async_progress_tracker import get_progress_by_id
+    
+    # 检查消息订阅状态
+    use_message_subscription = False
+    if MESSAGE_SUBSCRIPTION_AVAILABLE and is_message_subscription_enabled():
+        try:
+            manager = get_message_subscriber_manager()
+            if manager.is_registered(analysis_id):
+                use_message_subscription = True
+                logger.debug(f"📡 [消息订阅] 使用消息驱动更新: {analysis_id}")
+        except Exception as e:
+            logger.debug(f"检查消息订阅状态失败: {e}")
 
-    # 获取进度数据
+    # 获取进度数据（消息订阅模式下，数据已通过消息更新，这里获取最新状态）
     progress_data = get_progress_by_id(analysis_id)
 
     if not progress_data:
