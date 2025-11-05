@@ -16,7 +16,7 @@ def test_fundamentals_stock_name():
     print("=" * 50)
     
     # 测试股票代码
-    test_codes = ["603985", "000001", "300033"]
+    test_codes = ["390001", "603985", "000001", "300033"]
     
     for code in test_codes:
         print(f"\n📊 测试股票代码: {code}")

@@ -22,6 +22,122 @@ except ImportError:
     logger.warning("MongoDB模块不可用")
 
 
+def _normalize_date_column(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    标准化DataFrame的日期列
+    
+    Args:
+        df: 输入的DataFrame
+        
+    Returns:
+        标准化后的DataFrame，如果失败则返回空DataFrame
+    """
+    if df.empty:
+        return df
+    
+    # 如果已经有date列，直接返回
+    if 'date' in df.columns:
+        return df
+    
+    # 如果有trade_date列，转换为date
+    if 'trade_date' in df.columns:
+        df['date'] = pd.to_datetime(df['trade_date'])
+        return df
+    
+    # 如果索引是日期类型，重置为列
+    if df.index.name == 'date':
+        df = df.reset_index()
+        if 'date' not in df.columns:
+            logger.warning(f"重置索引后仍未找到date列，数据列: {list(df.columns)}")
+            return pd.DataFrame()
+        return df
+    
+    if hasattr(df.index, 'dtype') and pd.api.types.is_datetime64_any_dtype(df.index):
+        index_name = df.index.name if df.index.name else 'index'
+        df = df.reset_index()
+        if index_name in df.columns:
+            df['date'] = pd.to_datetime(df[index_name])
+        elif 'index' in df.columns:
+            df['date'] = pd.to_datetime(df['index'])
+        else:
+            logger.warning(f"重置日期索引后未找到日期列，数据列: {list(df.columns)}")
+            return pd.DataFrame()
+        return df
+    
+    logger.warning(f"无法从数据中提取日期列，数据列: {list(df.columns)}")
+    return pd.DataFrame()
+
+
+def _normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    标准化DataFrame的列名
+    
+    Args:
+        df: 输入的DataFrame
+        
+    Returns:
+        标准化后的DataFrame
+    """
+    column_mapping = {
+        'close': 'close',
+        'open': 'open',
+        'high': 'high',
+        'low': 'low',
+        'vol': 'volume',
+        'volume': 'volume',
+        'amount': 'volume'
+    }
+    
+    for old_col, new_col in column_mapping.items():
+        if old_col in df.columns and new_col not in df.columns:
+            df[new_col] = df[old_col]
+    
+    return df
+
+
+def _timestamp_to_milliseconds(timestamp_obj) -> float:
+    """
+    将时间戳对象转换为毫秒时间戳
+    
+    Args:
+        timestamp_obj: pandas Timestamp 或 datetime 对象
+        
+    Returns:
+        毫秒时间戳（float）
+    """
+    try:
+        return timestamp_obj.timestamp() * 1000
+    except AttributeError:
+        if hasattr(timestamp_obj, 'to_pydatetime'):
+            return timestamp_obj.to_pydatetime().timestamp() * 1000
+        return pd.to_datetime(timestamp_obj).timestamp() * 1000
+
+
+def _merge_dataframes(df_pre: pd.DataFrame, df_post: pd.DataFrame) -> pd.DataFrame:
+    """
+    合并两个DataFrame，按日期排序
+    
+    Args:
+        df_pre: 前一个DataFrame
+        df_post: 后一个DataFrame
+        
+    Returns:
+        合并后的DataFrame
+    """
+    if df_pre.empty:
+        return df_post if not df_post.empty else df_pre
+    if df_post.empty:
+        return df_pre
+    
+    if 'date' not in df_pre.columns or 'date' not in df_post.columns:
+        return df_post if not df_post.empty else df_pre
+    
+    df = pd.concat([df_pre, df_post], ignore_index=True)
+    df = df.sort_values('date').reset_index(drop=True)
+    df = df.drop_duplicates(subset=['date']).reset_index(drop=True)
+    return df
+
+
 def get_market_index_code(stock_code: str) -> tuple[str, str]:
     """
     根据股票代码确定对应的大盘指数代码
@@ -156,44 +272,19 @@ def get_stock_data_from_api(stock_code: str, start_date: str, end_date: str) -> 
                 from tradingagents.dataflows.tushare_adapter import get_tushare_adapter
                 adapter = get_tushare_adapter()
                 if adapter and adapter.provider and adapter.provider.connected:
-                    df = adapter.provider.get_stock_data(stock_code, start_date, end_date)
+                    df = adapter.provider.get_stock_daily(stock_code, start_date, end_date)
                     if df is not None and not df.empty:
-                        # 确保列名标准化
-                        if 'trade_date' in df.columns:
-                            df['date'] = pd.to_datetime(df['trade_date'])
-                        elif 'date' not in df.columns:
-                            if df.index.name == 'date':
-                                df = df.reset_index()
-                            elif hasattr(df.index, 'dtype') and pd.api.types.is_datetime64_any_dtype(df.index):
-                                # 如果索引是日期类型，重置为列
-                                df = df.reset_index()
-                                df['date'] = pd.to_datetime(df.index) if 'date' not in df.columns else df['date']
-                            else:
-                                logger.warning(f"无法从数据中提取日期列，数据列: {list(df.columns)}")
-                                return pd.DataFrame()
+                        df = _normalize_date_column(df)
+                        if df.empty:
+                            return pd.DataFrame()
                         
-                        # 标准化列名
-                        column_mapping = {
-                            'close': 'close',
-                            'open': 'open',
-                            'high': 'high',
-                            'low': 'low',
-                            'vol': 'volume',
-                            'volume': 'volume',
-                            'amount': 'volume'  # 如果只有amount，使用它作为volume
-                        }
+                        df = _normalize_column_names(df)
                         
-                        for old_col, new_col in column_mapping.items():
-                            if old_col in df.columns and new_col not in df.columns:
-                                df[new_col] = df[old_col]
-                        
-                        # 确保必要的列存在
-                        required_cols = ['date', 'close']
-                        if all(col in df.columns for col in required_cols):
+                        if 'date' in df.columns and 'close' in df.columns:
                             df = df.sort_values('date').reset_index(drop=True)
                             return df
                         else:
-                            logger.warning(f"数据缺少必要列，已有列: {list(df.columns)}，需要列: {required_cols}")
+                            logger.warning(f"数据缺少必要列，已有列: {list(df.columns)}，需要列: ['date', 'close']")
                             return pd.DataFrame()
             except Exception as e:
                 logger.debug(f"从Tushare适配器获取数据失败: {e}")
@@ -226,7 +317,7 @@ def get_index_data_from_api(index_code: str, start_date: str, end_date: str) -> 
     从API获取指数数据
     
     Args:
-        index_code: 指数代码
+        index_code: 指数代码（如：000001、399001）
         start_date: 开始日期
         end_date: 结束日期
         
@@ -234,45 +325,84 @@ def get_index_data_from_api(index_code: str, start_date: str, end_date: str) -> 
         DataFrame: 指数数据
     """
     try:
-        # 尝试从Tushare适配器直接获取DataFrame
+        # 使用指数数据接口
         try:
+            from tradingagents.dataflows.tushare_utils import get_china_index_data_tushare
             from tradingagents.dataflows.tushare_adapter import get_tushare_adapter
+            
+            # 先尝试从Tushare适配器的Provider直接获取
             adapter = get_tushare_adapter()
             if adapter and adapter.provider and adapter.provider.connected:
-                # 对于指数，可能需要特殊处理
-                # 尝试使用指数的标准格式
+                # 对于指数，需要转换为Tushare标准格式
                 if index_code == "000001":
-                    # 上证指数：可能需要使用 "000001.SH" 或其他格式
+                    # 上证指数
                     index_symbols = ["000001.SH", "000001"]
                 elif index_code == "399001":
                     # 深证成指
                     index_symbols = ["399001.SZ", "399001"]
                 else:
-                    index_symbols = [index_code]
+                    # 尝试自动判断交易所
+                    if index_code.startswith('39'):
+                        index_symbols = [f"{index_code}.SZ", index_code]
+                    elif index_code.startswith('00'):
+                        index_symbols = [f"{index_code}.SH", index_code]
+                    else:
+                        index_symbols = [index_code]
                 
                 for symbol in index_symbols:
                     try:
-                        df = adapter.provider.get_stock_data(symbol, start_date, end_date)
+                        df = adapter.provider.get_index_daily(symbol, start_date, end_date)
                         if df is not None and not df.empty:
-                            # 确保列名标准化
-                            if 'trade_date' in df.columns:
-                                df['date'] = pd.to_datetime(df['trade_date'])
-                            elif 'date' not in df.columns and df.index.name == 'date':
-                                df = df.reset_index()
+                            df = _normalize_date_column(df)
+                            if df.empty:
+                                continue
                             
-                            # 标准化列名
-                            if 'close' in df.columns:
+                            df = _normalize_column_names(df)
+                            
+                            if 'close' in df.columns and 'date' in df.columns:
                                 df = df.sort_values('date').reset_index(drop=True)
+                                logger.debug(f"✅ 成功获取指数数据: {index_code}, 数据条数: {len(df)}")
                                 return df
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"尝试指数代码 {symbol} 失败: {e}")
                         continue
         except Exception as e:
             logger.debug(f"从Tushare适配器获取指数数据失败: {e}")
         
-        # 降级方案：使用统一接口获取字符串数据并解析
+        # 降级方案：使用便捷函数
+        try:
+            from tradingagents.dataflows.tushare_utils import get_china_index_data_tushare
+            
+            # 转换指数代码格式
+            if index_code == "000001":
+                ts_code = "000001.SH"
+            elif index_code == "399001":
+                ts_code = "399001.SZ"
+            elif index_code.startswith('39'):
+                ts_code = f"{index_code}.SZ"
+            elif index_code.startswith('00'):
+                ts_code = f"{index_code}.SH"
+            else:
+                ts_code = index_code
+            
+            df = get_china_index_data_tushare(ts_code, start_date, end_date)
+            if df is not None and not df.empty:
+                df = _normalize_date_column(df)
+                if df.empty:
+                    return pd.DataFrame()
+                
+                df = _normalize_column_names(df)
+                
+                if 'close' in df.columns and 'date' in df.columns:
+                    df = df.sort_values('date').reset_index(drop=True)
+                    logger.debug(f"✅ 降级方案成功获取指数数据: {index_code}, 数据条数: {len(df)}")
+                    return df
+        except Exception as e:
+            logger.warning(f"降级方案获取指数数据失败: {e}")
+        
+        # 最终降级方案：使用统一接口获取字符串数据并解析（不推荐，但作为最后手段）
         from tradingagents.dataflows.interface import get_china_stock_data_unified
         
-        # 尝试获取指数数据（使用与股票相同的接口）
         data_str = get_china_stock_data_unified(index_code, start_date, end_date)
         
         if not data_str or "失败" in data_str or "错误" in data_str:
@@ -288,63 +418,12 @@ def get_index_data_from_api(index_code: str, start_date: str, end_date: str) -> 
         return pd.DataFrame()
 
 
-def extract_predicted_price(analysis_result: Dict[str, Any]) -> Optional[float]:
-    """
-    从分析结果中提取预测价格
-    
-    Args:
-        analysis_result: 分析结果字典
-        
-    Returns:
-        预测价格，如果无法提取则返回None
-    """
-    try:
-        # 尝试从formatted_decision中提取
-        formatted_decision = analysis_result.get('formatted_decision', {})
-        if isinstance(formatted_decision, dict):
-            target_price = formatted_decision.get('target_price')
-            if target_price is not None:
-                try:
-                    if isinstance(target_price, str):
-                        # 清理字符串格式的价格
-                        clean_price = target_price.replace('$', '').replace('¥', '').replace('￥', '').replace('元', '').strip()
-                        return float(clean_price) if clean_price and clean_price.lower() not in ['none', 'null', ''] else None
-                    elif isinstance(target_price, (int, float)):
-                        return float(target_price)
-                except (ValueError, TypeError):
-                    pass
-        
-        # 尝试从reports中提取
-        reports = analysis_result.get('reports', {})
-        if isinstance(reports, dict):
-            # 搜索所有报告中的目标价格
-            for report_key, report_content in reports.items():
-                if isinstance(report_content, str):
-                    # 使用正则表达式提取价格
-                    patterns = [
-                        r'目标[价位格]*[：:]\s*[¥$￥]?(\d+\.?\d*)',
-                        r'目标[价位格]*[：:]\s*(\d+\.?\d*)[元]?',
-                        r'target\s*price[：:]\s*[¥$￥]?(\d+\.?\d*)',
-                    ]
-                    for pattern in patterns:
-                        match = re.search(pattern, report_content, re.IGNORECASE)
-                        if match:
-                            try:
-                                return float(match.group(1))
-                            except (ValueError, TypeError):
-                                continue
-        
-        return None
-        
-    except Exception as e:
-        logger.error(f"提取预测价格失败: {e}")
-        return None
 
 
 def prepare_backtest_data(
     stock_code: str,
     analysis_date: str,
-    predicted_price: Optional[float],
+    target_price: Optional[float],
     min_points: int = 30
 ) -> Dict[str, Any]:
     """
@@ -353,11 +432,11 @@ def prepare_backtest_data(
     Args:
         stock_code: 股票代码
         analysis_date: 分析日期
-        predicted_price: 预测价格
+        target_price: 目标价格
         min_points: 最少数据点数
         
     Returns:
-        包含股票数据、指数数据和预测数据的字典
+        包含股票数据、指数数据和目标价格的字典
     """
     try:
         # 计算日期范围
@@ -387,24 +466,9 @@ def prepare_backtest_data(
             stock_df_pre = get_stock_data_from_api(stock_code, start_date_pre, end_date_pre)
             index_df_pre = get_index_data_from_api(index_code, start_date_pre, end_date_pre)
             
-            # 合并数据（检查是否有date列）
-            if not stock_df_pre.empty and 'date' in stock_df_pre.columns:
-                if not stock_df_post.empty and 'date' in stock_df_post.columns:
-                    stock_df = pd.concat([stock_df_pre, stock_df_post], ignore_index=True)
-                    stock_df = stock_df.sort_values('date').reset_index(drop=True)
-                else:
-                    stock_df = stock_df_pre
-            else:
-                stock_df = stock_df_post if not stock_df_post.empty else stock_df_pre
-            
-            if not index_df_pre.empty and 'date' in index_df_pre.columns:
-                if not index_df_post.empty and 'date' in index_df_post.columns:
-                    index_df = pd.concat([index_df_pre, index_df_post], ignore_index=True)
-                    index_df = index_df.sort_values('date').reset_index(drop=True)
-                else:
-                    index_df = index_df_pre
-            else:
-                index_df = index_df_post if not index_df_post.empty else index_df_pre
+            # 合并数据
+            stock_df = _merge_dataframes(stock_df_pre, stock_df_post)
+            index_df = _merge_dataframes(index_df_pre, index_df_post)
         else:
             stock_df = stock_df_post
             index_df = index_df_post
@@ -419,52 +483,37 @@ def prepare_backtest_data(
             stock_df_pre = get_stock_data_from_api(stock_code, start_date_pre, end_date_pre)
             index_df_pre = get_index_data_from_api(index_code, start_date_pre, end_date_pre)
             
-            if not stock_df_pre.empty and 'date' in stock_df_pre.columns:
-                if not stock_df.empty and 'date' in stock_df.columns:
-                    stock_df = pd.concat([stock_df_pre, stock_df], ignore_index=True)
-                    stock_df = stock_df.sort_values('date').reset_index(drop=True)
-                    stock_df = stock_df.drop_duplicates(subset=['date']).reset_index(drop=True)
-                else:
-                    stock_df = stock_df_pre
-            
-            if not index_df_pre.empty and 'date' in index_df_pre.columns:
-                if not index_df.empty and 'date' in index_df.columns:
-                    index_df = pd.concat([index_df_pre, index_df], ignore_index=True)
-                    index_df = index_df.sort_values('date').reset_index(drop=True)
-                    index_df = index_df.drop_duplicates(subset=['date']).reset_index(drop=True)
-                else:
-                    index_df = index_df_pre
+            stock_df = _merge_dataframes(stock_df_pre, stock_df)
+            index_df = _merge_dataframes(index_df_pre, index_df)
         
         # 标记分析日期（只在有数据时）
         analysis_date_dt = pd.to_datetime(analysis_date)
-        if not stock_df.empty and 'date' in stock_df.columns:
-            stock_df['is_after_analysis'] = stock_df['date'] >= analysis_date_dt
-        elif not stock_df.empty:
-            # 如果没有date列，尝试创建
-            logger.warning(f"股票数据缺少date列，尝试修复...")
-            if 'trade_date' in stock_df.columns:
-                stock_df['date'] = pd.to_datetime(stock_df['trade_date'])
-                stock_df['is_after_analysis'] = stock_df['date'] >= analysis_date_dt
-            else:
-                logger.error(f"股票数据格式异常，缺少date和trade_date列")
-                stock_df = pd.DataFrame()
         
-        if not index_df.empty and 'date' in index_df.columns:
-            index_df['is_after_analysis'] = index_df['date'] >= analysis_date_dt
-        elif not index_df.empty:
-            # 如果没有date列，尝试创建
-            logger.warning(f"指数数据缺少date列，尝试修复...")
-            if 'trade_date' in index_df.columns:
-                index_df['date'] = pd.to_datetime(index_df['trade_date'])
-                index_df['is_after_analysis'] = index_df['date'] >= analysis_date_dt
-            else:
-                logger.error(f"指数数据格式异常，缺少date和trade_date列")
-                index_df = pd.DataFrame()
+        for df_name, df in [('stock', stock_df), ('index', index_df)]:
+            if df.empty:
+                continue
+            
+            if 'date' not in df.columns:
+                logger.warning(f"{df_name}数据缺少date列，尝试修复...")
+                df = _normalize_date_column(df)
+                if df_name == 'stock':
+                    stock_df = df
+                else:
+                    index_df = df
+                if df.empty:
+                    continue
+            
+            if 'date' in df.columns:
+                df['is_after_analysis'] = df['date'] >= analysis_date_dt
+                if df_name == 'stock':
+                    stock_df = df
+                else:
+                    index_df = df
         
         return {
             'stock_data': stock_df,
             'index_data': index_df,
-            'predicted_price': predicted_price,
+            'target_price': target_price,
             'analysis_date': analysis_date,
             'index_code': index_code,
             'index_name': index_name
@@ -477,11 +526,52 @@ def prepare_backtest_data(
         return {
             'stock_data': pd.DataFrame(),
             'index_data': pd.DataFrame(),
-            'predicted_price': predicted_price,
+            'target_price': target_price,
             'analysis_date': analysis_date,
             'index_code': '',
             'index_name': ''
         }
+
+
+def _get_stock_name(stock_code: str) -> str:
+    """
+    获取股票名称
+    
+    Args:
+        stock_code: 股票代码
+        
+    Returns:
+        股票名称，如果获取失败则返回股票代码
+    """
+    try:
+        from tradingagents.dataflows.interface import get_china_stock_info_unified
+        stock_info = get_china_stock_info_unified(stock_code)
+        if "股票名称:" in stock_info:
+            return stock_info.split("股票名称:")[1].split("\n")[0].strip()
+    except Exception as e:
+        logger.debug(f"获取股票名称失败: {e}")
+    
+    # 降级方案：尝试从数据源管理器获取
+    try:
+        from tradingagents.dataflows.data_source_manager import get_data_source_manager
+        from tradingagents.utils.stock_utils import StockUtils
+        
+        manager = get_data_source_manager()
+        market_info = StockUtils.get_market_info(stock_code)
+        if market_info['is_china']:
+            from tradingagents.dataflows.tushare_adapter import get_tushare_adapter
+            adapter = get_tushare_adapter()
+            if adapter and adapter.provider and adapter.provider.connected:
+                try:
+                    stock_basic = adapter.provider.get_stock_basic_info(stock_code)
+                    if stock_basic and 'name' in stock_basic:
+                        return stock_basic['name']
+                except:
+                    pass
+    except Exception as e:
+        logger.debug(f"从数据源管理器获取股票名称失败: {e}")
+    
+    return stock_code
 
 
 def render_backtest_chart(backtest_data: Dict[str, Any], stock_code: str):
@@ -494,7 +584,7 @@ def render_backtest_chart(backtest_data: Dict[str, Any], stock_code: str):
     """
     stock_df = backtest_data['stock_data']
     index_df = backtest_data['index_data']
-    predicted_price = backtest_data['predicted_price']
+    target_price = backtest_data['target_price']
     analysis_date = backtest_data['analysis_date']
     index_name = backtest_data['index_name']
     
@@ -502,43 +592,29 @@ def render_backtest_chart(backtest_data: Dict[str, Any], stock_code: str):
         st.warning("暂无股票数据，无法绘制图表")
         return
     
+    # 获取股票名称
+    stock_name = _get_stock_name(stock_code)
+    
     # 创建子图
     fig = make_subplots(
         rows=2, cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.1,
+        shared_xaxes=False,  # 不共享x轴，让两个图都能显示日期标签
+        vertical_spacing=0.15,  # 增加间距，避免价格图的x轴标签被遮盖
         row_heights=[0.7, 0.3],
-        subplot_titles=(f'{stock_code} 回测对比图', '成交量')
+        subplot_titles=(f'{stock_name} ({stock_code}) 回测对比图', '成交量')
     )
     
     # 分析日期
     analysis_date_dt = pd.to_datetime(analysis_date)
     
-    # 分离分析日期前后的数据
-    stock_before = stock_df[stock_df['date'] < analysis_date_dt]
-    stock_after = stock_df[stock_df['date'] >= analysis_date_dt]
-    
-    # 绘制股票收盘价
-    if not stock_before.empty:
+    # 绘制股票收盘价（不拆分，合并为一条线）
+    if not stock_df.empty:
         fig.add_trace(
             go.Scatter(
-                x=stock_before['date'],
-                y=stock_before['close'],
+                x=stock_df['date'],
+                y=stock_df['close'],
                 mode='lines',
-                name=f'{stock_code} 实际收盘价（分析前）',
-                line=dict(color='lightblue', width=2),
-                legendgroup='stock'
-            ),
-            row=1, col=1
-        )
-    
-    if not stock_after.empty:
-        fig.add_trace(
-            go.Scatter(
-                x=stock_after['date'],
-                y=stock_after['close'],
-                mode='lines',
-                name=f'{stock_code} 实际收盘价（分析后）',
+                name=f'{stock_name} 实际收盘价',
                 line=dict(color='blue', width=2),
                 legendgroup='stock'
             ),
@@ -553,64 +629,49 @@ def render_backtest_chart(backtest_data: Dict[str, Any], stock_code: str):
         
         if index_price_range > 0 and stock_price_range > 0:
             # 找到分析日期当天的股票价格和指数，用于对齐
-            analysis_stock_price = stock_df[stock_df['date'] <= analysis_date_dt]['close'].iloc[-1] if not stock_df[stock_df['date'] <= analysis_date_dt].empty else stock_df['close'].iloc[0]
-            analysis_index_price = index_df[index_df['date'] <= analysis_date_dt]['close'].iloc[-1] if not index_df[index_df['date'] <= analysis_date_dt].empty else index_df['close'].iloc[0]
+            stock_filtered = stock_df[stock_df['date'] <= analysis_date_dt]
+            index_filtered = index_df[index_df['date'] <= analysis_date_dt]
+            analysis_stock_price = stock_filtered['close'].iloc[-1] if not stock_filtered.empty else stock_df['close'].iloc[0]
+            analysis_index_price = index_filtered['close'].iloc[-1] if not index_filtered.empty else index_df['close'].iloc[0]
             
             # 计算归一化系数
             scale_factor = analysis_stock_price / analysis_index_price if analysis_index_price > 0 else 1
-            index_normalized = index_df['close'] * scale_factor
             
-            index_before = index_df[index_df['date'] < analysis_date_dt]
-            index_after = index_df[index_df['date'] >= analysis_date_dt]
-            
-            if not index_before.empty:
+            # 指数数据也不拆分，合并为一条线
+            if not index_df.empty:
+                index_normalized = index_df['close'] * scale_factor
                 fig.add_trace(
                     go.Scatter(
-                        x=index_before['date'],
-                        y=index_normalized[index_before.index],
+                        x=index_df['date'],
+                        y=index_normalized,
                         mode='lines',
-                        name=f'{index_name}（分析前）',
-                        line=dict(color='lightgreen', width=2, dash='dash'),
-                        legendgroup='index'
-                    ),
-                    row=1, col=1
-                )
-            
-            if not index_after.empty:
-                fig.add_trace(
-                    go.Scatter(
-                        x=index_after['date'],
-                        y=index_normalized[index_after.index],
-                        mode='lines',
-                        name=f'{index_name}（分析后）',
+                        name=f'{index_name}',
                         line=dict(color='green', width=2, dash='dash'),
                         legendgroup='index'
                     ),
                     row=1, col=1
                 )
     
-    # 绘制预测价格线
-    if predicted_price is not None:
-        # 在分析日期之后绘制预测价格线
+    # 绘制目标价格线（仅在分析日期之后）
+    if target_price is not None:
+        stock_after = stock_df[stock_df['date'] >= analysis_date_dt]
         if not stock_after.empty:
-            predicted_dates = stock_after['date'].tolist()
-            predicted_prices = [predicted_price] * len(predicted_dates)
-            
             fig.add_trace(
                 go.Scatter(
-                    x=predicted_dates,
-                    y=predicted_prices,
+                    x=stock_after['date'],
+                    y=[target_price] * len(stock_after),
                     mode='lines',
-                    name=f'预测价格: {predicted_price:.2f}',
+                    name=f'目标价格: {target_price:.2f}',
                     line=dict(color='red', width=2, dash='dot'),
-                    legendgroup='predicted'
+                    legendgroup='target'
                 ),
                 row=1, col=1
             )
     
-    # 添加分析日期标记线
+    # 添加分析日期标记线（plotly 的 add_vline 需要 int/float 类型）
+    analysis_date_timestamp = _timestamp_to_milliseconds(analysis_date_dt)
     fig.add_vline(
-        x=analysis_date_dt,
+        x=analysis_date_timestamp,
         line_dash="dash",
         line_color="orange",
         annotation_text="分析日期",
@@ -618,46 +679,49 @@ def render_backtest_chart(backtest_data: Dict[str, Any], stock_code: str):
         row=1, col=1
     )
     
-    # 绘制成交量
-    if 'volume' in stock_df.columns:
-        volume_before = stock_before['volume'] if not stock_before.empty else pd.Series()
-        volume_after = stock_after['volume'] if not stock_after.empty else pd.Series()
-        
-        if not stock_before.empty:
-            fig.add_trace(
-                go.Bar(
-                    x=stock_before['date'],
-                    y=stock_before['volume'],
-                    name='成交量（分析前）',
-                    marker_color='lightgray',
-                    legendgroup='volume',
-                    showlegend=False
-                ),
-                row=2, col=1
-            )
-        
-        if not stock_after.empty:
-            fig.add_trace(
-                go.Bar(
-                    x=stock_after['date'],
-                    y=stock_after['volume'],
-                    name='成交量（分析后）',
-                    marker_color='gray',
-                    legendgroup='volume',
-                    showlegend=False
-                ),
-                row=2, col=1
-            )
+    # 绘制成交量（不拆分，合并为一条）
+    if 'volume' in stock_df.columns and not stock_df.empty:
+        fig.add_trace(
+            go.Bar(
+                x=stock_df['date'],
+                y=stock_df['volume'],
+                name='成交量',
+                marker_color='gray',
+                legendgroup='volume',
+                showlegend=False
+            ),
+            row=2, col=1
+        )
     
     # 更新布局
-    fig.update_xaxes(title_text="日期", row=2, col=1)
+    # 价格图的x轴：显示日期标签（仅月-日）
+    fig.update_xaxes(
+        title_text="日期",
+        tickformat='%m-%d',
+        type='date',
+        tickangle=-45,
+        showgrid=True,
+        showticklabels=True,
+        row=1, col=1
+    )
+    # 成交量图的x轴：显示日期标签（仅月-日）
+    fig.update_xaxes(
+        title_text="日期",
+        tickformat='%m-%d',
+        type='date',
+        tickangle=-45,
+        showgrid=True,
+        showticklabels=True,
+        row=2, col=1
+    )
     fig.update_yaxes(title_text="价格", row=1, col=1)
     fig.update_yaxes(title_text="成交量", row=2, col=1)
     
     fig.update_layout(
-        height=800,
-        title_text=f"{stock_code} 回测分析",
-        hovermode='x unified'
+        height=850,  # 稍微增加高度，为x轴标签留出空间
+        title_text=f"{stock_name} ({stock_code}) 回测分析",
+        hovermode='x unified',
+        margin=dict(b=100)  # 增加底部边距，确保x轴标签可见
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -673,7 +737,7 @@ def render_backtest_table(backtest_data: Dict[str, Any], stock_code: str):
     """
     stock_df = backtest_data['stock_data']
     index_df = backtest_data['index_data']
-    predicted_price = backtest_data['predicted_price']
+    target_price = backtest_data['target_price']
     analysis_date = backtest_data['analysis_date']
     index_name = backtest_data['index_name']
     
@@ -690,11 +754,11 @@ def render_backtest_table(backtest_data: Dict[str, Any], stock_code: str):
         index_data_dict = dict(zip(index_df['date'], index_df['close']))
         result_df[f'{index_name}'] = result_df['日期'].map(index_data_dict)
     
-    # 添加预测价格
-    if predicted_price is not None:
+    # 添加目标价格
+    if target_price is not None:
         analysis_date_dt = pd.to_datetime(analysis_date)
-        result_df['预测价格'] = result_df.apply(
-            lambda row: predicted_price if pd.to_datetime(row['日期']) >= analysis_date_dt else None,
+        result_df['目标价格'] = result_df.apply(
+            lambda row: target_price if pd.to_datetime(row['日期']) >= analysis_date_dt else None,
             axis=1
         )
     
@@ -702,14 +766,14 @@ def render_backtest_table(backtest_data: Dict[str, Any], stock_code: str):
     analysis_date_dt = pd.to_datetime(analysis_date)
     result_df['是否分析后'] = result_df['日期'] >= analysis_date_dt
     
-    # 计算预测误差（如果分析日期后）
-    if predicted_price is not None:
-        result_df['预测误差'] = result_df.apply(
-            lambda row: abs(row[f'{stock_code}收盘价'] - predicted_price) if row['是否分析后'] and pd.notna(row[f'{stock_code}收盘价']) else None,
+    # 计算目标价格误差（如果分析日期后）
+    if target_price is not None:
+        result_df['价格误差'] = result_df.apply(
+            lambda row: abs(row[f'{stock_code}收盘价'] - target_price) if row['是否分析后'] and pd.notna(row[f'{stock_code}收盘价']) else None,
             axis=1
         )
-        result_df['预测误差率(%)'] = result_df.apply(
-            lambda row: abs((row[f'{stock_code}收盘价'] - predicted_price) / predicted_price * 100) if row['是否分析后'] and pd.notna(row[f'{stock_code}收盘价']) and predicted_price > 0 else None,
+        result_df['价格误差率(%)'] = result_df.apply(
+            lambda row: abs((row[f'{stock_code}收盘价'] - target_price) / target_price * 100) if row['是否分析后'] and pd.notna(row[f'{stock_code}收盘价']) and target_price > 0 else None,
             axis=1
         )
     
@@ -720,8 +784,8 @@ def render_backtest_table(backtest_data: Dict[str, Any], stock_code: str):
     columns = ['日期', f'{stock_code}收盘价']
     if not index_df.empty:
         columns.append(f'{index_name}')
-    if predicted_price is not None:
-        columns.extend(['预测价格', '预测误差', '预测误差率(%)'])
+    if target_price is not None:
+        columns.extend(['目标价格', '价格误差', '价格误差率(%)'])
     columns.append('是否分析后')
     
     result_df = result_df[columns]
@@ -731,12 +795,12 @@ def render_backtest_table(backtest_data: Dict[str, Any], stock_code: str):
     st.dataframe(result_df, use_container_width=True)
     
     # 显示统计信息
-    if predicted_price is not None:
+    if target_price is not None:
         after_analysis = result_df[result_df['是否分析后'] == True]
-        if not after_analysis.empty and '预测误差' in after_analysis.columns:
-            errors = after_analysis['预测误差'].dropna()
+        if not after_analysis.empty and '价格误差' in after_analysis.columns:
+            errors = after_analysis['价格误差'].dropna()
             if not errors.empty:
-                st.subheader("📈 预测准确性统计")
+                st.subheader("📈 目标价格准确性统计")
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.metric("平均误差", f"{errors.mean():.2f}")
@@ -745,8 +809,8 @@ def render_backtest_table(backtest_data: Dict[str, Any], stock_code: str):
                 with col3:
                     st.metric("最小误差", f"{errors.min():.2f}")
                 with col4:
-                    if '预测误差率(%)' in after_analysis.columns:
-                        error_rates = after_analysis['预测误差率(%)'].dropna()
+                    if '价格误差率(%)' in after_analysis.columns:
+                        error_rates = after_analysis['价格误差率(%)'].dropna()
                         if not error_rates.empty:
                             st.metric("平均误差率", f"{error_rates.mean():.2f}%")
 
@@ -890,7 +954,7 @@ def render_backtest_page():
         st.info("👆 确认分析结果后，点击「开始回测」按钮进行回测")
         return
     
-    # 提取分析日期和预测价格
+    # 提取分析日期和目标价格
     analysis_date = selected_report.get('analysis_date', '')
     if not analysis_date:
         # 从timestamp提取
@@ -904,11 +968,54 @@ def render_backtest_page():
             st.error("无法确定分析日期")
             return
     
-    # 提取预测价格
-    predicted_price = extract_predicted_price(selected_report)
+    # 提取formatted_decision信息
+    formatted_decision = selected_report.get('formatted_decision', {})
+    if not formatted_decision:
+        st.warning("⚠️ 未找到决策信息，将仅显示实际价格和指数对比。")
     
-    if predicted_price is None:
-        st.warning("⚠️ 未找到预测价格信息，将仅显示实际价格和指数对比。")
+    # 提取目标价格
+    target_price = None
+    if isinstance(formatted_decision, dict):
+        target_price = formatted_decision.get('target_price')
+        if target_price is not None:
+            try:
+                if isinstance(target_price, str):
+                    # 清理字符串格式的价格
+                    clean_price = target_price.replace('$', '').replace('¥', '').replace('￥', '').replace('元', '').strip()
+                    target_price = float(clean_price) if clean_price and clean_price.lower() not in ['none', 'null', ''] else None
+                elif isinstance(target_price, (int, float)):
+                    target_price = float(target_price)
+            except (ValueError, TypeError):
+                target_price = None
+    
+    # 显示决策信息
+    if formatted_decision:
+        st.markdown("---")
+        st.subheader("📋 交易决策信息")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            action = formatted_decision.get('action', 'N/A')
+            action_color = 'red' if action == '卖出' else ('green' if action == '买入' else 'gray')
+            st.markdown(f"**操作建议**: <span style='color:{action_color};font-weight:bold'>{action}</span>", unsafe_allow_html=True)
+            
+            target_price_str = f"{target_price:.2f}" if target_price is not None else "N/A"
+            st.markdown(f"**目标价格**: {target_price_str}")
+        
+        with col2:
+            confidence = formatted_decision.get('confidence', 0)
+            confidence_str = f"{confidence:.1%}" if isinstance(confidence, (int, float)) else str(confidence)
+            st.markdown(f"**置信度**: {confidence_str}")
+            
+            risk_score = formatted_decision.get('risk_score', 0)
+            risk_score_str = f"{risk_score:.2f}" if isinstance(risk_score, (int, float)) else str(risk_score)
+            st.markdown(f"**风险评分**: {risk_score_str}")
+        
+        # 显示决策理由
+        reasoning = formatted_decision.get('reasoning', '')
+        if reasoning:
+            with st.expander("📝 决策理由", expanded=False):
+                st.write(reasoning)
     
     # 准备回测数据
     try:
@@ -916,7 +1023,7 @@ def render_backtest_page():
             backtest_data = prepare_backtest_data(
                 stock_code=stock_code,
                 analysis_date=analysis_date,
-                predicted_price=predicted_price,
+                target_price=target_price,
                 min_points=30
             )
         

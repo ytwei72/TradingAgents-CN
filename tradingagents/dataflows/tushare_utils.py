@@ -165,7 +165,7 @@ class TushareProvider:
         """
         # 记录详细的调用信息
         logger.info(f"🔍 [Tushare详细日志] get_stock_daily 开始执行")
-        logger.info(f"🔍 [Tushare详细日志] 输入参数: symbol='{symbol}', start_date='{start_date}', end_date='{end_date}'")
+        logger.debug(f"🔍 [Tushare详细日志] 输入参数: symbol='{symbol}', start_date='{start_date}', end_date='{end_date}'")
         logger.debug(f"🔍 [Tushare详细日志] 连接状态: {self.connected}")
         logger.debug(f"🔍 [Tushare详细日志] API对象: {type(self.api).__name__ if self.api else 'None'}")
 
@@ -185,24 +185,24 @@ class TushareProvider:
 
             if end_date is None:
                 end_date = datetime.now().strftime('%Y%m%d')
-                logger.info(f"🔍 [Tushare详细日志] 结束日期为空，设置为当前日期: {end_date}")
+                logger.debug(f"🔍 [Tushare详细日志] 结束日期为空，设置为当前日期: {end_date}")
             else:
                 end_date = end_date.replace('-', '')
-                logger.info(f"🔍 [Tushare详细日志] 结束日期转换: '{original_end}' -> '{end_date}'")
+                logger.debug(f"🔍 [Tushare详细日志] 结束日期转换: '{original_end}' -> '{end_date}'")
 
             if start_date is None:
                 start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
-                logger.info(f"🔍 [Tushare详细日志] 开始日期为空，设置为一年前: {start_date}")
+                logger.debug(f"🔍 [Tushare详细日志] 开始日期为空，设置为一年前: {start_date}")
             else:
                 start_date = start_date.replace('-', '')
-                logger.info(f"🔍 [Tushare详细日志] 开始日期转换: '{original_start}' -> '{start_date}'")
+                logger.debug(f"🔍 [Tushare详细日志] 开始日期转换: '{original_start}' -> '{start_date}'")
 
             logger.info(f"🔄 从Tushare获取{ts_code}数据 ({start_date} 到 {end_date})...")
             logger.debug(f"🔍 [股票代码追踪] 调用 Tushare API daily，传入参数: ts_code='{ts_code}', start_date='{start_date}', end_date='{end_date}'")
 
             # 记录API调用前的状态
             api_start_time = time.time()
-            logger.info(f"🔍 [Tushare详细日志] API调用开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
+            logger.debug(f"🔍 [Tushare详细日志] API调用开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
 
             # 获取日线数据
             try:
@@ -212,7 +212,7 @@ class TushareProvider:
                     end_date=end_date
                 )
                 api_duration = time.time() - api_start_time
-                logger.info(f"🔍 [Tushare详细日志] API调用完成，耗时: {api_duration:.3f}秒")
+                logger.debug(f"🔍 [Tushare详细日志] API调用完成，耗时: {api_duration:.3f}秒")
 
             except Exception as api_error:
                 api_duration = time.time() - api_start_time
@@ -223,19 +223,19 @@ class TushareProvider:
 
             # 详细记录返回数据的信息
             logger.debug(f"🔍 [股票代码追踪] Tushare API daily 返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
-            logger.info(f"🔍 [Tushare详细日志] 返回数据类型: {type(data)}")
+            logger.debug(f"🔍 [Tushare详细日志] 返回数据类型: {type(data)}")
 
             if data is not None:
-                logger.info(f"🔍 [Tushare详细日志] 数据是否为空: {data.empty}")
+                logger.debug(f"🔍 [Tushare详细日志] 数据是否为空: {data.empty}")
                 if not data.empty:
-                    logger.info(f"🔍 [Tushare详细日志] 数据列名: {list(data.columns)}")
-                    logger.info(f"🔍 [Tushare详细日志] 数据索引类型: {type(data.index)}")
+                    logger.debug(f"🔍 [Tushare详细日志] 数据列名: {list(data.columns)}")
+                    logger.debug(f"🔍 [Tushare详细日志] 数据索引类型: {type(data.index)}")
                     if 'ts_code' in data.columns:
                         unique_codes = data['ts_code'].unique()
                         logger.debug(f"🔍 [股票代码追踪] 返回数据中的ts_code: {unique_codes}")
                     if 'trade_date' in data.columns:
                         date_range = f"{data['trade_date'].min()} 到 {data['trade_date'].max()}"
-                        logger.info(f"🔍 [Tushare详细日志] 数据日期范围: {date_range}")
+                        logger.debug(f"🔍 [Tushare详细日志] 数据日期范围: {date_range}")
                 else:
                     logger.warning(f"⚠️ [Tushare详细日志] 返回的DataFrame为空")
             else:
@@ -243,35 +243,35 @@ class TushareProvider:
 
             if data is not None and not data.empty:
                 # 数据预处理
-                logger.info(f"🔍 [Tushare详细日志] 开始数据预处理...")
+                logger.debug(f"🔍 [Tushare详细日志] 开始数据预处理...")
                 data = data.sort_values('trade_date')
                 data['trade_date'] = pd.to_datetime(data['trade_date'])
 
                 # 计算前复权价格（基于pct_chg重新计算连续价格）
-                logger.info(f"🔍 [Tushare详细日志] 开始计算前复权价格...")
+                logger.debug(f"🔍 [Tushare详细日志] 开始计算前复权价格...")
                 data = self._calculate_forward_adjusted_prices(data)
-                logger.info(f"🔍 [Tushare详细日志] 前复权价格计算完成")
+                logger.debug(f"🔍 [Tushare详细日志] 前复权价格计算完成")
 
-                logger.info(f"🔍 [Tushare详细日志] 数据预处理完成")
+                logger.debug(f"🔍 [Tushare详细日志] 数据预处理完成")
 
-                logger.info(f"✅ 获取{ts_code}数据成功: {len(data)}条")
+                logger.debug(f"✅ 获取{ts_code}数据成功: {len(data)}条")
 
                 # 缓存数据
                 if self.enable_cache and self.cache_manager:
                     try:
-                        logger.info(f"🔍 [Tushare详细日志] 开始缓存数据...")
+                        logger.debug(f"🔍 [Tushare详细日志] 开始缓存数据...")
                         cache_key = self.cache_manager.save_stock_data(
                             symbol=symbol,
                             data=data,
                             data_source="tushare"
                         )
-                        logger.info(f"💾 A股历史数据已缓存: {symbol} (tushare) -> {cache_key}")
-                        logger.info(f"🔍 [Tushare详细日志] 数据缓存完成")
+                        logger.debug(f"💾 A股历史数据已缓存: {symbol} (tushare) -> {cache_key}")
+                        logger.debug(f"🔍 [Tushare详细日志] 数据缓存完成")
                     except Exception as cache_error:
                         logger.error(f"⚠️ 缓存保存失败: {cache_error}")
                         logger.error(f"⚠️ [Tushare详细日志] 缓存异常类型: {type(cache_error).__name__}")
 
-                logger.info(f"🔍 [Tushare详细日志] get_stock_daily 执行成功，返回数据")
+                logger.debug(f"🔍 [Tushare详细日志] get_stock_daily 执行成功，返回数据")
                 return data
             else:
                 logger.warning(f"⚠️ Tushare返回空数据: {ts_code}")
@@ -284,6 +284,260 @@ class TushareProvider:
             logger.error(f"❌ [Tushare详细日志] 异常信息: {str(e)}")
             import traceback
             logger.error(f"❌ [Tushare详细日志] 异常堆栈: {traceback.format_exc()}")
+            return pd.DataFrame()
+
+    def get_fund_daily(self, symbol: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        获取基金日线数据
+        
+        Args:
+            symbol: 基金代码（如：390001.SZ 或 510300.SH）
+            start_date: 开始日期（YYYY-MM-DD 或 YYYYMMDD）
+            end_date: 结束日期（YYYY-MM-DD 或 YYYYMMDD）
+            
+        Returns:
+            DataFrame: 基金日线数据
+        """
+        # 记录详细的调用信息
+        logger.info(f"🔍 [基金数据] get_fund_daily 开始执行")
+        logger.debug(f"🔍 [基金数据] 输入参数: symbol='{symbol}', start_date='{start_date}', end_date='{end_date}'")
+        logger.debug(f"🔍 [基金数据] 连接状态: {self.connected}")
+
+        if not self.connected:
+            logger.error(f"❌ [基金数据] Tushare未连接，无法获取基金数据")
+            return pd.DataFrame()
+
+        try:
+            # 验证是否是基金代码（399xxx是股票指数，不是基金）
+            symbol_clean = symbol.replace('.SZ', '').replace('.SH', '').replace('.BJ', '')
+            if symbol_clean.startswith('399'):
+                logger.warning(f"⚠️ [基金数据] {symbol}是股票指数（399xxx），不是基金，请使用get_stock_daily")
+                return pd.DataFrame()
+            
+            # 标准化基金代码
+            logger.debug(f"🔍 [基金数据] 标准化基金代码: '{symbol}'")
+            ts_code = self._normalize_symbol(symbol)
+            logger.debug(f"🔍 [基金数据] 标准化后代码: '{ts_code}'")
+
+            # 设置默认日期
+            original_start = start_date
+            original_end = end_date
+
+            if end_date is None:
+                end_date = datetime.now().strftime('%Y%m%d')
+                logger.debug(f"🔍 [基金数据] 结束日期为空，设置为当前日期: {end_date}")
+            else:
+                end_date = end_date.replace('-', '')
+                logger.debug(f"🔍 [基金数据] 结束日期转换: '{original_end}' -> '{end_date}'")
+
+            if start_date is None:
+                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
+                logger.debug(f"🔍 [基金数据] 开始日期为空，设置为一年前: {start_date}")
+            else:
+                start_date = start_date.replace('-', '')
+                logger.debug(f"🔍 [基金数据] 开始日期转换: '{original_start}' -> '{start_date}'")
+
+            logger.info(f"🔄 从Tushare获取基金{ts_code}数据 ({start_date} 到 {end_date})...")
+
+            # 记录API调用前的状态
+            api_start_time = time.time()
+            logger.debug(f"🔍 [基金数据] API调用开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
+
+            # 获取基金日线数据
+            try:
+                data = self.api.fund_daily(
+                    ts_code=ts_code,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                api_duration = time.time() - api_start_time
+                logger.debug(f"🔍 [基金数据] fund_daily API调用完成，耗时: {api_duration:.3f}秒")
+
+            except Exception as api_error:
+                api_duration = time.time() - api_start_time
+                logger.error(f"❌ [基金数据] API调用异常，耗时: {api_duration:.3f}秒")
+                logger.error(f"❌ [基金数据] API异常类型: {type(api_error).__name__}")
+                logger.error(f"❌ [基金数据] API异常信息: {str(api_error)}")
+                raise api_error
+
+            # 详细记录返回数据的信息
+            logger.debug(f"🔍 [基金数据] API返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
+            logger.debug(f"🔍 [基金数据] 返回数据类型: {type(data)}")
+
+            if data is not None:
+                logger.debug(f"🔍 [基金数据] 数据是否为空: {data.empty}")
+                if not data.empty:
+                    logger.debug(f"🔍 [基金数据] 数据列名: {list(data.columns)}")
+                    if 'ts_code' in data.columns:
+                        unique_codes = data['ts_code'].unique()
+                        logger.debug(f"🔍 [基金数据] 返回数据中的ts_code: {unique_codes}")
+                    if 'trade_date' in data.columns:
+                        date_range = f"{data['trade_date'].min()} 到 {data['trade_date'].max()}"
+                        logger.debug(f"🔍 [基金数据] 数据日期范围: {date_range}")
+                else:
+                    logger.warning(f"⚠️ [基金数据] 返回的DataFrame为空")
+            else:
+                logger.warning(f"⚠️ [基金数据] 返回数据为None")
+
+            if data is not None and not data.empty:
+                # 数据预处理
+                logger.debug(f"🔍 [基金数据] 开始数据预处理...")
+                data = data.sort_values('trade_date')
+                data['trade_date'] = pd.to_datetime(data['trade_date'])
+
+                logger.debug(f"🔍 [基金数据] 数据预处理完成")
+                logger.info(f"✅ 获取基金{ts_code}数据成功: {len(data)}条")
+
+                # 缓存数据
+                if self.enable_cache and self.cache_manager:
+                    try:
+                        logger.debug(f"🔍 [基金数据] 开始缓存数据...")
+                        cache_key = self.cache_manager.save_stock_data(
+                            symbol=symbol,
+                            data=data,
+                            data_source="tushare_fund"
+                        )
+                        logger.debug(f"💾 基金历史数据已缓存: {symbol} (tushare_fund) -> {cache_key}")
+                    except Exception as cache_error:
+                        logger.error(f"⚠️ 缓存保存失败: {cache_error}")
+
+                logger.debug(f"🔍 [基金数据] get_fund_daily 执行成功，返回数据")
+                return data
+            else:
+                logger.warning(f"⚠️ Tushare返回空基金数据: {ts_code}")
+                logger.warning(f"⚠️ [基金数据] 空数据详情: data={data}, empty={data.empty if data is not None else 'N/A'}")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"❌ 获取基金{symbol}数据失败: {e}")
+            logger.error(f"❌ [基金数据] 异常类型: {type(e).__name__}")
+            logger.error(f"❌ [基金数据] 异常信息: {str(e)}")
+            import traceback
+            logger.error(f"❌ [基金数据] 异常堆栈: {traceback.format_exc()}")
+            return pd.DataFrame()
+
+    def get_index_daily(self, symbol: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        获取指数日线数据
+        
+        Args:
+            symbol: 指数代码（如：000001.SH、399001.SZ）
+            start_date: 开始日期（YYYY-MM-DD 或 YYYYMMDD）
+            end_date: 结束日期（YYYY-MM-DD 或 YYYYMMDD）
+            
+        Returns:
+            DataFrame: 指数日线数据
+        """
+        # 记录详细的调用信息
+        logger.info(f"🔍 [指数数据] get_index_daily 开始执行")
+        logger.debug(f"🔍 [指数数据] 输入参数: symbol='{symbol}', start_date='{start_date}', end_date='{end_date}'")
+        logger.debug(f"🔍 [指数数据] 连接状态: {self.connected}")
+
+        if not self.connected:
+            logger.error(f"❌ [指数数据] Tushare未连接，无法获取指数数据")
+            return pd.DataFrame()
+
+        try:
+            # 标准化指数代码
+            logger.debug(f"🔍 [指数数据] 标准化指数代码: '{symbol}'")
+            ts_code = self._normalize_symbol(symbol)
+            logger.debug(f"🔍 [指数数据] 标准化后代码: '{ts_code}'")
+
+            # 设置默认日期
+            original_start = start_date
+            original_end = end_date
+
+            if end_date is None:
+                end_date = datetime.now().strftime('%Y%m%d')
+                logger.debug(f"🔍 [指数数据] 结束日期为空，设置为当前日期: {end_date}")
+            else:
+                end_date = end_date.replace('-', '')
+                logger.debug(f"🔍 [指数数据] 结束日期转换: '{original_end}' -> '{end_date}'")
+
+            if start_date is None:
+                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
+                logger.debug(f"🔍 [指数数据] 开始日期为空，设置为一年前: {start_date}")
+            else:
+                start_date = start_date.replace('-', '')
+                logger.debug(f"🔍 [指数数据] 开始日期转换: '{original_start}' -> '{start_date}'")
+
+            logger.info(f"🔄 从Tushare获取指数{ts_code}数据 ({start_date} 到 {end_date})...")
+
+            # 记录API调用前的状态
+            api_start_time = time.time()
+            logger.debug(f"🔍 [指数数据] API调用开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
+
+            # 获取指数日线数据
+            try:
+                data = self.api.index_daily(
+                    ts_code=ts_code,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                api_duration = time.time() - api_start_time
+                logger.debug(f"🔍 [指数数据] index_daily API调用完成，耗时: {api_duration:.3f}秒")
+
+            except Exception as api_error:
+                api_duration = time.time() - api_start_time
+                logger.error(f"❌ [指数数据] API调用异常，耗时: {api_duration:.3f}秒")
+                logger.error(f"❌ [指数数据] API异常类型: {type(api_error).__name__}")
+                logger.error(f"❌ [指数数据] API异常信息: {str(api_error)}")
+                raise api_error
+
+            # 详细记录返回数据的信息
+            logger.debug(f"🔍 [指数数据] API返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
+            logger.debug(f"🔍 [指数数据] 返回数据类型: {type(data)}")
+
+            if data is not None:
+                logger.debug(f"🔍 [指数数据] 数据是否为空: {data.empty}")
+                if not data.empty:
+                    logger.debug(f"🔍 [指数数据] 数据列名: {list(data.columns)}")
+                    if 'ts_code' in data.columns:
+                        unique_codes = data['ts_code'].unique()
+                        logger.debug(f"🔍 [指数数据] 返回数据中的ts_code: {unique_codes}")
+                    if 'trade_date' in data.columns:
+                        date_range = f"{data['trade_date'].min()} 到 {data['trade_date'].max()}"
+                        logger.debug(f"🔍 [指数数据] 数据日期范围: {date_range}")
+                else:
+                    logger.warning(f"⚠️ [指数数据] 返回的DataFrame为空")
+            else:
+                logger.warning(f"⚠️ [指数数据] 返回数据为None")
+
+            if data is not None and not data.empty:
+                # 数据预处理
+                logger.debug(f"🔍 [指数数据] 开始数据预处理...")
+                data = data.sort_values('trade_date')
+                data['trade_date'] = pd.to_datetime(data['trade_date'])
+
+                logger.debug(f"🔍 [指数数据] 数据预处理完成")
+                logger.info(f"✅ 获取指数{ts_code}数据成功: {len(data)}条")
+
+                # 缓存数据
+                if self.enable_cache and self.cache_manager:
+                    try:
+                        logger.debug(f"🔍 [指数数据] 开始缓存数据...")
+                        cache_key = self.cache_manager.save_stock_data(
+                            symbol=symbol,
+                            data=data,
+                            data_source="tushare_index"
+                        )
+                        logger.debug(f"💾 指数历史数据已缓存: {symbol} (tushare_index) -> {cache_key}")
+                    except Exception as cache_error:
+                        logger.error(f"⚠️ 缓存保存失败: {cache_error}")
+
+                logger.debug(f"🔍 [指数数据] get_index_daily 执行成功，返回数据")
+                return data
+            else:
+                logger.warning(f"⚠️ Tushare返回空指数数据: {ts_code}")
+                logger.warning(f"⚠️ [指数数据] 空数据详情: data={data}, empty={data.empty if data is not None else 'N/A'}")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"❌ 获取指数{symbol}数据失败: {e}")
+            logger.error(f"❌ [指数数据] 异常类型: {type(e).__name__}")
+            logger.error(f"❌ [指数数据] 异常信息: {str(e)}")
+            import traceback
+            logger.error(f"❌ [指数数据] 异常堆栈: {traceback.format_exc()}")
             return pd.DataFrame()
 
     def _calculate_forward_adjusted_prices(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -585,3 +839,35 @@ def get_china_stock_info_tushare(symbol: str) -> Dict:
     """
     provider = get_tushare_provider()
     return provider.get_stock_info(symbol)
+
+
+def get_china_fund_data_tushare(symbol: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+    """
+    获取中国基金日线数据的便捷函数（Tushare数据源）
+    
+    Args:
+        symbol: 基金代码（如：390001 或 390001.SZ）
+        start_date: 开始日期（YYYY-MM-DD 或 YYYYMMDD）
+        end_date: 结束日期（YYYY-MM-DD 或 YYYYMMDD）
+        
+    Returns:
+        DataFrame: 基金日线数据
+    """
+    provider = get_tushare_provider()
+    return provider.get_fund_daily(symbol, start_date, end_date)
+
+
+def get_china_index_data_tushare(symbol: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+    """
+    获取中国指数日线数据的便捷函数（Tushare数据源）
+    
+    Args:
+        symbol: 指数代码（如：000001 或 000001.SH、399001 或 399001.SZ）
+        start_date: 开始日期（YYYY-MM-DD 或 YYYYMMDD）
+        end_date: 结束日期（YYYY-MM-DD 或 YYYYMMDD）
+        
+    Returns:
+        DataFrame: 指数日线数据
+    """
+    provider = get_tushare_provider()
+    return provider.get_index_daily(symbol, start_date, end_date)

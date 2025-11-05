@@ -275,6 +275,8 @@ class MongoDBReportManager:
                     "tags": [],
                     "is_favorite": False,
                     "reports": doc.get("reports", {}),
+                    "formatted_decision": doc.get("formatted_decision", {}),
+                    "analysis_date": doc.get("analysis_date", ""),
                     "source": "mongodb"
                 }
                 results.append(result)
