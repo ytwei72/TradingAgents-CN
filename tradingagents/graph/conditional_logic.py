@@ -59,7 +59,6 @@ class ConditionalLogic:
         """Determine if debate should continue."""
         debate_state = state["investment_debate_state"]
         count = debate_state.get("count", 0)
-        current_response = debate_state.get("current_response", "")
         
         # 计算最大允许的count值（2个节点各执行max_debate_rounds次）
         max_count = 2 * self.max_debate_rounds
@@ -69,20 +68,19 @@ class ConditionalLogic:
             logger.info(f"📊 [辩论] 达到最大轮数 ({count} >= {max_count})，结束辩论，跳转到 Research Manager")
             return "Research Manager"
         
-        # 如果当前响应以"Bull"开头，轮到看跌研究员
-        if current_response.startswith("Bull"):
-            logger.info(f"📊 [辩论] 当前响应以'Bull'开头 (count={count}/{max_count})，轮到看跌研究员")
+        # 使用count计数来决定下一个发言者
+        # count为偶数（包括0）时，轮到看涨研究员；count为奇数时，轮到看跌研究员
+        if count % 2 == 0:
+            logger.info(f"📊 [辩论] count={count} (偶数)，轮到看涨研究员")
+            return "Bull Researcher"
+        else:
+            logger.info(f"📊 [辩论] count={count} (奇数)，轮到看跌研究员")
             return "Bear Researcher"
-        
-        # 否则轮到看涨研究员（初始状态或当前响应以"Bear"开头）
-        logger.info(f"📊 [辩论] 轮到看涨研究员 (count={count}/{max_count}, current_response={current_response[:50] if current_response else '空'}...)")
-        return "Bull Researcher"
 
     def should_continue_risk_analysis(self, state: AgentState) -> str:
         """Determine if risk analysis should continue."""
         risk_state = state["risk_debate_state"]
         count = risk_state.get("count", 0)
-        latest_speaker = risk_state.get("latest_speaker", "")
         
         # 计算最大允许的count值（3个节点各执行max_risk_discuss_rounds次）
         max_count = 3 * self.max_risk_discuss_rounds
@@ -92,16 +90,16 @@ class ConditionalLogic:
             logger.info(f"⚠️ [风险分析] 达到最大轮数 ({count} >= {max_count})，结束风险分析，跳转到 Risk Judge")
             return "Risk Judge"
         
-        # 如果最后发言者是激进分析师，轮到保守分析师
-        if latest_speaker.startswith("Risky"):
-            logger.info(f"⚠️ [风险分析] 最后发言者是激进分析师 (count={count}/{max_count})，轮到保守分析师")
+        # 使用count计数来决定下一个发言者
+        # count % 3 == 0: 激进分析师
+        # count % 3 == 1: 保守分析师
+        # count % 3 == 2: 中性分析师
+        if count % 3 == 0:
+            logger.info(f"⚠️ [风险分析] count={count} (mod 3 == 0)，轮到激进分析师")
+            return "Risky Analyst"
+        elif count % 3 == 1:
+            logger.info(f"⚠️ [风险分析] count={count} (mod 3 == 1)，轮到保守分析师")
             return "Safe Analyst"
-        
-        # 如果最后发言者是保守分析师，轮到中性分析师
-        if latest_speaker.startswith("Safe"):
-            logger.info(f"⚠️ [风险分析] 最后发言者是保守分析师 (count={count}/{max_count})，轮到中性分析师")
+        else:  # count % 3 == 2
+            logger.info(f"⚠️ [风险分析] count={count} (mod 3 == 2)，轮到中性分析师")
             return "Neutral Analyst"
-        
-        # 否则轮到激进分析师（初始状态或最后发言者是中性分析师）
-        logger.info(f"⚠️ [风险分析] 轮到激进分析师 (count={count}/{max_count}, latest_speaker={latest_speaker or '空'})")
-        return "Risky Analyst"

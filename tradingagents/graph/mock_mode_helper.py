@@ -76,7 +76,7 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
     logger.info(f"🎭 [模拟模式] 节点 {node_name} 启用模拟模式")
     
     # 尝试加载历史输出
-    historical_state = _graph_instance._load_historical_step_output(node_name, ticker, trade_date)
+    historical_state = _graph_instance._load_historical_step_output(node_name, ticker, trade_date, state)
     
     # 记录开始时间（用于计算耗时）
     start_time = time.time()
@@ -93,6 +93,19 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
             merged_state['analysis_id'] = preserved_analysis_id
         if preserved_session_id is not None:
             merged_state['session_id'] = preserved_session_id
+        
+        # 模拟模式下也需要更新count值，以保持与真实执行一致的行为
+        # 对于研究员节点（bull_researcher, bear_researcher），增加investment_debate_state的count
+        if node_name in ['bull_researcher', 'bear_researcher']:
+            if 'investment_debate_state' in merged_state and isinstance(merged_state['investment_debate_state'], dict):
+                current_count = merged_state['investment_debate_state'].get('count', 0)
+                merged_state['investment_debate_state']['count'] = current_count + 1
+        
+        # 对于风险分析师节点（risky_analyst, safe_analyst, neutral_analyst），增加risk_debate_state的count
+        if node_name in ['risky_analyst', 'safe_analyst', 'neutral_analyst']:
+            if 'risk_debate_state' in merged_state and isinstance(merged_state['risk_debate_state'], dict):
+                current_count = merged_state['risk_debate_state'].get('count', 0)
+                merged_state['risk_debate_state']['count'] = current_count + 1
         
         # 随机sleep 2-10秒
         sleep_time = random.uniform(

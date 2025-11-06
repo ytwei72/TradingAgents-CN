@@ -501,13 +501,14 @@ class TradingAgentsGraph:
         # 检查节点是否在配置列表中
         return self.mock_mode_config.get(node_name, False)
     
-    def _load_historical_step_output(self, node_name: str, ticker: str, trade_date: str) -> Optional[Dict[str, Any]]:
+    def _load_historical_step_output(self, node_name: str, ticker: str, trade_date: str, current_state: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """从历史步骤文件中加载指定节点的输出
         
         Args:
             node_name: 节点名称
             ticker: 股票代码
             trade_date: 交易日期
+            current_state: 当前状态字典，用于获取count值
             
         Returns:
             如果找到历史输出则返回状态字典，否则返回None
@@ -556,7 +557,7 @@ class TradingAgentsGraph:
                     
                     if best_match:
                         logger.info(f"🎭 [模拟模式] 找到历史输出: {node_name} (步骤 {best_match.get('step_number', '?')}, 匹配分数: {best_match_score})")
-                        return self._convert_historical_to_state(best_match, node_name)
+                        return self._convert_historical_to_state(best_match, node_name, current_state)
                 except Exception as e:
                     logger.debug(f"🔍 [模拟模式] 读取历史文件失败: {e}")
                     continue
@@ -693,12 +694,13 @@ class TradingAgentsGraph:
         
         return score
     
-    def _convert_historical_to_state(self, historical_step: Dict[str, Any], node_name: str) -> Dict[str, Any]:
+    def _convert_historical_to_state(self, historical_step: Dict[str, Any], node_name: str, current_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """将历史步骤数据转换为状态字典
         
         Args:
             historical_step: 历史步骤数据
             node_name: 节点名称
+            current_state: 当前状态字典，用于获取count值
             
         Returns:
             状态字典
@@ -731,10 +733,34 @@ class TradingAgentsGraph:
                 state[field] = historical_step[field]
         
         # 复制辩论状态
+        # 使用当前state的count值（如果存在），否则设为0
         if 'investment_debate_state' in historical_step:
-            state['investment_debate_state'] = historical_step['investment_debate_state']
+            investment_state = historical_step['investment_debate_state'].copy() if isinstance(historical_step['investment_debate_state'], dict) else historical_step['investment_debate_state']
+            if isinstance(investment_state, dict):
+                # 如果当前state中有count值，使用当前state的count值；否则设为0
+                if current_state and 'investment_debate_state' in current_state and isinstance(current_state['investment_debate_state'], dict):
+                    current_count = current_state['investment_debate_state'].get('count')
+                    if current_count is not None:
+                        investment_state['count'] = current_count
+                    else:
+                        investment_state['count'] = 0
+                else:
+                    investment_state['count'] = 0
+            state['investment_debate_state'] = investment_state
+        
         if 'risk_debate_state' in historical_step:
-            state['risk_debate_state'] = historical_step['risk_debate_state']
+            risk_state = historical_step['risk_debate_state'].copy() if isinstance(historical_step['risk_debate_state'], dict) else historical_step['risk_debate_state']
+            if isinstance(risk_state, dict):
+                # 如果当前state中有count值，使用当前state的count值；否则设为0
+                if current_state and 'risk_debate_state' in current_state and isinstance(current_state['risk_debate_state'], dict):
+                    current_count = current_state['risk_debate_state'].get('count')
+                    if current_count is not None:
+                        risk_state['count'] = current_count
+                    else:
+                        risk_state['count'] = 0
+                else:
+                    risk_state['count'] = 0
+            state['risk_debate_state'] = risk_state
         
         return state
     
