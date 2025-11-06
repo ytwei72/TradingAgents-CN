@@ -782,7 +782,7 @@ def save_analysis_results(
     if message_producer and analysis_id and async_tracker:
         try:
             import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
+            from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
             current_step = 11  # 步骤12（索引从0开始）
             total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
             progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
@@ -797,7 +797,7 @@ def save_analysis_results(
                 remaining_time=0,
                 last_message="💾 正在保存分析报告...",
                 module_name="save_results",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.START.value  # 任务节点状态
+                node_status=NodeStatus.START.value  # 任务节点状态：开始
             )
             message_producer.publish_progress(progress_msg)
         except Exception as e:
@@ -855,7 +855,7 @@ def save_analysis_results(
         if message_producer and analysis_id and async_tracker:
             try:
                 import time
-                from tradingagents.messaging.business.messages import TaskProgressMessage
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
                 current_step = 11  # 步骤12（索引从0开始）
                 total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
                 progress_percentage = 100.0  # 步骤12完成，进度为100%
@@ -876,7 +876,7 @@ def save_analysis_results(
                     remaining_time=0,
                     last_message=final_msg,
                     module_name="save_results",  # 任务节点名称（英文ID）
-                    node_status=NodeStatus.COMPLETE.value  # 任务节点状态
+                    node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
                 )
                 message_producer.publish_progress(progress_msg)
             except Exception as e:
@@ -892,7 +892,7 @@ def save_analysis_results(
         if message_producer and analysis_id and async_tracker:
             try:
                 import time
-                from tradingagents.messaging.business.messages import TaskProgressMessage
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
                 current_step = 11  # 步骤12（索引从0开始）
                 total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
                 progress_percentage = 100.0  # 即使出错，步骤也算完成
@@ -907,7 +907,7 @@ def save_analysis_results(
                     remaining_time=0,
                     last_message=error_msg,
                     module_name="save_results",  # 任务节点名称（英文ID）
-                    node_status=NodeStatus.ERROR.value  # 任务节点状态
+                    node_status=NodeStatus.ERROR.value  # 任务节点状态：错误
                 )
                 message_producer.publish_progress(progress_msg)
             except Exception as e:

@@ -17,13 +17,14 @@ class SignalProcessor:
         self.quick_thinking_llm = quick_thinking_llm
 
     @message_analysis_module("graph_signal_processing")
-    def process_signal(self, full_signal: str, stock_symbol: str = None) -> dict:
+    def process_signal(self, full_signal: str, stock_symbol: str = None, analysis_id: str = None) -> dict:
         """
         Process a full trading signal to extract structured decision information.
 
         Args:
             full_signal: Complete trading signal text
             stock_symbol: Stock symbol to determine currency type
+            analysis_id: Analysis ID for progress tracking (optional)
 
         Returns:
             Dictionary containing extracted decision information

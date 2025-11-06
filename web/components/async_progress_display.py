@@ -714,7 +714,7 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
             logger.debug(f"步骤 {i+1} ({step_name}) 状态信息: module_name={module_name}, node_status={node_status}, end_time={history.get('end_time', 'N/A')}")
             
             # 如果步骤在step_history中且有end_time，确保状态为完成
-            if 'end_time' in history and history['end_time'] > 0:
+            if 'end_time' in history and history['end_time'] is not None and history['end_time'] > 0:
                 # 如果node_status缺失或为start，但步骤已完成，强制设置为complete
                 if not node_status or node_status == 'start':
                     node_status = 'complete'
@@ -740,9 +740,14 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
                 status_text = '⏸️ 已暂停'
             else:
                 # 默认情况下，如果步骤在step_history中且有end_time，视为已完成
-                status = 'completed'
-                icon = '✅'
-                status_text = '✅ 已完成'
+                if 'end_time' in history and history['end_time'] is not None and history['end_time'] > 0:
+                    status = 'completed'
+                    icon = '✅'
+                    status_text = '✅ 已完成'
+                else:
+                    status = 'pending'
+                    icon = '⏳'
+                    status_text = '⏳ 等待执行'
             
             # 构建消息，包含节点信息和状态
             if module_name:
@@ -750,12 +755,18 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
             else:
                 message_text = f'{step_description} - {status_text}'
             
+            # 处理end_time为None的情况（start状态）
+            end_time = history.get('end_time')
+            if end_time is None:
+                # 如果end_time为None，说明步骤还在进行中，使用当前时间
+                end_time = time.time()
+            
             steps_history.append({
                 'phase': f'阶段 {i+1}: {step_name}',
                 'message': message_text,
-                'timestamp': history['end_time'],  # 使用实际完成时间
-                'step_duration': history['duration'],  # 步骤执行时长
-                'total_elapsed': history['end_time'] - start_time,  # 从开始到完成该步骤的总用时
+                'timestamp': end_time,  # 使用实际完成时间（如果为None则使用当前时间）
+                'step_duration': history.get('duration', 0),  # 步骤执行时长
+                'total_elapsed': end_time - start_time,  # 从开始到完成该步骤的总用时
                 'status': status,
                 'icon': icon,
                 'module_name': module_name,  # 任务节点名称

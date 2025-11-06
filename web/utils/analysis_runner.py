@@ -482,12 +482,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         logger.debug(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")
         logger.debug(f"🔍 [DEBUG] decision内容: {decision}")
 
-        update_progress("📋 分析完成，正在整理结果...")
-        
-        # 发布步骤10进度消息
+        # 发布步骤10开始消息
         if message_producer and analysis_id:
             try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
                 if async_tracker:
                     current_step = 9  # 步骤10（索引从0开始）
                     total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
@@ -498,16 +496,43 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                         total_steps=total_steps,
                         progress_percentage=progress_percentage,
                         current_step_name="📋 处理分析结果",
-                        current_step_description="分析完成，正在整理结果",
+                        current_step_description="开始处理分析结果",
                         elapsed_time=time.time() - analysis_start_time,
                         remaining_time=0,
                         last_message="📋 分析完成，正在整理结果...",
                         module_name="result_processing",  # 任务节点名称（英文ID）
-                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态
+                        node_status=NodeStatus.START.value  # 任务节点状态：开始
                     )
                     message_producer.publish_progress(progress_msg)
             except Exception as e:
-                logger.debug(f"发布步骤10消息失败: {e}")
+                logger.debug(f"发布步骤10开始消息失败: {e}")
+
+        update_progress("📋 分析完成，正在整理结果...")
+        
+        # 发布步骤10完成消息
+        if message_producer and analysis_id:
+            try:
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
+                if async_tracker:
+                    current_step = 9  # 步骤10（索引从0开始）
+                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
+                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
+                    progress_msg = TaskProgressMessage(
+                        analysis_id=analysis_id,
+                        current_step=current_step,
+                        total_steps=total_steps,
+                        progress_percentage=progress_percentage,
+                        current_step_name="📋 处理分析结果",
+                        current_step_description="分析结果处理完成",
+                        elapsed_time=time.time() - analysis_start_time,
+                        remaining_time=0,
+                        last_message="📋 分析完成，正在整理结果...",
+                        module_name="result_processing",  # 任务节点名称（英文ID）
+                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
+                    )
+                    message_producer.publish_progress(progress_msg)
+            except Exception as e:
+                logger.debug(f"发布步骤10完成消息失败: {e}")
 
         # 提取风险评估数据
         risk_assessment = extract_risk_assessment(state)
@@ -535,6 +560,31 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         }
 
         # ========== 步骤11: 记录完成日志 ==========
+        # 发布步骤11开始消息
+        if message_producer and analysis_id:
+            try:
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
+                if async_tracker:
+                    current_step = 10  # 步骤11（索引从0开始）
+                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
+                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
+                    progress_msg = TaskProgressMessage(
+                        analysis_id=analysis_id,
+                        current_step=current_step,
+                        total_steps=total_steps,
+                        progress_percentage=progress_percentage,
+                        current_step_name="✅ 记录完成日志",
+                        current_step_description="开始记录完成日志",
+                        elapsed_time=time.time() - analysis_start_time,
+                        remaining_time=0,
+                        last_message="✅ 记录完成日志...",
+                        module_name="completion_logging",  # 任务节点名称（英文ID）
+                        node_status=NodeStatus.START.value  # 任务节点状态：开始
+                    )
+                    message_producer.publish_progress(progress_msg)
+            except Exception as e:
+                logger.debug(f"发布步骤11开始消息失败: {e}")
+
         update_progress("✅ 记录完成日志...")
         analysis_duration = time.time() - analysis_start_time
         
@@ -564,10 +614,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         
         update_progress(f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}")
         
-        # 发布步骤11进度消息
+        # 发布步骤11完成消息
         if message_producer and analysis_id:
             try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
                 if async_tracker:
                     current_step = 10  # 步骤11（索引从0开始）
                     total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
@@ -583,11 +633,11 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                         remaining_time=0,
                         last_message=f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}",
                         module_name="completion_logging",  # 任务节点名称（英文ID）
-                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态
+                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
                     )
                     message_producer.publish_progress(progress_msg)
             except Exception as e:
-                logger.debug(f"发布步骤11消息失败: {e}")
+                logger.debug(f"发布步骤11完成消息失败: {e}")
 
         # ========== 步骤12: 保存分析结果 ==========
         save_analysis_results(results, stock_symbol, analysis_id, update_progress, async_tracker)

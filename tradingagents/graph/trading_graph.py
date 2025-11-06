@@ -424,7 +424,7 @@ class TradingAgentsGraph:
         self._log_state(trade_date, final_state)
 
         # Return decision and processed signal
-        return final_state, self.process_signal(final_state["final_trade_decision"], company_name)
+        return final_state, self.process_signal(final_state["final_trade_decision"], company_name, analysis_id=analysis_id)
 
     def _load_mock_mode_config(self) -> Dict[str, bool]:
         """加载模拟模式配置，支持节点级别的配置
@@ -980,6 +980,6 @@ class TradingAgentsGraph:
             self.curr_state, returns_losses, self.risk_manager_memory
         )
 
-    def process_signal(self, full_signal, stock_symbol=None):
+    def process_signal(self, full_signal, stock_symbol=None, analysis_id=None):
         """Process a signal to extract the core decision."""
-        return self.signal_processor.process_signal(full_signal, stock_symbol)
+        return self.signal_processor.process_signal(full_signal, stock_symbol, analysis_id=analysis_id)

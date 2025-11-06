@@ -448,34 +448,89 @@ class AsyncProgressTracker:
             old_step = self.current_step
             new_step = message['current_step']
             
-            # 如果收到完成状态的消息，先确保当前步骤被标记为完成
-            if node_status == 'complete' and old_step not in [s['step_index'] for s in self.step_history]:
-                # 当前步骤还没有记录，先记录为完成
-                step_start = self.step_start_times.get(old_step, current_time)
-                step_duration = current_time - step_start
-                self.step_history.append({
-                    'step_index': old_step,
-                    'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
-                    'start_time': step_start,
-                    'end_time': current_time,
-                    'duration': step_duration,
-                    'message': message.get('last_message', ''),
-                    'module_name': module_name,
-                    'node_status': 'complete'  # 任务节点状态
-                })
-            elif node_status == 'complete':
-                # 当前步骤已经记录，更新其状态为完成
-                for step_record in self.step_history:
-                    if step_record['step_index'] == old_step:
-                        step_record['node_status'] = 'complete'
-                        step_record['end_time'] = current_time
-                        step_record['duration'] = current_time - step_record.get('start_time', current_time)
-                        step_record['message'] = message.get('last_message', step_record.get('message', ''))
-                        if module_name:
-                            step_record['module_name'] = module_name
-                        break
+            # 处理start消息：记录步骤开始
+            if node_status == 'start':
+                # 如果步骤切换，记录旧步骤的完成（如果有）
+                if new_step != old_step and old_step not in [s['step_index'] for s in self.step_history]:
+                    # 旧步骤还没有记录，先记录为完成
+                    step_start = self.step_start_times.get(old_step, current_time)
+                    step_duration = current_time - step_start
+                    self.step_history.append({
+                        'step_index': old_step,
+                        'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
+                        'start_time': step_start,
+                        'end_time': current_time,
+                        'duration': step_duration,
+                        'message': message.get('last_message', ''),
+                        'module_name': module_name,
+                        'node_status': 'complete'  # 旧步骤完成
+                    })
+                
+                # 记录新步骤的开始（如果还没有记录）
+                if new_step not in [s['step_index'] for s in self.step_history]:
+                    self.step_start_times[new_step] = current_time
+                    self.step_history.append({
+                        'step_index': new_step,
+                        'step_name': self.analysis_steps[new_step]['name'] if new_step < len(self.analysis_steps) else '未知',
+                        'start_time': current_time,
+                        'end_time': None,  # 尚未完成
+                        'duration': 0,
+                        'message': message.get('last_message', ''),
+                        'module_name': module_name,
+                        'node_status': 'start'  # 任务节点状态：开始
+                    })
+                else:
+                    # 更新已存在的步骤记录为start状态
+                    for step_record in self.step_history:
+                        if step_record['step_index'] == new_step:
+                            step_record['node_status'] = 'start'
+                            step_record['start_time'] = current_time
+                            step_record['message'] = message.get('last_message', step_record.get('message', ''))
+                            if module_name:
+                                step_record['module_name'] = module_name
+                            break
+                
+                # 更新当前步骤
+                if new_step != old_step:
+                    self.current_step = new_step
             
-            if new_step != old_step and new_step >= old_step:
+            # 处理complete消息
+            elif node_status == 'complete':
+                # 如果收到完成状态的消息，先确保当前步骤被标记为完成
+                if old_step not in [s['step_index'] for s in self.step_history]:
+                    # 当前步骤还没有记录，先记录为完成
+                    step_start = self.step_start_times.get(old_step, current_time)
+                    step_duration = current_time - step_start
+                    self.step_history.append({
+                        'step_index': old_step,
+                        'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
+                        'start_time': step_start,
+                        'end_time': current_time,
+                        'duration': step_duration,
+                        'message': message.get('last_message', ''),
+                        'module_name': module_name,
+                        'node_status': 'complete'  # 任务节点状态
+                    })
+                else:
+                    # 当前步骤已经记录，更新其状态为完成
+                    for step_record in self.step_history:
+                        if step_record['step_index'] == old_step:
+                            step_record['node_status'] = 'complete'
+                            step_record['end_time'] = current_time
+                            step_record['duration'] = current_time - step_record.get('start_time', current_time)
+                            step_record['message'] = message.get('last_message', step_record.get('message', ''))
+                            if module_name:
+                                step_record['module_name'] = module_name
+                            break
+                
+                # 如果步骤切换，记录新步骤的开始
+                if new_step != old_step and new_step >= old_step:
+                    self.current_step = new_step
+                    if new_step not in self.step_start_times:
+                        self.step_start_times[new_step] = current_time
+            
+            # 处理步骤切换（非start/complete消息）
+            elif new_step != old_step and new_step >= old_step:
                 # 记录步骤切换（如果旧步骤还没有记录）
                 if old_step not in [s['step_index'] for s in self.step_history]:
                     step_start = self.step_start_times.get(old_step, current_time)
@@ -573,7 +628,7 @@ class AsyncProgressTracker:
             'safe_analyst': self._find_step_by_keyword(['保守风险分析师', '保守策略', '保守']),
             'neutral_analyst': self._find_step_by_keyword(['中性风险分析师', '平衡策略', '平衡']),
             'risk_manager': self._find_step_by_keyword(['风险经理', '风险控制', '控制']),
-            'graph_signal_processing': self._find_step_by_keyword(['信号处理', '处理信号']),
+            'graph_signal_processing': self._find_step_by_keyword(['信号处理', '处理信号']),  # 信号处理在风险经理之后，应该映射到信号处理步骤
         }
         
         return module_step_map.get(module_name)

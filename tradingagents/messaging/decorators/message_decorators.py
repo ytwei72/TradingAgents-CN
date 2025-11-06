@@ -77,7 +77,7 @@ def _find_step_by_module_name(module_name: str, analysis_steps: list) -> Optiona
         'safe_analyst': ['保守风险分析师', '保守策略', '保守'],
         'neutral_analyst': ['中性风险分析师', '平衡策略', '平衡'],
         'risk_manager': ['风险经理', '风险控制', '控制'],
-        'graph_signal_processing': ['信号处理', '处理信号'],
+        'graph_signal_processing': ['信号处理', '处理信号'],  # 信号处理在风险经理之后，应该映射到信号处理步骤
     }
     
     keywords = module_keywords_map.get(module_name, [])
