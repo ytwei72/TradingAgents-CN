@@ -7,10 +7,13 @@ logger = get_logger("default")
 
 # 导入分析模块日志装饰器
 from tradingagents.utils.tool_logging import log_analysis_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 
 
 def create_neutral_debator(llm):
-    @log_analysis_module("neutral_analyst")
+    @message_analysis_module("neutral_analyst")
+    @log_analysis_module("neutral_analyst")  # 保留日志装饰器作为后备
     def neutral_node(state) -> dict:
         risk_debate_state = state["risk_debate_state"]
         history = risk_debate_state.get("history", "")

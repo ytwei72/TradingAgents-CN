@@ -7,10 +7,13 @@ logger = get_logger("default")
 
 # 导入分析模块日志装饰器
 from tradingagents.utils.tool_logging import log_analysis_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 
 
 def create_research_manager(llm, memory):
-    @log_analysis_module("research_manager")
+    @message_analysis_module("research_manager")
+    @log_analysis_module("research_manager")  # 保留日志装饰器作为后备
     def research_manager_node(state) -> dict:
         history = state["investment_debate_state"].get("history", "")
         market_research_report = state["market_report"]

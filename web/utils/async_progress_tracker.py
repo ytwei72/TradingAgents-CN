@@ -128,32 +128,37 @@ class AsyncProgressTracker:
         self.message_producer = None
         self._init_message_system()
 
-        # 注册到日志系统进行自动进度更新（兼容模式）
-        if not self.message_producer:
-            try:
-                from .progress_log_handler import register_analysis_tracker
-                import threading
-
-                # 使用超时机制避免死锁
-                def register_with_timeout():
-                    try:
-                        register_analysis_tracker(self.analysis_id, self)
-                        print(f"✅ [进度集成] 跟踪器注册成功: {self.analysis_id}")
-                    except Exception as e:
-                        print(f"❌ [进度集成] 跟踪器注册失败: {e}")
-
-                # 在单独线程中注册，避免阻塞主线程
-                register_thread = threading.Thread(target=register_with_timeout, daemon=True)
-                register_thread.start()
-                register_thread.join(timeout=2.0)  # 2秒超时
-
-                if register_thread.is_alive():
-                    print(f"⚠️ [进度集成] 跟踪器注册超时，继续执行: {self.analysis_id}")
-
-            except ImportError:
-                logger.debug("📊 [异步进度] 日志集成不可用")
-            except Exception as e:
-                print(f"❌ [进度集成] 跟踪器注册异常: {e}")
+        # ========== 日志系统注册已禁用（已迁移到消息模式） ==========
+        # 注意：任务阶段识别、状态和进度获取已迁移到消息模式
+        # 如果消息模式未启用，系统会回退到消息装饰器的日志模式
+        # 不再使用 ProgressLogHandler 进行日志识别
+        
+        # 注册到日志系统进行自动进度更新（已禁用，迁移到消息模式）
+        # if not self.message_producer:
+        #     try:
+        #         from .progress_log_handler import register_analysis_tracker
+        #         import threading
+        #
+        #         # 使用超时机制避免死锁
+        #         def register_with_timeout():
+        #             try:
+        #                 register_analysis_tracker(self.analysis_id, self)
+        #                 print(f"✅ [进度集成] 跟踪器注册成功: {self.analysis_id}")
+        #             except Exception as e:
+        #                 print(f"❌ [进度集成] 跟踪器注册失败: {e}")
+        #
+        #         # 在单独线程中注册，避免阻塞主线程
+        #         register_thread = threading.Thread(target=register_with_timeout, daemon=True)
+        #         register_thread.start()
+        #         register_thread.join(timeout=2.0)  # 2秒超时
+        #
+        #         if register_thread.is_alive():
+        #             print(f"⚠️ [进度集成] 跟踪器注册超时，继续执行: {self.analysis_id}")
+        #
+        #     except ImportError:
+        #         logger.debug("📊 [异步进度] 日志集成不可用")
+        #     except Exception as e:
+        #         print(f"❌ [进度集成] 跟踪器注册异常: {e}")
     
     def _init_message_system(self):
         """初始化消息系统"""
@@ -393,119 +398,18 @@ class AsyncProgressTracker:
         return total_time
     
     def update_progress(self, message: str, step: Optional[int] = None):
-        """更新进度状态"""
+        """更新进度状态（保留函数，但已迁移到消息模式）
+        
+        注意：此函数保留用于向后兼容，但任务阶段识别、状态和进度获取已迁移到消息模式。
+        在消息模式下，进度更新通过 update_progress_from_message 和 handle_module_* 方法处理。
+        """
         current_time = time.time()
         # 使用有效时长（排除暂停时间）
         elapsed_time = self.get_effective_elapsed_time()
 
-        # 自动检测步骤
-        if step is None:
-            step = self._detect_step_from_message(message)
-            logger.info(f"📊 [进度监测] 检测到步骤: step={step}, message={message}")
+        # 仅记录日志（保留用于调试）
+        logger.debug(f"📊 [进度更新-日志模式] {self.analysis_id}: {message[:50]}... (消息模式启用时，状态更新由消息消费处理)")
 
-        # 更新步骤（防止倒退）
-        old_step = self.current_step
-        if step is not None and step >= self.current_step:
-            # 如果步骤发生变化，记录历史
-            if step != old_step:
-                old_step_name = self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知'
-                new_step_name = self.analysis_steps[step]['name'] if step < len(self.analysis_steps) else '未知'
-                
-                # 记录旧步骤的完成时间
-                if old_step not in [s['step_index'] for s in self.step_history]:
-                    step_start = self.step_start_times.get(old_step, current_time)
-                    step_duration = current_time - step_start
-                    self.step_history.append({
-                        'step_index': old_step,
-                        'step_name': old_step_name,
-                        'start_time': step_start,
-                        'end_time': current_time,
-                        'duration': step_duration,
-                        'message': message
-                    })
-                    logger.info(f"📝 [步骤切换-记录] 步骤 {old_step} ({old_step_name}) 完成，用时: {step_duration:.2f}秒")
-                else:
-                    logger.info(f"📝 [步骤切换-跳过] 步骤 {old_step} ({old_step_name}) 已记录")
-                
-                logger.info(f"🔄 [步骤切换] 从步骤 {old_step} ({old_step_name}) → 步骤 {step} ({new_step_name})")
-                
-                # 记录新步骤的开始时间
-                self.step_start_times[step] = current_time
-                
-            self.current_step = step
-            logger.debug(f"📊 [异步进度] 步骤推进到 {self.current_step + 1}/{len(self.analysis_steps)}")
-
-        # 如果是完成消息，确保进度为100%
-        if "分析完成" in message or "分析成功" in message or "✅ 分析完成" in message:
-            # 记录最后一步的完成时间
-            if self.current_step not in [s['step_index'] for s in self.step_history]:
-                step_start = self.step_start_times.get(self.current_step, current_time)
-                step_duration = current_time - step_start
-                self.step_history.append({
-                    'step_index': self.current_step,
-                    'step_name': self.analysis_steps[self.current_step]['name'] if self.current_step < len(self.analysis_steps) else '未知',
-                    'start_time': step_start,
-                    'end_time': current_time,
-                    'duration': step_duration,
-                    'message': message
-                })
-            
-            self.current_step = len(self.analysis_steps) - 1
-            logger.info(f"📊 [异步进度] 分析完成，设置为最终步骤")
-        
-
-        # 计算进度
-        progress_percentage = self._calculate_weighted_progress() * 100
-        remaining_time = self._estimate_remaining_time(progress_percentage / 100, elapsed_time)
-
-        # 更新进度数据
-        current_step_info = self.analysis_steps[self.current_step] if self.current_step < len(self.analysis_steps) else self.analysis_steps[-1]
-
-        # 特殊处理工具调用消息，更新步骤描述但不改变步骤
-        step_description = current_step_info['description']
-        if "工具调用" in message:
-            # 提取工具名称并更新描述
-            if "get_stock_market_data_unified" in message:
-                step_description = "正在获取市场数据和技术指标..."
-            elif "get_stock_fundamentals_unified" in message:
-                step_description = "正在获取基本面数据和财务指标..."
-            elif "get_china_stock_data" in message:
-                step_description = "正在获取A股市场数据..."
-            elif "get_china_fundamentals" in message:
-                step_description = "正在获取A股基本面数据..."
-            else:
-                step_description = "正在调用分析工具..."
-        elif "模块开始" in message:
-            step_description = f"开始{current_step_info['name']}..."
-        elif "模块完成" in message:
-            step_description = f"{current_step_info['name']}已完成"
-
-        self.progress_data.update({
-            'current_step': self.current_step,
-            'progress_percentage': progress_percentage,
-            'current_step_name': current_step_info['name'],
-            'current_step_description': step_description,
-            'elapsed_time': elapsed_time,
-            'remaining_time': remaining_time,
-            'last_message': message,
-            'last_update': current_time,
-            'status': 'completed' if progress_percentage >= 100 else 'running',
-            'step_history': self.step_history  # 保存步骤执行历史
-        })
-
-        # 保存到存储
-        self._save_progress()
-
-        # 注意：消息生产已完全解耦
-        # - 消息模式：消息由装饰器直接发布，进度更新通过消息消费（update_progress_from_message/handle_module_*）处理
-        # - 日志模式：update_progress只负责状态更新和保存，不发布消息
-        # 这样可以避免循环依赖：update_progress -> publish -> consumer -> update_progress_from_message
-
-        # 详细的更新日志
-        step_name = current_step_info.get('name', '未知')
-        logger.info(f"📊 [进度更新] {self.analysis_id}: {message[:50]}...")
-        logger.debug(f"📊 [进度详情] 步骤{self.current_step + 1}/{len(self.analysis_steps)} ({step_name}), 进度{progress_percentage:.1f}%, 耗时{elapsed_time:.1f}s")
-    
     def _publish_progress_message(self):
         """发布进度消息"""
         if self.message_producer:
@@ -536,14 +440,43 @@ class AsyncProgressTracker:
             message: 消息负载字典
         """
         current_time = time.time()
+        node_status = message.get('node_status', '')
+        module_name = message.get('module_name', '')
         
         # 直接使用消息中的结构化数据
         if 'current_step' in message:
             old_step = self.current_step
             new_step = message['current_step']
             
+            # 如果收到完成状态的消息，先确保当前步骤被标记为完成
+            if node_status == 'complete' and old_step not in [s['step_index'] for s in self.step_history]:
+                # 当前步骤还没有记录，先记录为完成
+                step_start = self.step_start_times.get(old_step, current_time)
+                step_duration = current_time - step_start
+                self.step_history.append({
+                    'step_index': old_step,
+                    'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
+                    'start_time': step_start,
+                    'end_time': current_time,
+                    'duration': step_duration,
+                    'message': message.get('last_message', ''),
+                    'module_name': module_name,
+                    'node_status': 'complete'  # 任务节点状态
+                })
+            elif node_status == 'complete':
+                # 当前步骤已经记录，更新其状态为完成
+                for step_record in self.step_history:
+                    if step_record['step_index'] == old_step:
+                        step_record['node_status'] = 'complete'
+                        step_record['end_time'] = current_time
+                        step_record['duration'] = current_time - step_record.get('start_time', current_time)
+                        step_record['message'] = message.get('last_message', step_record.get('message', ''))
+                        if module_name:
+                            step_record['module_name'] = module_name
+                        break
+            
             if new_step != old_step and new_step >= old_step:
-                # 记录步骤切换
+                # 记录步骤切换（如果旧步骤还没有记录）
                 if old_step not in [s['step_index'] for s in self.step_history]:
                     step_start = self.step_start_times.get(old_step, current_time)
                     step_duration = current_time - step_start
@@ -553,14 +486,43 @@ class AsyncProgressTracker:
                         'start_time': step_start,
                         'end_time': current_time,
                         'duration': step_duration,
-                        'message': message.get('last_message', '')
+                        'message': message.get('last_message', ''),
+                        'module_name': module_name,  # 任务节点名称（英文ID）
+                        'node_status': node_status if node_status else 'complete'  # 任务节点状态，默认为完成
                     })
                 
                 self.current_step = new_step
                 if new_step not in self.step_start_times:
                     self.step_start_times[new_step] = current_time
+        elif node_status == 'complete':
+            # 如果没有current_step但收到完成消息，记录当前步骤的完成状态
+            current_step = self.current_step
+            if current_step not in [s['step_index'] for s in self.step_history]:
+                step_start = self.step_start_times.get(current_step, current_time)
+                step_duration = current_time - step_start
+                self.step_history.append({
+                    'step_index': current_step,
+                    'step_name': self.analysis_steps[current_step]['name'] if current_step < len(self.analysis_steps) else '未知',
+                    'start_time': step_start,
+                    'end_time': current_time,
+                    'duration': step_duration,
+                    'message': message.get('last_message', ''),
+                    'module_name': module_name,
+                    'node_status': 'complete'  # 任务节点状态
+                })
+            else:
+                # 更新已存在的步骤记录为完成状态
+                for step_record in self.step_history:
+                    if step_record['step_index'] == current_step:
+                        step_record['node_status'] = 'complete'
+                        step_record['end_time'] = current_time
+                        step_record['duration'] = current_time - step_record.get('start_time', current_time)
+                        step_record['message'] = message.get('last_message', step_record.get('message', ''))
+                        if module_name:
+                            step_record['module_name'] = module_name
+                        break
         
-        # 更新进度数据
+        # 更新进度数据（包含节点信息）
         self.progress_data.update({
             'current_step': message.get('current_step', self.current_step),
             'progress_percentage': message.get('progress_percentage', self.progress_data.get('progress_percentage', 0.0)),
@@ -570,101 +532,20 @@ class AsyncProgressTracker:
             'remaining_time': message.get('remaining_time', self.progress_data.get('remaining_time', 0.0)),
             'last_message': message.get('last_message', self.progress_data.get('last_message', '')),
             'last_update': current_time,
+            'current_module_name': message.get('module_name'),  # 当前任务节点名称
+            'current_node_status': message.get('node_status'),  # 当前任务节点状态
+            'step_history': self.step_history  # 同步步骤历史（包含节点信息和状态）
         })
         
         # 保存到存储
         self._save_progress()
-        logger.debug(f"📊 [消息更新] 从消息更新进度: {self.analysis_id} - {message.get('progress_percentage', 0):.1f}%")
-    
-    def handle_module_start(self, message: Dict[str, Any]):
-        """处理模块开始消息
+        logger.info(f"📊 [消息更新] 从消息更新进度: {self.analysis_id} - {message.get('progress_percentage', 0):.1f}%")
         
-        Args:
-            message: 消息负载字典，包含 module_name, stock_symbol 等
-        """
+        # 记录任务节点名称和状态
         module_name = message.get('module_name', '')
-        step = self._find_step_by_module_name(module_name)
-        
-        if step is not None:
-            old_step = self.current_step
-            if step >= old_step:
-                # 记录步骤切换
-                if old_step not in [s['step_index'] for s in self.step_history]:
-                    step_start = self.step_start_times.get(old_step, time.time())
-                    step_duration = time.time() - step_start
-                    self.step_history.append({
-                        'step_index': old_step,
-                        'step_name': self.analysis_steps[old_step]['name'] if old_step < len(self.analysis_steps) else '未知',
-                        'start_time': step_start,
-                        'end_time': time.time(),
-                        'duration': step_duration,
-                        'message': f"模块开始: {module_name}"
-                    })
-                
-                self.current_step = step
-                if step not in self.step_start_times:
-                    self.step_start_times[step] = time.time()
-                
-                self._update_progress_data()
-                self._save_progress()
-                
-                # 注意：消息发布已解耦，由消息装饰器直接发布模块事件消息
-                # 这里只负责更新内部状态，不发布消息
-                
-                logger.info(f"📊 [模块开始] {self.analysis_id} - {module_name} -> 步骤 {step + 1}")
-    
-    def handle_module_complete(self, message: Dict[str, Any]):
-        """处理模块完成消息
-        
-        Args:
-            message: 消息负载字典，包含 module_name, duration 等
-        """
-        current_time = time.time()
-        
-        # 记录当前步骤的完成时间
-        if self.current_step not in [s['step_index'] for s in self.step_history]:
-            step_start = self.step_start_times.get(self.current_step, current_time)
-            step_duration = current_time - step_start
-            self.step_history.append({
-                'step_index': self.current_step,
-                'step_name': self.analysis_steps[self.current_step]['name'] if self.current_step < len(self.analysis_steps) else '未知',
-                'start_time': step_start,
-                'end_time': current_time,
-                'duration': step_duration,
-                'message': f"模块完成: {message.get('module_name', '')}"
-            })
-        
-        # 推进到下一步
-        next_step = min(self.current_step + 1, len(self.analysis_steps) - 1)
-        if next_step != self.current_step:
-            self.current_step = next_step
-            if next_step not in self.step_start_times:
-                self.step_start_times[next_step] = current_time
-            
-            self._update_progress_data()
-            self._save_progress()
-            
-            # 注意：消息发布已解耦，由消息装饰器直接发布模块事件消息
-            # 这里只负责更新内部状态，不发布消息
-            
-            logger.info(f"📊 [模块完成] {self.analysis_id} - {message.get('module_name', '')} -> 步骤 {next_step + 1}")
-    
-    def handle_module_error(self, message: Dict[str, Any]):
-        """处理模块错误消息
-        
-        Args:
-            message: 消息负载字典，包含 module_name, error_message 等
-        """
-        error_msg = message.get('error_message', '未知错误')
-        module_name = message.get('module_name', '')
-        
-        self.progress_data.update({
-            'last_message': f"模块错误: {module_name} - {error_msg}",
-            'last_update': time.time(),
-        })
-        self._save_progress()
-        
-        logger.warning(f"📊 [模块错误] {self.analysis_id} - {module_name}: {error_msg}")
+        node_status = message.get('node_status', '')
+        if module_name or node_status:
+            logger.info(f"📦 [任务节点] {self.analysis_id} - 节点: {module_name or '未知'}, 状态: {node_status or '未知'}")
     
     def _find_step_by_module_name(self, module_name: str) -> Optional[int]:
         """根据模块名称查找步骤（替代关键字匹配）

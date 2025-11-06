@@ -9,10 +9,9 @@ from tradingagents.utils.logging_manager import get_logger
 from ..handler.message_handler import MessageHandler, MessageType
 from .messages import (
     TaskStatus,
-    ModuleEvent,
+    NodeStatus,
     TaskProgressMessage,
-    TaskStatusMessage,
-    ModuleEventMessage
+    TaskStatusMessage
 )
 
 logger = get_logger('messaging.producer')
@@ -45,10 +44,12 @@ class TaskMessageProducer:
             'current_step_description': progress_data.current_step_description,
             'elapsed_time': progress_data.elapsed_time,
             'remaining_time': progress_data.remaining_time,
-            'last_message': progress_data.last_message
+            'last_message': progress_data.last_message,
+            'module_name': progress_data.module_name,  # 任务节点名称（英文ID）
+            'node_status': progress_data.node_status  # 任务节点状态
         }
         self.handler.publish(MessageType.TASK_PROGRESS, payload)
-        logger.debug(f"已发布进度消息: {progress_data.analysis_id} - {progress_data.progress_percentage:.1f}%")
+        logger.debug(f"已发布进度消息: {progress_data.analysis_id} - {progress_data.progress_percentage:.1f}% - 节点: {progress_data.module_name} - 状态: {progress_data.node_status}")
     
     def publish_status(self, analysis_id: str, status: TaskStatus, message: str):
         """发布状态消息
@@ -66,67 +67,4 @@ class TaskMessageProducer:
         }
         self.handler.publish(MessageType.TASK_STATUS, payload)
         logger.info(f"已发布状态消息: {analysis_id} - {status.value}")
-    
-    def publish_module_start(self, analysis_id: str, module_name: str, 
-                            stock_symbol: Optional[str] = None, **extra):
-        """发布模块开始消息
-        
-        Args:
-            analysis_id: 分析ID
-            module_name: 模块名称
-            stock_symbol: 股票代码（可选）
-            **extra: 额外数据
-        """
-        payload = {
-            'analysis_id': analysis_id,
-            'module_name': module_name,
-            'stock_symbol': stock_symbol,
-            'event': ModuleEvent.START.value,
-            **extra
-        }
-        self.handler.publish(MessageType.MODULE_START, payload)
-        logger.debug(f"已发布模块开始消息: {analysis_id} - {module_name}")
-    
-    def publish_module_complete(self, analysis_id: str, module_name: str,
-                               duration: float, stock_symbol: Optional[str] = None,
-                               **extra):
-        """发布模块完成消息
-        
-        Args:
-            analysis_id: 分析ID
-            module_name: 模块名称
-            duration: 执行时长（秒）
-            stock_symbol: 股票代码（可选）
-            **extra: 额外数据
-        """
-        payload = {
-            'analysis_id': analysis_id,
-            'module_name': module_name,
-            'stock_symbol': stock_symbol,
-            'event': ModuleEvent.COMPLETE.value,
-            'duration': duration,
-            **extra
-        }
-        self.handler.publish(MessageType.MODULE_COMPLETE, payload)
-        logger.debug(f"已发布模块完成消息: {analysis_id} - {module_name} (耗时: {duration:.2f}s)")
-    
-    def publish_module_error(self, analysis_id: str, module_name: str,
-                            error_message: str, stock_symbol: Optional[str] = None):
-        """发布模块错误消息
-        
-        Args:
-            analysis_id: 分析ID
-            module_name: 模块名称
-            error_message: 错误消息
-            stock_symbol: 股票代码（可选）
-        """
-        payload = {
-            'analysis_id': analysis_id,
-            'module_name': module_name,
-            'stock_symbol': stock_symbol,
-            'event': ModuleEvent.ERROR.value,
-            'error_message': error_message
-        }
-        self.handler.publish(MessageType.MODULE_ERROR, payload)
-        logger.warning(f"已发布模块错误消息: {analysis_id} - {module_name} - {error_message}")
 

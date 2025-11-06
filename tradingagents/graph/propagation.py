@@ -20,10 +20,10 @@ class Propagator:
         self.max_recur_limit = max_recur_limit
 
     def create_initial_state(
-        self, company_name: str, trade_date: str
+        self, company_name: str, trade_date: str, analysis_id: str = None, session_id: str = None
     ) -> Dict[str, Any]:
         """Create the initial state for the agent graph."""
-        return {
+        state = {
             "messages": [("human", company_name)],
             "company_of_interest": company_name,
             "trade_date": str(trade_date),
@@ -44,6 +44,14 @@ class Propagator:
             "sentiment_report": "",
             "news_report": "",
         }
+        
+        # 添加analysis_id和session_id到state，供消息装饰器使用
+        if analysis_id:
+            state["analysis_id"] = analysis_id
+        if session_id:
+            state["session_id"] = session_id
+        
+        return state
 
     def get_graph_args(self) -> Dict[str, Any]:
         """Get arguments for the graph invocation."""

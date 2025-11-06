@@ -7,6 +7,7 @@
 
 import streamlit as st
 import time
+import html
 from typing import Optional, Dict, Any
 from web.utils.async_progress_tracker import get_progress_by_id, format_time
 
@@ -705,19 +706,68 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
         if i in step_history_map:
             # 已完成的步骤，使用实际记录的时间
             history = step_history_map[i]
+            # 从消息中获取节点信息和状态（确保与消息处理时保存的状态信息对应）
+            module_name = history.get('module_name', '')
+            node_status = history.get('node_status', '')
+            
+            # 调试日志：检查状态信息
+            logger.debug(f"步骤 {i+1} ({step_name}) 状态信息: module_name={module_name}, node_status={node_status}, end_time={history.get('end_time', 'N/A')}")
+            
+            # 如果步骤在step_history中且有end_time，确保状态为完成
+            if 'end_time' in history and history['end_time'] > 0:
+                # 如果node_status缺失或为start，但步骤已完成，强制设置为complete
+                if not node_status or node_status == 'start':
+                    node_status = 'complete'
+                    logger.debug(f"步骤 {i+1} 已完成但状态为 {history.get('node_status')}，更新为 complete")
+            
+            # 根据节点状态确定显示状态（确保完成状态正确显示）
+            # 状态值映射：complete -> completed, start -> running, error -> error
+            if node_status == 'error':
+                status = 'error'
+                icon = '❌'
+                status_text = '❌ 执行失败'
+            elif node_status in ['complete', 'completed']:  # 支持两种完成状态值
+                status = 'completed'
+                icon = '✅'
+                status_text = '✅ 已完成'
+            elif node_status == 'start':
+                status = 'running'
+                icon = '🔄'
+                status_text = '🔄 执行中'
+            elif node_status == 'paused':
+                status = 'paused'
+                icon = '⏸️'
+                status_text = '⏸️ 已暂停'
+            else:
+                # 默认情况下，如果步骤在step_history中且有end_time，视为已完成
+                status = 'completed'
+                icon = '✅'
+                status_text = '✅ 已完成'
+            
+            # 构建消息，包含节点信息和状态
+            if module_name:
+                message_text = f'{step_description}\n{status_text} - 节点: {module_name} (状态: {node_status or "complete"})'
+            else:
+                message_text = f'{step_description} - {status_text}'
+            
             steps_history.append({
                 'phase': f'阶段 {i+1}: {step_name}',
-                'message': f'{step_description} - 已完成',
+                'message': message_text,
                 'timestamp': history['end_time'],  # 使用实际完成时间
                 'step_duration': history['duration'],  # 步骤执行时长
                 'total_elapsed': history['end_time'] - start_time,  # 从开始到完成该步骤的总用时
-                'status': 'completed',
-                'icon': '✅'
+                'status': status,
+                'icon': icon,
+                'module_name': module_name,  # 任务节点名称
+                'node_status': node_status  # 任务节点状态
             })
         elif i == current_step:
             # 当前进行中的步骤
             current_message = progress_data.get('last_message', '')
+            current_module_name = progress_data.get('current_module_name', '')
+            current_node_status = progress_data.get('current_node_status', 'start')
             current_time = time.time()
+            
             # 计算当前步骤已运行时长
             if i in step_history_map:
                 step_start = step_history_map[i]['start_time']
@@ -730,14 +780,33 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
                     step_start = start_time
             step_duration = current_time - step_start
             
+            # 根据节点状态确定显示状态和图标
+            if current_node_status == 'error':
+                status = 'error'
+                icon = '❌'
+            elif current_node_status == 'paused':
+                status = 'paused'
+                icon = '⏸️'
+            else:
+                status = 'running'
+                icon = '🔄'
+            
+            # 构建消息，包含节点信息
+            if current_module_name:
+                message_text = f'{step_description}\n💬 {current_message}\n📦 节点: {current_module_name} ({current_node_status})'
+            else:
+                message_text = f'{step_description}\n💬 {current_message}'
+            
             steps_history.append({
                 'phase': f'阶段 {i+1}: {step_name}',
-                'message': f'{step_description}\n💬 {current_message}',
+                'message': message_text,
                 'timestamp': current_time,  # 使用当前时间
                 'step_duration': step_duration,  # 当前步骤已运行时长
                 'total_elapsed': current_time - start_time,  # 从开始到现在的总用时
-                'status': 'running',
-                'icon': '🔄'
+                'status': status,
+                'icon': icon,
+                'module_name': current_module_name,  # 任务节点名称
+                'node_status': current_node_status  # 任务节点状态
             })
         else:
             # 待执行的步骤
@@ -773,13 +842,19 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
         
         # 显示步骤日志
         for idx, step in enumerate(steps_history):
-            # 根据状态设置样式
+            # 根据状态设置样式（支持错误和暂停状态）
             if step['status'] == 'completed':
                 bg_color = '#e8f5e9'  # 淡绿色
                 border_color = '#4caf50'
             elif step['status'] == 'running':
                 bg_color = '#e3f2fd'  # 淡蓝色
                 border_color = '#2196f3'
+            elif step['status'] == 'error':
+                bg_color = '#ffebee'  # 淡红色
+                border_color = '#f44336'
+            elif step['status'] == 'paused':
+                bg_color = '#fff3e0'  # 淡橙色
+                border_color = '#ff9800'
             else:  # pending
                 bg_color = '#f5f5f5'  # 灰色
                 border_color = '#9e9e9e'
@@ -791,15 +866,46 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
                 step_duration_str = format_time(step.get('step_duration', 0))
                 # 总用时
                 total_elapsed_str = format_time(step.get('total_elapsed', 0))
-                # 步骤标题包含用时
+                # 步骤标题包含用时（注意：转义phase内容，然后添加HTML标签）
+                escaped_phase = html.escape(str(step['phase']))
                 if step.get('step_duration', 0) > 0:
-                    phase_with_duration = f"{step['phase']} <span style='color: #2196f3; font-weight: normal;'>(用时: {step_duration_str})</span>"
+                    phase_with_duration = f"{escaped_phase} <span style='color: #2196f3; font-weight: normal;'>(用时: {step_duration_str})</span>"
                 else:
-                    phase_with_duration = step['phase']
+                    phase_with_duration = escaped_phase
             else:
                 time_str = '未开始'
                 total_elapsed_str = '-'
-                phase_with_duration = step['phase']
+                phase_with_duration = html.escape(str(step['phase']))
+            
+            # 显示状态标签
+            node_status = step.get('node_status', '')
+            module_name = step.get('module_name', '')
+            status_badge = ""
+            if node_status:
+                status_colors = {
+                    'complete': '#4caf50',
+                    'completed': '#4caf50',
+                    'start': '#2196f3',
+                    'error': '#f44336',
+                    'paused': '#ff9800'
+                }
+                status_labels = {
+                    'complete': '已完成',
+                    'completed': '已完成',
+                    'start': '执行中',
+                    'error': '失败',
+                    'paused': '已暂停'
+                }
+                status_color = status_colors.get(node_status, '#9e9e9e')
+                status_label = status_labels.get(node_status, node_status)
+                status_badge = f'<span style="background-color: {status_color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">{status_label}</span>'
+            
+            # 转义消息内容中的HTML特殊字符，避免破坏HTML结构
+            # 注意：phase_with_duration 和 status_badge 已经包含HTML标签，不需要转义
+            escaped_message = html.escape(str(step['message']))
+            escaped_module_name = html.escape(str(module_name)) if module_name else ''
+            escaped_time_str = html.escape(str(time_str))
+            escaped_total_elapsed_str = html.escape(str(total_elapsed_str))
             
             # 使用HTML渲染美化的步骤卡片
             step_html = f"""
@@ -810,12 +916,12 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
                         border-radius: 5px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="flex: 1;">
-                        <strong style="font-size: 16px;">{step['icon']} {phase_with_duration}</strong>
-                        <p style="margin: 5px 0; color: #555; white-space: pre-wrap;">{step['message']}</p>
+                        <strong style="font-size: 16px;">{step['icon']} {phase_with_duration}{status_badge}</strong>
+                        <p style="margin: 5px 0; color: #555; white-space: pre-wrap;">{escaped_message}</p>
                     </div>
                     <div style="text-align: right; margin-left: 15px; min-width: 180px;">
-                        <div style="font-size: 12px; color: #666;">🕐 {time_str}</div>
-                        <div style="font-size: 12px; color: #666;">📊 总用时: {total_elapsed_str}</div>
+                        <div style="font-size: 12px; color: #666;">🕐 {escaped_time_str}</div>
+                        <div style="font-size: 12px; color: #666;">📊 总用时: {escaped_total_elapsed_str}</div>
                     </div>
                 </div>
             </div>

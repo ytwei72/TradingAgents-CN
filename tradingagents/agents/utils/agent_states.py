@@ -57,6 +57,10 @@ class AgentState(MessagesState):
 
     sender: Annotated[str, "Agent that sent this message"]
 
+    # 消息机制相关字段
+    analysis_id: Annotated[Optional[str], "Analysis task ID for message mechanism"]
+    session_id: Annotated[Optional[str], "Session ID for message mechanism"]
+
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]
     sentiment_report: Annotated[str, "Report from the Social Media Analyst"]

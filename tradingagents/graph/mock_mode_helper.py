@@ -62,7 +62,15 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
     if historical_state:
         # 合并历史状态到当前状态（保留当前状态的基础信息）
         merged_state = state.copy()
+        # 保存analysis_id和session_id，避免被历史数据覆盖
+        preserved_analysis_id = state.get('analysis_id')
+        preserved_session_id = state.get('session_id')
         merged_state.update(historical_state)
+        # 恢复analysis_id和session_id
+        if preserved_analysis_id is not None:
+            merged_state['analysis_id'] = preserved_analysis_id
+        if preserved_session_id is not None:
+            merged_state['session_id'] = preserved_session_id
         
         # 随机sleep 2-10秒
         sleep_time = random.uniform(

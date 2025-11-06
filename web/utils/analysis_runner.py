@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger, get_logger_manager
+from tradingagents.messaging.business.messages import NodeStatus
 logger = get_logger('web')
 
 # 添加项目根目录到Python路径
@@ -284,21 +285,21 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     )
     
     # 检查是否启用模拟模式（用于测试进度跟踪功能）
-    mock_mode_enabled = os.getenv('MOCK_ANALYSIS_MODE', 'false').lower() == 'true'
-    if mock_mode_enabled:
-        logger.warning("🎭 [模拟模式] 检测到 MOCK_ANALYSIS_MODE=true，使用模拟分析")
-        return run_mock_analysis(
-            stock_symbol=stock_symbol,
-            analysis_date=analysis_date,
-            analysts=analysts,
-            research_depth=research_depth,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
-            market_type=market_type,
-            progress_callback=progress_callback,
-            analysis_id=analysis_id,
-            async_tracker=async_tracker
-        )
+    # mock_mode_enabled = os.getenv('MOCK_ANALYSIS_MODE', 'false').lower() == 'true'
+    # if mock_mode_enabled:
+    #     logger.warning("🎭 [模拟模式] 检测到 MOCK_ANALYSIS_MODE=true，使用模拟分析")
+    #     return run_mock_analysis(
+    #         stock_symbol=stock_symbol,
+    #         analysis_date=analysis_date,
+    #         analysts=analysts,
+    #         research_depth=research_depth,
+    #         llm_provider=llm_provider,
+    #         llm_model=llm_model,
+    #         market_type=market_type,
+    #         progress_callback=progress_callback,
+    #         analysis_id=analysis_id,
+    #         async_tracker=async_tracker
+    #     )
 
     def update_progress(message, step=None, total_steps=None):
         """更新进度"""
@@ -330,7 +331,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             logger.debug(f"发布任务开始消息失败: {e}")
 
     # ========== 步骤2: 成本估算 ==========
-    estimate_analysis_cost(llm_provider, llm_model, analysts, research_depth, update_progress)
+    estimate_analysis_cost(
+        llm_provider, llm_model, analysts, research_depth, 
+        update_progress, analysis_id, async_tracker
+    )
 
     # ========== 准备步骤3-8: 准备分析步骤 ==========
     prep_success, prep_result, prep_error = prepare_analysis_steps(
@@ -408,7 +412,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                         current_step_description="步骤输出目录已准备",
                         elapsed_time=time.time() - analysis_start_time,
                         remaining_time=0,
-                        last_message="✅ 步骤输出目录已准备"
+                        last_message="✅ 步骤输出目录已准备",
+                    module_name="step_output_directory",  # 任务节点名称（英文ID）
+                    node_status=NodeStatus.COMPLETE.value  # 任务节点状态
                     )
                     message_producer.publish_progress(progress_msg)
             except Exception as e:
@@ -434,7 +440,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                         current_step_description="开始多智能体分析执行",
                         elapsed_time=time.time() - analysis_start_time,
                         remaining_time=0,
-                        last_message=f"📊 开始分析 {formatted_symbol} 股票"
+                        last_message=f"📊 开始分析 {formatted_symbol} 股票",
+                    module_name="analysis_execution",  # 任务节点名称（英文ID）
+                    node_status=NodeStatus.START.value  # 任务节点状态
                     )
                     message_producer.publish_progress(progress_msg)
             except Exception as e:
@@ -453,8 +461,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         logger.debug(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
         logger.debug(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
         logger.debug(f"🔍 [RUNNER DEBUG]   date: '{analysis_date}'")
+        logger.debug(f"🔍 [RUNNER DEBUG]   analysis_id: '{analysis_id}'")
+        logger.debug(f"🔍 [RUNNER DEBUG]   session_id: '{session_id}'")
 
-        state, decision = graph.propagate(formatted_symbol, analysis_date)
+        state, decision = graph.propagate(formatted_symbol, analysis_date, analysis_id=analysis_id, session_id=session_id)
         
         if not check_task_control_helper(analysis_id, async_tracker):
             logger.warning(f"⚠️ [任务控制] 分析完成后检测到停止信号")
@@ -491,7 +501,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                         current_step_description="分析完成，正在整理结果",
                         elapsed_time=time.time() - analysis_start_time,
                         remaining_time=0,
-                        last_message="📋 分析完成，正在整理结果..."
+                        last_message="📋 分析完成，正在整理结果...",
+                        module_name="result_processing",  # 任务节点名称（英文ID）
+                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态
                     )
                     message_producer.publish_progress(progress_msg)
             except Exception as e:
@@ -569,14 +581,16 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                         current_step_description=f"完成日志已记录，总耗时: {analysis_duration:.1f}秒",
                         elapsed_time=analysis_duration,
                         remaining_time=0,
-                        last_message=f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}"
+                        last_message=f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}",
+                        module_name="completion_logging",  # 任务节点名称（英文ID）
+                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态
                     )
                     message_producer.publish_progress(progress_msg)
             except Exception as e:
                 logger.debug(f"发布步骤11消息失败: {e}")
 
         # ========== 步骤12: 保存分析结果 ==========
-        save_analysis_results(results, stock_symbol, analysis_id, update_progress)
+        save_analysis_results(results, stock_symbol, analysis_id, update_progress, async_tracker)
 
         update_progress("✅ 分析成功完成！")
         

@@ -8,10 +8,13 @@ logger = get_logger("default")
 
 # 导入分析模块日志装饰器
 from tradingagents.utils.tool_logging import log_analysis_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 
 
 def create_bull_researcher(llm, memory):
-    @log_analysis_module("bull_researcher")
+    @message_analysis_module("bull_researcher")
+    @log_analysis_module("bull_researcher")  # 保留日志装饰器作为后备
     def bull_node(state) -> dict:
         logger.debug(f"🐂 [DEBUG] ===== 看涨研究员节点开始 =====")
 

@@ -7,10 +7,13 @@ logger = get_logger("default")
 
 # 导入分析模块日志装饰器
 from tradingagents.utils.tool_logging import log_analysis_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 
 
 def create_risk_manager(llm, memory):
-    @log_analysis_module("risk_manager")
+    @message_analysis_module("risk_manager")
+    @log_analysis_module("risk_manager")  # 保留日志装饰器作为后备
     def risk_manager_node(state) -> dict:
 
         company_name = state["company_of_interest"]

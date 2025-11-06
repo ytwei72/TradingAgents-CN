@@ -346,24 +346,28 @@ class TradingAgentsGraph:
             ),
         }
 
-    def propagate(self, company_name, trade_date):
+    def propagate(self, company_name, trade_date, analysis_id=None, session_id=None):
         """Run the trading agents graph for a company on a specific date."""
-
+        
         # 添加详细的接收日志
         logger.debug(f"🔍 [GRAPH DEBUG] ===== TradingAgentsGraph.propagate 接收参数 =====")
         logger.debug(f"🔍 [GRAPH DEBUG] 接收到的company_name: '{company_name}' (类型: {type(company_name)})")
         logger.debug(f"🔍 [GRAPH DEBUG] 接收到的trade_date: '{trade_date}' (类型: {type(trade_date)})")
+        logger.debug(f"🔍 [GRAPH DEBUG] 接收到的analysis_id: '{analysis_id}' (类型: {type(analysis_id)})")
+        logger.debug(f"🔍 [GRAPH DEBUG] 接收到的session_id: '{session_id}' (类型: {type(session_id)})")
 
         self.ticker = company_name
         logger.debug(f"🔍 [GRAPH DEBUG] 设置self.ticker: '{self.ticker}'")
 
         # Initialize state
-        logger.debug(f"🔍 [GRAPH DEBUG] 创建初始状态，传递参数: company_name='{company_name}', trade_date='{trade_date}'")
+        logger.debug(f"🔍 [GRAPH DEBUG] 创建初始状态，传递参数: company_name='{company_name}', trade_date='{trade_date}', analysis_id='{analysis_id}', session_id='{session_id}'")
         init_agent_state = self.propagator.create_initial_state(
-            company_name, trade_date
+            company_name, trade_date, analysis_id=analysis_id, session_id=session_id
         )
         logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的company_of_interest: '{init_agent_state.get('company_of_interest', 'NOT_FOUND')}'")
         logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的trade_date: '{init_agent_state.get('trade_date', 'NOT_FOUND')}'")
+        logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的analysis_id: '{init_agent_state.get('analysis_id', 'NOT_FOUND')}'")
+        logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的session_id: '{init_agent_state.get('session_id', 'NOT_FOUND')}'")
         args = self.propagator.get_graph_args()
 
         # 清空之前的步骤追踪

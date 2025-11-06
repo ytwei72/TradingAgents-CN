@@ -20,6 +20,15 @@ class TaskStatus(Enum):
 class ModuleEvent(Enum):
     """模块事件类型"""
     START = "start"
+    PAUSED = "paused"
+    COMPLETE = "complete"
+    ERROR = "error"
+
+
+class NodeStatus(Enum):
+    """任务节点状态"""
+    START = "start"
+    PAUSED = "paused"
     COMPLETE = "complete"
     ERROR = "error"
 
@@ -36,6 +45,8 @@ class TaskProgressMessage:
     elapsed_time: float
     remaining_time: float
     last_message: str
+    module_name: Optional[str] = None  # 任务节点名称（英文ID识别）
+    node_status: Optional[str] = None  # 任务节点状态（start/paused/complete/error）
 
 
 @dataclass

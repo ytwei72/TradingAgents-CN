@@ -8,10 +8,13 @@ logger = get_logger("default")
 
 # 导入分析模块日志装饰器
 from tradingagents.utils.tool_logging import log_analysis_module
+# 导入消息装饰器（优先使用消息模式）
+from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 
 
 def create_bear_researcher(llm, memory):
-    @log_analysis_module("bear_researcher")
+    @message_analysis_module("bear_researcher")
+    @log_analysis_module("bear_researcher")  # 保留日志装饰器作为后备
     def bear_node(state) -> dict:
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")

@@ -37,7 +37,7 @@ class MessageConfig:
             try:
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    logger.info(f"已加载消息配置: {config_path}")
+                    logger.debug(f"已加载消息配置: {config_path}")
                     return config
             except Exception as e:
                 logger.warning(f"加载消息配置失败: {e}，使用默认配置")
