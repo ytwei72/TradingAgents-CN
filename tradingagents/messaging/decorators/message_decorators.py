@@ -39,7 +39,7 @@ def _extract_analysis_id(*args, **kwargs) -> Optional[str]:
 
 
 def _extract_stock_symbol(*args, **kwargs) -> Optional[str]:
-    """从参数中提取股票代码（与log_analysis_module保持一致的逻辑）"""
+    """从参数中提取股票代码"""
     symbol = None
     
     if args:

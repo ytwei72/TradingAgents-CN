@@ -102,16 +102,18 @@ def test_signal_processing_logging():
         return False
 
 def test_logging_extraction():
-    """测试日志装饰器的股票代码提取"""
-    print("\n🔍 测试日志装饰器股票代码提取")
+    """测试消息装饰器的股票代码提取（已迁移到消息机制）"""
+    print("\n🔍 测试消息装饰器股票代码提取")
     print("=" * 80)
+    print("ℹ️  注意：log_graph_module 装饰器已删除，现在使用 message_analysis_module")
+    print("   此测试已更新为测试消息装饰器")
     
     try:
-        # 模拟信号处理模块的调用
-        from tradingagents.utils.tool_logging import log_graph_module
+        # 模拟信号处理模块的调用（使用消息装饰器）
+        from tradingagents.messaging.decorators.message_decorators import message_analysis_module
         
-        # 创建一个测试函数来验证日志装饰器
-        @log_graph_module("signal_processing")
+        # 创建一个测试函数来验证消息装饰器
+        @message_analysis_module("graph_signal_processing")
         def mock_process_signal(self, full_signal: str, stock_symbol: str = None) -> dict:
             """模拟信号处理函数"""
             print(f"🔍 [模拟函数] 接收到的参数:")
@@ -173,7 +175,7 @@ def main():
     
     results = []
     
-    # 测试1: 日志装饰器股票代码提取
+    # 测试1: 消息装饰器股票代码提取
     results.append(test_logging_extraction())
     
     # 测试2: 信号处理模块日志记录
@@ -188,7 +190,7 @@ def main():
     total = len(results)
     
     test_names = [
-        "日志装饰器股票代码提取",
+        "消息装饰器股票代码提取",
         "信号处理模块日志记录"
     ]
     

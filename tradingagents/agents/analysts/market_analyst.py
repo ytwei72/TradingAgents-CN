@@ -5,8 +5,6 @@ import time
 import json
 import traceback
 
-# 导入分析模块日志装饰器
-from tradingagents.utils.tool_logging import log_analyst_module
 # 导入消息装饰器（优先使用消息模式）
 from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 
@@ -85,7 +83,6 @@ def _get_company_name(ticker: str, market_info: dict) -> str:
 def create_market_analyst_react(llm, toolkit):
     """使用ReAct Agent模式的市场分析师（适用于通义千问）"""
     @message_analysis_module("market_analyst")
-    @log_analyst_module("market_react")  # 保留日志装饰器作为后备
     def market_analyst_react_node(state):
         logger.debug(f"📈 [DEBUG] ===== ReAct市场分析师节点开始 =====")
 
@@ -268,7 +265,6 @@ def create_market_analyst_react(llm, toolkit):
 
 def create_market_analyst(llm, toolkit):
     @message_analysis_module("market_analyst")
-    @log_analyst_module("market")  # 保留日志装饰器作为后备
     def market_analyst_node(state):
         logger.debug(f"📈 [DEBUG] ===== 市场分析师节点开始 =====")
 

@@ -15,6 +15,11 @@ from datetime import datetime
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('tools')  # 使用tools日志器，与正常节点执行保持一致，便于ProgressLogHandler统一捕获
 
+# 导入消息机制
+from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
+from tradingagents.messaging.decorators.message_decorators import _publish_progress_message
+from tradingagents.messaging.business.messages import NodeStatus
+
 # 全局变量存储graph实例（用于访问模拟模式功能）
 _graph_instance = None
 
@@ -52,12 +57,29 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
         logger.warning(f"⚠️ [模拟模式] 无法获取股票代码或日期，跳过模拟模式")
         return None
     
+    # 提取分析ID（用于消息机制）
+    analysis_id = state.get('analysis_id') or state.get('session_id')
+    
+    # 如果消息模式启用，发送模块开始消息
+    if is_message_mode_enabled():
+        producer = get_message_producer()
+        if producer and analysis_id:
+            _publish_progress_message(
+                producer=producer,
+                analysis_id=str(analysis_id),
+                module_name=node_name,
+                node_status=NodeStatus.START.value
+            )
+    
     # 记录模块开始（用于进度追踪）
     logger.info(f"📊 [模块开始] {node_name} - 股票: {ticker}")
     logger.info(f"🎭 [模拟模式] 节点 {node_name} 启用模拟模式")
     
     # 尝试加载历史输出
     historical_state = _graph_instance._load_historical_step_output(node_name, ticker, trade_date)
+    
+    # 记录开始时间（用于计算耗时）
+    start_time = time.time()
     
     if historical_state:
         # 合并历史状态到当前状态（保留当前状态的基础信息）
@@ -79,10 +101,20 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
         )
         logger.info(f"🎭 [模拟模式] 节点 {node_name} 使用历史数据，sleep {sleep_time:.2f} 秒")
         
-        # 记录sleep开始时间
-        start_time = time.time()
         time.sleep(sleep_time)
         duration = time.time() - start_time
+        
+        # 如果消息模式启用，发送模块完成消息
+        if is_message_mode_enabled():
+            producer = get_message_producer()
+            if producer and analysis_id:
+                _publish_progress_message(
+                    producer=producer,
+                    analysis_id=str(analysis_id),
+                    module_name=node_name,
+                    node_status=NodeStatus.COMPLETE.value,
+                    duration=duration
+                )
         
         # 记录模块完成（用于进度追踪）
         logger.info(f"📊 [模块完成] {node_name} - 模拟模式完成 - 股票: {ticker}, 耗时: {duration:.2f}s")
@@ -91,6 +123,20 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
     else:
         # 如果没有找到历史数据，记录警告但继续正常执行
         # 注意：即使没有历史数据，也输出模块完成日志，确保进度追踪系统能检测到节点执行
+        duration = time.time() - start_time
+        
+        # 如果消息模式启用，发送模块完成消息（即使没有历史数据）
+        if is_message_mode_enabled():
+            producer = get_message_producer()
+            if producer and analysis_id:
+                _publish_progress_message(
+                    producer=producer,
+                    analysis_id=str(analysis_id),
+                    module_name=node_name,
+                    node_status=NodeStatus.COMPLETE.value,
+                    duration=duration
+                )
+        
         logger.warning(f"⚠️ [模拟模式] 节点 {node_name} 未找到历史数据，使用正常模式")
         logger.info(f"📊 [模块完成] {node_name} - 未找到历史数据，使用正常执行 - 股票: {ticker}")
         return None

@@ -233,6 +233,7 @@ class GraphSetup:
             "Bull Researcher",
             self.conditional_logic.should_continue_debate,
             {
+                "Bull Researcher": "Bull Researcher",
                 "Bear Researcher": "Bear Researcher",
                 "Research Manager": "Research Manager",
             },
@@ -242,6 +243,7 @@ class GraphSetup:
             self.conditional_logic.should_continue_debate,
             {
                 "Bull Researcher": "Bull Researcher",
+                "Bear Researcher": "Bear Researcher",
                 "Research Manager": "Research Manager",
             },
         )
@@ -251,7 +253,9 @@ class GraphSetup:
             "Risky Analyst",
             self.conditional_logic.should_continue_risk_analysis,
             {
+                "Risky Analyst": "Risky Analyst",
                 "Safe Analyst": "Safe Analyst",
+                "Neutral Analyst": "Neutral Analyst",
                 "Risk Judge": "Risk Judge",
             },
         )
@@ -259,6 +263,8 @@ class GraphSetup:
             "Safe Analyst",
             self.conditional_logic.should_continue_risk_analysis,
             {
+                "Risky Analyst": "Risky Analyst",
+                "Safe Analyst": "Safe Analyst",
                 "Neutral Analyst": "Neutral Analyst",
                 "Risk Judge": "Risk Judge",
             },
@@ -268,6 +274,8 @@ class GraphSetup:
             self.conditional_logic.should_continue_risk_analysis,
             {
                 "Risky Analyst": "Risky Analyst",
+                "Safe Analyst": "Safe Analyst",
+                "Neutral Analyst": "Neutral Analyst",
                 "Risk Judge": "Risk Judge",
             },
         )

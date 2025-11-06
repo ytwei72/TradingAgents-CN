@@ -3,9 +3,8 @@ import time
 import json
 from datetime import datetime
 
-# 导入统一日志系统和分析模块日志装饰器
+# 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
-from tradingagents.utils.tool_logging import log_analyst_module
 # 导入消息装饰器（优先使用消息模式）
 from tradingagents.messaging.decorators.message_decorators import message_analysis_module
 # 导入统一新闻工具
@@ -20,7 +19,6 @@ logger = get_logger("analysts.news")
 
 def create_news_analyst(llm, toolkit):
     @message_analysis_module("news_analyst")
-    @log_analyst_module("news")  # 保留日志装饰器作为后备
     def news_analyst_node(state):
         start_time = datetime.now()
         current_date = state["trade_date"]

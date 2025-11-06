@@ -57,23 +57,51 @@ class ConditionalLogic:
 
     def should_continue_debate(self, state: AgentState) -> str:
         """Determine if debate should continue."""
-
-        if (
-            state["investment_debate_state"]["count"] >= 2 * self.max_debate_rounds
-        ):  # 3 rounds of back-and-forth between 2 agents
+        debate_state = state["investment_debate_state"]
+        count = debate_state.get("count", 0)
+        current_response = debate_state.get("current_response", "")
+        
+        # 计算最大允许的count值（2个节点各执行max_debate_rounds次）
+        max_count = 2 * self.max_debate_rounds
+        
+        # 如果达到最大轮数，结束辩论
+        if count >= max_count:
+            logger.info(f"📊 [辩论] 达到最大轮数 ({count} >= {max_count})，结束辩论，跳转到 Research Manager")
             return "Research Manager"
-        if state["investment_debate_state"]["current_response"].startswith("Bull"):
+        
+        # 如果当前响应以"Bull"开头，轮到看跌研究员
+        if current_response.startswith("Bull"):
+            logger.info(f"📊 [辩论] 当前响应以'Bull'开头 (count={count}/{max_count})，轮到看跌研究员")
             return "Bear Researcher"
+        
+        # 否则轮到看涨研究员（初始状态或当前响应以"Bear"开头）
+        logger.info(f"📊 [辩论] 轮到看涨研究员 (count={count}/{max_count}, current_response={current_response[:50] if current_response else '空'}...)")
         return "Bull Researcher"
 
     def should_continue_risk_analysis(self, state: AgentState) -> str:
         """Determine if risk analysis should continue."""
-        if (
-            state["risk_debate_state"]["count"] >= 3 * self.max_risk_discuss_rounds
-        ):  # 3 rounds of back-and-forth between 3 agents
+        risk_state = state["risk_debate_state"]
+        count = risk_state.get("count", 0)
+        latest_speaker = risk_state.get("latest_speaker", "")
+        
+        # 计算最大允许的count值（3个节点各执行max_risk_discuss_rounds次）
+        max_count = 3 * self.max_risk_discuss_rounds
+        
+        # 如果达到最大轮数，结束风险分析
+        if count >= max_count:
+            logger.info(f"⚠️ [风险分析] 达到最大轮数 ({count} >= {max_count})，结束风险分析，跳转到 Risk Judge")
             return "Risk Judge"
-        if state["risk_debate_state"]["latest_speaker"].startswith("Risky"):
+        
+        # 如果最后发言者是激进分析师，轮到保守分析师
+        if latest_speaker.startswith("Risky"):
+            logger.info(f"⚠️ [风险分析] 最后发言者是激进分析师 (count={count}/{max_count})，轮到保守分析师")
             return "Safe Analyst"
-        if state["risk_debate_state"]["latest_speaker"].startswith("Safe"):
+        
+        # 如果最后发言者是保守分析师，轮到中性分析师
+        if latest_speaker.startswith("Safe"):
+            logger.info(f"⚠️ [风险分析] 最后发言者是保守分析师 (count={count}/{max_count})，轮到中性分析师")
             return "Neutral Analyst"
+        
+        # 否则轮到激进分析师（初始状态或最后发言者是中性分析师）
+        logger.info(f"⚠️ [风险分析] 轮到激进分析师 (count={count}/{max_count}, latest_speaker={latest_speaker or '空'})")
         return "Risky Analyst"
