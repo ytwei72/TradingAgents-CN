@@ -227,6 +227,30 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     try:
 
         # ========== 步骤8: 步骤输出目录准备 ==========
+        # 发布步骤8开始消息
+        if message_producer and analysis_id and async_tracker:
+            try:
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
+                current_step = 7  # 步骤8（索引从0开始）
+                total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
+                progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
+                progress_msg = TaskProgressMessage(
+                    analysis_id=analysis_id,
+                    current_step=current_step,
+                    total_steps=total_steps,
+                    progress_percentage=progress_percentage,
+                    current_step_name="📁 步骤输出目录准备",
+                    current_step_description="正在准备步骤输出目录",
+                    elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else time.time() - analysis_start_time,
+                    remaining_time=0,
+                    last_message="📁 准备步骤输出目录...",
+                    module_name="step_output_directory",  # 任务节点名称（英文ID）
+                    node_status=NodeStatus.START.value  # 任务节点状态：开始
+                )
+                message_producer.publish_progress(progress_msg)
+            except Exception as e:
+                logger.debug(f"发布步骤8开始消息失败: {e}")
+        
         update_progress("📁 准备步骤输出目录...")
         from pathlib import Path
         step_output_base_dir = Path("eval_results") / formatted_symbol / "TradingAgentsStrategy_logs" / "step_outputs" / analysis_date
@@ -234,30 +258,28 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         update_progress(f"✅ 步骤输出目录已准备: {step_output_base_dir}")
         
         # 发布步骤8完成消息
-        if message_producer and analysis_id:
+        if message_producer and analysis_id and async_tracker:
             try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage
-                # 获取当前步骤信息（步骤8）
-                if async_tracker:
-                    current_step = 7  # 步骤8（索引从0开始）
-                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                    progress_msg = TaskProgressMessage(
-                        analysis_id=analysis_id,
-                        current_step=current_step,
-                        total_steps=total_steps,
-                        progress_percentage=progress_percentage,
-                        current_step_name="📁 步骤输出目录准备",
-                        current_step_description="步骤输出目录已准备",
-                        elapsed_time=time.time() - analysis_start_time,
-                        remaining_time=0,
-                        last_message="✅ 步骤输出目录已准备",
+                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
+                current_step = 7  # 步骤8（索引从0开始）
+                total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
+                progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
+                progress_msg = TaskProgressMessage(
+                    analysis_id=analysis_id,
+                    current_step=current_step,
+                    total_steps=total_steps,
+                    progress_percentage=progress_percentage,
+                    current_step_name="📁 步骤输出目录准备",
+                    current_step_description=f"步骤输出目录已准备: {step_output_base_dir}",
+                    elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else time.time() - analysis_start_time,
+                    remaining_time=0,
+                    last_message=f"✅ 步骤输出目录已准备: {step_output_base_dir}",
                     module_name="step_output_directory",  # 任务节点名称（英文ID）
-                    node_status=NodeStatus.COMPLETE.value  # 任务节点状态
-                    )
-                    message_producer.publish_progress(progress_msg)
+                    node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
+                )
+                message_producer.publish_progress(progress_msg)
             except Exception as e:
-                logger.debug(f"发布步骤8消息失败: {e}")
+                logger.debug(f"发布步骤8完成消息失败: {e}")
         
         # ========== 步骤9: 执行分析 ==========
         update_progress(f"📊 开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
