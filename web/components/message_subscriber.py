@@ -91,9 +91,16 @@ class MessageSubscriberManager:
             return False
         
         try:
-            # 注册跟踪器到消息系统
-            self._progress_handler.register_tracker(analysis_id, tracker)
-            self._registered_trackers[analysis_id] = tracker
+            # 检查是否已经注册过
+            if analysis_id in self._registered_trackers:
+                logger.debug(f"分析ID {analysis_id} 已注册，更新跟踪器和回调")
+                # 更新跟踪器（底层会处理重复订阅问题）
+                self._progress_handler.register_tracker(analysis_id, tracker)
+                self._registered_trackers[analysis_id] = tracker
+            else:
+                # 首次注册
+                self._progress_handler.register_tracker(analysis_id, tracker)
+                self._registered_trackers[analysis_id] = tracker
             
             # 保存回调函数
             if progress_callback:

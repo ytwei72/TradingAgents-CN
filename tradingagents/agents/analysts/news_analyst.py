@@ -30,7 +30,7 @@ def create_news_analyst(llm, toolkit):
         
         # 获取市场信息
         market_info = StockUtils.get_market_info(ticker)
-        logger.info(f"[新闻分析师] 股票类型: {market_info['market_name']}")
+        logger.debug(f"[新闻分析师] 股票类型: {market_info['market_name']}")
         
         # 获取公司名称
         def _get_company_name(ticker: str, market_info: dict) -> str:
@@ -88,16 +88,16 @@ def create_news_analyst(llm, toolkit):
                 return f"股票{ticker}"
         
         company_name = _get_company_name(ticker, market_info)
-        logger.info(f"[新闻分析师] 公司名称: {company_name}")
+        logger.debug(f"[新闻分析师] 公司名称: {company_name}")
         
         # 🔧 使用统一新闻工具，简化工具调用
-        logger.info(f"[新闻分析师] 使用统一新闻工具，自动识别股票类型并获取相应新闻")
+        logger.debug(f"[新闻分析师] 使用统一新闻工具，自动识别股票类型并获取相应新闻")
    # 创建统一新闻工具
         unified_news_tool = create_unified_news_tool(toolkit)
         unified_news_tool.name = "get_stock_news_unified"
         
         tools = [unified_news_tool]
-        logger.info(f"[新闻分析师] 已加载统一新闻工具: get_stock_news_unified")
+        logger.debug(f"[新闻分析师] 已加载统一新闻工具: get_stock_news_unified")
 
         system_message = (
             """您是一位专业的财经新闻分析师，负责分析最新的市场新闻和事件对股票价格的潜在影响。
@@ -191,7 +191,7 @@ def create_news_analyst(llm, toolkit):
         except:
             model_info = "Unknown"
         
-        logger.info(f"[新闻分析师] 准备调用LLM进行新闻分析，模型: {model_info}")
+        logger.debug(f"[新闻分析师] 准备调用LLM进行新闻分析，模型: {model_info}")
         
         # 🚨 DashScope预处理：强制获取新闻数据
         pre_fetched_news = None
@@ -199,11 +199,11 @@ def create_news_analyst(llm, toolkit):
             logger.warning(f"[新闻分析师] 🚨 检测到DashScope模型，启动预处理强制新闻获取...")
             try:
                 # 强制预先获取新闻数据
-                logger.info(f"[新闻分析师] 🔧 预处理：强制调用统一新闻工具...")
+                logger.debug(f"[新闻分析师] 🔧 预处理：强制调用统一新闻工具...")
                 pre_fetched_news = unified_news_tool(stock_code=ticker, max_news=10, model_info=model_info)
                 
                 if pre_fetched_news and len(pre_fetched_news.strip()) > 100:
-                    logger.info(f"[新闻分析师] ✅ 预处理成功获取新闻: {len(pre_fetched_news)} 字符")
+                    logger.debug(f"[新闻分析师] ✅ 预处理成功获取新闻: {len(pre_fetched_news)} 字符")
                     
                     # 直接基于预获取的新闻生成分析，跳过工具调用
                     enhanced_prompt = f"""
@@ -218,18 +218,18 @@ def create_news_analyst(llm, toolkit):
 请基于上述真实新闻数据撰写详细的中文分析报告。注意：新闻数据已经提供，您无需再调用任何工具。
 """
                     
-                    logger.info(f"[新闻分析师] 🔄 使用预获取新闻数据直接生成分析...")
+                    logger.debug(f"[新闻分析师] 🔄 使用预获取新闻数据直接生成分析...")
                     llm_start_time = datetime.now()
                     result = llm.invoke([{"role": "user", "content": enhanced_prompt}])
                     
                     llm_end_time = datetime.now()
                     llm_time_taken = (llm_end_time - llm_start_time).total_seconds()
-                    logger.info(f"[新闻分析师] LLM调用完成（预处理模式），耗时: {llm_time_taken:.2f}秒")
+                    logger.debug(f"[新闻分析师] LLM调用完成（预处理模式），耗时: {llm_time_taken:.2f}秒")
                     
                     # 直接返回结果，跳过后续的工具调用检测
                     if hasattr(result, 'content') and result.content:
                         report = result.content
-                        logger.info(f"[新闻分析师] ✅ 预处理模式成功，报告长度: {len(report)} 字符")
+                        logger.debug(f"[新闻分析师] ✅ 预处理模式成功，报告长度: {len(report)} 字符")
                         
                         # 跳转到最终处理
                         state["messages"].append(result)
@@ -250,7 +250,7 @@ def create_news_analyst(llm, toolkit):
         # 使用统一的Google工具调用处理器
         llm_start_time = datetime.now()
         chain = prompt | llm.bind_tools(tools)
-        logger.info(f"[新闻分析师] 开始LLM调用，分析 {ticker} 的新闻")
+        logger.debug(f"[新闻分析师] 开始LLM调用，分析 {ticker} 的新闻")
         result = chain.invoke(state["messages"])
         
         llm_end_time = datetime.now()
@@ -259,7 +259,7 @@ def create_news_analyst(llm, toolkit):
 
         # 使用统一的Google工具调用处理器
         if GoogleToolCallHandler.is_google_model(llm):
-            logger.info(f"📊 [新闻分析师] 检测到Google模型，使用统一工具调用处理器")
+            logger.debug(f"📊 [新闻分析师] 检测到Google模型，使用统一工具调用处理器")
             
             # 创建分析提示词
             analysis_prompt_template = GoogleToolCallHandler.create_analysis_prompt(
@@ -280,22 +280,22 @@ def create_news_analyst(llm, toolkit):
             )
         else:
             # 非Google模型的处理逻辑
-            logger.info(f"[新闻分析师] 非Google模型 ({llm.__class__.__name__})，使用标准处理逻辑")
+            logger.debug(f"[新闻分析师] 非Google模型 ({llm.__class__.__name__})，使用标准处理逻辑")
             
             # 检查工具调用情况
             tool_call_count = len(result.tool_calls) if hasattr(result, 'tool_calls') else 0
-            logger.info(f"[新闻分析师] LLM调用了 {tool_call_count} 个工具")
+            logger.debug(f"[新闻分析师] LLM调用了 {tool_call_count} 个工具")
             
             if tool_call_count == 0:
                 logger.warning(f"[新闻分析师] ⚠️ {llm.__class__.__name__} 没有调用任何工具，启动补救机制...")
                 
                 try:
                     # 强制获取新闻数据
-                    logger.info(f"[新闻分析师] 🔧 强制调用统一新闻工具获取新闻数据...")
+                    logger.debug(f"[新闻分析师] 🔧 强制调用统一新闻工具获取新闻数据...")
                     forced_news = unified_news_tool(stock_code=ticker, max_news=10, model_info="")
                     
                     if forced_news and len(forced_news.strip()) > 100:
-                        logger.info(f"[新闻分析师] ✅ 强制获取新闻成功: {len(forced_news)} 字符")
+                        logger.debug(f"[新闻分析师] ✅ 强制获取新闻成功: {len(forced_news)} 字符")
                         
                         # 基于真实新闻数据重新生成分析
                         forced_prompt = f"""
@@ -310,12 +310,12 @@ def create_news_analyst(llm, toolkit):
 请基于上述真实新闻数据撰写详细的中文分析报告。
 """
                         
-                        logger.info(f"[新闻分析师] 🔄 基于强制获取的新闻数据重新生成完整分析...")
+                        logger.debug(f"[新闻分析师] 🔄 基于强制获取的新闻数据重新生成完整分析...")
                         forced_result = llm.invoke([{"role": "user", "content": forced_prompt}])
                         
                         if hasattr(forced_result, 'content') and forced_result.content:
                             report = forced_result.content
-                            logger.info(f"[新闻分析师] ✅ 强制补救成功，生成基于真实数据的报告，长度: {len(report)} 字符")
+                            logger.debug(f"[新闻分析师] ✅ 强制补救成功，生成基于真实数据的报告，长度: {len(report)} 字符")
                         else:
                             logger.warning(f"[新闻分析师] ⚠️ 强制补救失败，使用原始结果")
                             report = result.content
@@ -338,7 +338,7 @@ def create_news_analyst(llm, toolkit):
         from langchain_core.messages import AIMessage
         clean_message = AIMessage(content=report)
         
-        logger.info(f"[新闻分析师] ✅ 返回清洁消息，报告长度: {len(report)} 字符")
+        logger.debug(f"[新闻分析师] ✅ 返回清洁消息，报告长度: {len(report)} 字符")
 
         return {
             "messages": [clean_message],
