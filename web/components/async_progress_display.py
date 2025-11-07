@@ -411,22 +411,24 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
     # 显示当前步骤
     st.write(f"**当前步骤**: {current_step_name}")
 
-    # 显示进度条和统计信息
-    col1, col2, col3 = st.columns(3)
+    # 显示进度条和统计信息 - 使用empty容器避免重复显示
+    metrics_placeholder = st.empty()
+    with metrics_placeholder.container():
+        col1, col2, col3 = st.columns(3)
 
-    with col1:
-        st.metric("进度", f"{progress_percentage:.1f}%")
+        with col1:
+            st.metric("进度", f"{progress_percentage:.1f}%")
 
-    with col2:
-        st.metric("已用时间", format_time(elapsed_time))
+        with col2:
+            st.metric("已用时间", format_time(elapsed_time))
 
-    with col3:
-        if status == 'completed':
-            st.metric("预计剩余", "已完成")
-        elif status == 'failed':
-            st.metric("预计剩余", "已中断")
-        else:
-            st.metric("预计剩余", format_time(remaining_time))
+        with col3:
+            if status == 'completed':
+                st.metric("预计剩余", "已完成")
+            elif status == 'failed':
+                st.metric("预计剩余", "已中断")
+            else:
+                st.metric("预计剩余", format_time(remaining_time))
 
     # 显示进度条
     st.progress(min(progress_percentage / 100.0, 1.0))

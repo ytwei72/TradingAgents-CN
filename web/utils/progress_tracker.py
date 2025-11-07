@@ -290,24 +290,24 @@ class SmartStreamlitProgressDisplay:
             self.step_info = st.empty()
             self.time_info = st.empty()
 
-    def update(self, message: str, current_step: int, total_steps: int, progress: float, elapsed_time: float, remaining_time: float):
-        """更新显示"""
-        # 更新进度条
-        self.progress_bar.progress(progress)
-
-        # 更新状态文本
-        self.status_text.markdown(f"**当前状态:** 📋 {message}")
-
-        # 更新步骤信息
-        step_text = f"**进度:** 第 {current_step + 1} 步，共 {total_steps} 步 ({progress:.1%})"
-        self.step_info.markdown(step_text)
-
-        # 更新时间信息
-        time_text = f"**已用时间:** {self._format_time(elapsed_time)}"
-        if remaining_time > 0:
-            time_text += f" | **预计剩余:** {self._format_time(remaining_time)}"
-
-        self.time_info.markdown(time_text)
+    # def update(self, message: str, current_step: int, total_steps: int, progress: float, elapsed_time: float, remaining_time: float):
+    #     """更新显示"""
+    #     # 更新进度条
+    #     self.progress_bar.progress(progress)
+    #
+    #     # 更新状态文本
+    #     self.status_text.markdown(f"**当前状态:** 📋 {message}")
+    #
+    #     # 更新步骤信息
+    #     step_text = f"**进度:** 第 {current_step + 1} 步，共 {total_steps} 步 ({progress:.1%})"
+    #     self.step_info.markdown(step_text)
+    #
+    #     # 更新时间信息
+    #     time_text = f"**已用时间:** {self._format_time(elapsed_time)}"
+    #     if remaining_time > 0:
+    #         time_text += f" | **预计剩余:** {self._format_time(remaining_time)}"
+    #
+    #     self.time_info.markdown(time_text)
     
     def _format_time(self, seconds: float) -> str:
         """格式化时间显示"""
