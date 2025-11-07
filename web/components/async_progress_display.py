@@ -5,11 +5,13 @@
 支持消息驱动的实时更新（如果消息模式启用）
 """
 
-import streamlit as st
+from datetime import datetime
 import time
 import html
 from typing import Optional, Dict, Any
 from web.utils.async_progress_tracker import get_progress_by_id, format_time
+from web.utils.analysis_runner import format_analysis_results
+import streamlit as st
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -112,7 +114,6 @@ class AsyncProgressDisplay:
                         # 尝试恢复分析结果（如果还没有的话）
                         if not st.session_state.get('analysis_results'):
                             try:
-                                from web.utils.analysis_runner import format_analysis_results
                                 raw_results = progress_data.get('raw_results')
                                 if raw_results:
                                     formatted_results = format_analysis_results(raw_results)
@@ -136,7 +137,6 @@ class AsyncProgressDisplay:
             estimated_total_time = progress_data.get('estimated_total_time', 0)
 
             # 计算已用时间
-            import time
             if status == 'completed':
                 # 已完成的分析使用存储的最终耗时
                 real_elapsed_time = progress_data.get('elapsed_time', 0)
@@ -261,7 +261,6 @@ def streamlit_auto_refresh_progress(analysis_id: str, refresh_interval: int = 2)
             # 尝试恢复分析结果（如果还没有的话）
             if not st.session_state.get('analysis_results'):
                 try:
-                    from web.utils.analysis_runner import format_analysis_results
                     raw_results = progress_data.get('raw_results')
                     if raw_results:
                         formatted_results = format_analysis_results(raw_results)
@@ -288,7 +287,6 @@ def streamlit_auto_refresh_progress(analysis_id: str, refresh_interval: int = 2)
     estimated_total_time = progress_data.get('estimated_total_time', 0)
 
     # 计算已用时间
-    import time
     if status == 'completed':
         # 已完成的分析使用存储的最终耗时
         elapsed_time = progress_data.get('elapsed_time', 0)
@@ -321,7 +319,6 @@ def streamlit_auto_refresh_progress(analysis_id: str, refresh_interval: int = 2)
             default_value = st.session_state.get(auto_refresh_key, True)  # 默认为True
             auto_refresh = st.checkbox("🔄 自动刷新", value=default_value, key=auto_refresh_key)
             if auto_refresh and status == 'running':  # 只在运行时自动刷新
-                import time
                 time.sleep(3)  # 等待3秒
                 st.rerun()
             elif auto_refresh and status in ['completed', 'failed']:
@@ -330,171 +327,11 @@ def streamlit_auto_refresh_progress(analysis_id: str, refresh_interval: int = 2)
 
     return status in ['completed', 'failed']
 
-# 新增：静态进度显示（不会触发页面刷新）
-def display_static_progress(analysis_id: str) -> bool:
-    """
-    显示静态进度（不自动刷新）
-    支持消息驱动的实时更新（如果消息模式启用）
-    返回是否已完成
-    """
-    import streamlit as st
-
-    # 使用session state避免重复创建组件
-    progress_key = f"progress_display_{analysis_id}"
-    if progress_key not in st.session_state:
-        st.session_state[progress_key] = True
-    
-    # 检查消息订阅是否启用并已注册
-    if MESSAGE_SUBSCRIPTION_AVAILABLE and is_message_subscription_enabled():
-        try:
-            manager = get_message_subscriber_manager()
-            if manager.is_registered(analysis_id):
-                logger.debug(f"📡 [消息订阅] 使用消息驱动更新显示: {analysis_id}")
-        except Exception as e:
-            logger.debug(f"检查消息订阅状态失败: {e}")
-
-    # 获取进度数据（消息订阅模式下，数据已通过消息更新，这里获取最新状态）
-    progress_data = get_progress_by_id(analysis_id)
-
-    if not progress_data:
-        st.error("❌ 无法获取分析进度，请检查分析是否正在运行")
-        return False
-
-    status = progress_data.get('status', 'running')
-
-    # 调试信息（可以在生产环境中移除）
-    import datetime
-    current_time = datetime.datetime.now().strftime('%H:%M:%S')
-    logger.debug(f"📊 [进度显示] {current_time} - 状态: {status}, 进度: {progress_data.get('progress_percentage', 0):.1f}%")
-
-    # 显示基本信息（移除分析ID显示）
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-
-    with col1:
-        step_name = progress_data.get('current_step_name', '未知')
-        st.write(f"**当前步骤**: {step_name}")
-
-    with col2:
-        progress_percentage = progress_data.get('progress_percentage', 0.0)
-        st.metric("进度", f"{progress_percentage:.1f}%")
-
-    with col3:
-        # 计算已用时间
-        start_time = progress_data.get('start_time', 0)
-        import time
-        if status == 'completed':
-            # 已完成的分析使用存储的最终耗时
-            elapsed_time = progress_data.get('elapsed_time', 0)
-        elif start_time > 0:
-            # 进行中的分析使用实时计算
-            elapsed_time = time.time() - start_time
-        else:
-            # 备用方案
-            elapsed_time = progress_data.get('elapsed_time', 0)
-        st.metric("已用时间", format_time(elapsed_time))
-
-    with col4:
-        remaining_time = progress_data.get('remaining_time', 0)
-        if status == 'completed':
-            st.metric("预计剩余", "已完成")
-        elif status == 'failed':
-            st.metric("预计剩余", "已中断")
-        elif remaining_time > 0 and status == 'running':
-            st.metric("预计剩余", format_time(remaining_time))
-        else:
-            st.metric("预计剩余", "计算中...")
-
-    # 进度条
-    st.progress(min(progress_percentage / 100, 1.0))
-
-    # 步骤详情
-    step_description = progress_data.get('current_step_description', '正在处理...')
-    st.write(f"**当前任务**: {step_description}")
-    
-    # 添加步骤日志记录 - 可展开/收缩的容器
-    _render_step_log(progress_data, analysis_id)
-
-    # 状态信息
-    last_message = progress_data.get('last_message', '')
-
-    # 状态图标
-    status_icon = {
-        'running': '🔄',
-        'completed': '✅',
-        'failed': '❌'
-    }.get(status, '🔄')
-
-    # 显示状态
-    if status == 'failed':
-        st.error(f"❌ **分析失败**: {last_message}")
-    elif status == 'completed':
-        st.success(f"🎉 **分析完成**: {last_message}")
-
-        # 添加查看报告按钮
-        if st.button("📊 查看分析报告", key=f"view_report_static_{analysis_id}", type="primary"):
-            # 尝试恢复分析结果（如果还没有的话）
-            if not st.session_state.get('analysis_results'):
-                try:
-                    from web.utils.async_progress_tracker import get_progress_by_id
-                    from web.utils.analysis_runner import format_analysis_results
-                    progress_data = get_progress_by_id(analysis_id)
-                    if progress_data and progress_data.get('raw_results'):
-                        formatted_results = format_analysis_results(progress_data['raw_results'])
-                        if formatted_results:
-                            st.session_state.analysis_results = formatted_results
-                            st.session_state.analysis_running = False
-                except Exception as e:
-                    st.error(f"恢复分析结果失败: {e}")
-
-            # 触发显示报告
-            st.session_state.show_analysis_results = True
-            st.session_state.current_analysis_id = analysis_id
-            st.rerun()
-    else:
-        st.info(f"{status_icon} **当前状态**: {last_message}")
-
-        # 添加刷新控制（仅在运行时显示）
-        if status == 'running':
-            # 使用唯一的容器避免重复
-            refresh_container_key = f"refresh_container_{analysis_id}"
-            if refresh_container_key not in st.session_state:
-                st.session_state[refresh_container_key] = True
-
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                if st.button("🔄 刷新进度", key=f"refresh_static_{analysis_id}"):
-                    st.rerun()
-            with col2:
-                auto_refresh_key = f"auto_refresh_static_{analysis_id}"
-                # 获取默认值，如果是新分析则默认为True
-                default_value = st.session_state.get(auto_refresh_key, True)  # 默认为True
-                auto_refresh = st.checkbox("🔄 自动刷新", value=default_value, key=auto_refresh_key)
-                if auto_refresh and status == 'running':  # 只在运行时自动刷新
-                    import time
-                    time.sleep(3)  # 等待3秒
-                    st.rerun()
-                elif auto_refresh and status in ['completed', 'failed']:
-                    # 分析完成后自动关闭自动刷新
-                    st.session_state[auto_refresh_key] = False
-
-    # 清理session state（分析完成后）
-    if status in ['completed', 'failed']:
-        progress_key = f"progress_display_{analysis_id}"
-        refresh_container_key = f"refresh_container_{analysis_id}"
-        if progress_key in st.session_state:
-            del st.session_state[progress_key]
-        if refresh_container_key in st.session_state:
-            del st.session_state[refresh_container_key]
-
-    return status in ['completed', 'failed']
-
-
 def display_unified_progress(analysis_id: str, show_refresh_controls: bool = True) -> bool:
     """
     统一的进度显示函数，避免重复元素
     返回是否已完成
     """
-    import streamlit as st
 
     # 简化逻辑：直接调用显示函数，通过参数控制是否显示刷新按钮
     # 调用方负责确保只在需要的地方传入show_refresh_controls=True
@@ -506,9 +343,6 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
     显示静态进度，可控制是否显示刷新控件
     支持消息驱动的实时更新（如果消息模式启用）
     """
-    import streamlit as st
-    from web.utils.async_progress_tracker import get_progress_by_id
-    
     # 检查消息订阅状态
     use_message_subscription = False
     if MESSAGE_SUBSCRIPTION_AVAILABLE and is_message_subscription_enabled():
@@ -542,7 +376,6 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
                 default_value = st.session_state.get(auto_refresh_key, True)  # 默认为True
                 auto_refresh = st.checkbox("🔄 自动刷新", value=default_value, key=auto_refresh_key)
                 if auto_refresh and status == 'running':  # 只在运行时自动刷新
-                    import time
                     time.sleep(3)  # 等待3秒
                     st.rerun()
                 elif auto_refresh and status in ['completed', 'failed']:
@@ -560,7 +393,6 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
     # 计算已用时间
     start_time = progress_data.get('start_time', 0)
     estimated_total_time = progress_data.get('estimated_total_time', 0)
-    import time
     if status == 'completed':
         # 已完成的分析使用存储的最终耗时
         elapsed_time = progress_data.get('elapsed_time', 0)
@@ -620,8 +452,6 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
             # 尝试恢复分析结果（如果还没有的话）
             if not st.session_state.get('analysis_results'):
                 try:
-                    from web.utils.async_progress_tracker import get_progress_by_id
-                    from web.utils.analysis_runner import format_analysis_results
                     progress_data = get_progress_by_id(analysis_id)
                     if progress_data and progress_data.get('raw_results'):
                         formatted_results = format_analysis_results(progress_data['raw_results'])
@@ -654,7 +484,6 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
             default_value = st.session_state.get(auto_refresh_key, True)  # 默认为True
             auto_refresh = st.checkbox("🔄 自动刷新", value=default_value, key=auto_refresh_key)
             if auto_refresh and status == 'running':  # 只在运行时自动刷新
-                import time
                 time.sleep(3)  # 等待3秒
                 st.rerun()
             elif auto_refresh and status in ['completed', 'failed']:
@@ -671,8 +500,6 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
     渲染分析步骤日志记录
     显示每个阶段的状态信息和时间戳
     """
-    from datetime import datetime
-    
     # 从 progress_data 中提取步骤历史信息
     steps_history = []
     
