@@ -1201,7 +1201,7 @@ def save_analysis_report(stock_symbol: str, analysis_results: Dict[str, Any],
         )
         
         if success:
-            logger.info(f"✅ 分析报告已成功保存到MongoDB - 股票: {stock_symbol}, ID: {mongodb_analysis_id}")
+            logger.info(f"✅ 分析报告已成功保存到MongoDB - 股票: {stock_symbol}, ID: {analysis_id}")
         else:
             logger.error(f"❌ 分析报告保存到MongoDB失败 - 股票: {stock_symbol}")
         

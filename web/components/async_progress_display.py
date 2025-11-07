@@ -757,15 +757,19 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
             
             # 处理end_time为None的情况（start状态）
             end_time = history.get('end_time')
+            step_duration = history.get('duration', 0)
             if end_time is None:
-                # 如果end_time为None，说明步骤还在进行中，使用当前时间
-                end_time = time.time()
+                # 如果end_time为None，说明步骤还在进行中，使用当前时间并重新计算duration
+                current_time = time.time()
+                end_time = current_time
+                step_start = history.get('start_time', current_time)
+                step_duration = current_time - step_start  # 重新计算进行中的步骤用时
             
             steps_history.append({
                 'phase': f'阶段 {i+1}: {step_name}',
                 'message': message_text,
                 'timestamp': end_time,  # 使用实际完成时间（如果为None则使用当前时间）
-                'step_duration': history.get('duration', 0),  # 步骤执行时长
+                'step_duration': step_duration,  # 步骤执行时长（对于进行中的步骤会重新计算）
                 'total_elapsed': end_time - start_time,  # 从开始到完成该步骤的总用时
                 'status': status,
                 'icon': icon,
