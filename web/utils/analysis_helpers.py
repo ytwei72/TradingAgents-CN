@@ -917,3 +917,383 @@ def save_analysis_results(
             update_progress("⚠️ 报告保存出错，但分析已完成")
         return False, saved_files
 
+
+# ========== 封装的步骤函数 ==========
+
+def log_analysis_start(
+    stock_symbol: str,
+    analysis_date: str,
+    analysts: list,
+    research_depth: int,
+    llm_provider: str,
+    llm_model: str,
+    market_type: str,
+    update_progress: Optional[Callable] = None,
+    analysis_id: Optional[str] = None,
+    async_tracker: Optional[Any] = None
+) -> tuple[Any, float]:
+    """
+    步骤1: 记录分析开始日志
+    
+    Args:
+        stock_symbol: 股票代码
+        analysis_date: 分析日期
+        analysts: 分析师列表
+        research_depth: 研究深度
+        llm_provider: LLM提供商
+        llm_model: 模型名称
+        market_type: 市场类型
+        update_progress: 进度回调函数
+        analysis_id: 分析ID
+        async_tracker: 异步进度跟踪器
+        
+    Returns:
+        (logger_manager, analysis_start_time)
+    """
+    from tradingagents.utils.logging_manager import get_logger_manager
+    import time
+    
+    logger_manager = get_logger_manager()
+    analysis_start_time = time.time()
+    
+    if update_progress:
+        update_progress("🚀 开始股票分析...")
+    
+    # 发布任务开始状态消息
+    from .message_utils import publish_task_status
+    publish_task_status(analysis_id, "RUNNING", "🚀 开始股票分析...")
+    
+    return logger_manager, analysis_start_time
+
+
+def prepare_step_output_directory(
+    formatted_symbol: str,
+    analysis_date: str,
+    update_progress: Optional[Callable] = None,
+    analysis_id: Optional[str] = None,
+    async_tracker: Optional[Any] = None,
+    analysis_start_time: Optional[float] = None
+) -> Path:
+    """
+    步骤8: 步骤输出目录准备
+    
+    Args:
+        formatted_symbol: 格式化后的股票代码
+        analysis_date: 分析日期
+        update_progress: 进度回调函数
+        analysis_id: 分析ID
+        async_tracker: 异步进度跟踪器
+        analysis_start_time: 分析开始时间
+        
+    Returns:
+        步骤输出目录路径
+    """
+    from pathlib import Path
+    from .message_utils import publish_progress_message, get_step_info, get_message_producer
+    
+    # 发布步骤8开始消息
+    message_producer = get_message_producer()
+    current_step, total_steps = get_step_info(async_tracker, 7, 12)
+    
+    publish_progress_message(
+        analysis_id=analysis_id,
+        current_step=current_step,
+        total_steps=total_steps,
+        step_name="📁 步骤输出目录准备",
+        step_description="正在准备步骤输出目录",
+        last_message="📁 准备步骤输出目录...",
+        module_name="step_output_directory",
+        node_status=NodeStatus.START.value,
+        async_tracker=async_tracker,
+        analysis_start_time=analysis_start_time,
+        message_producer=message_producer
+    )
+    
+    if update_progress:
+        update_progress("📁 准备步骤输出目录...")
+    
+    step_output_base_dir = Path("eval_results") / formatted_symbol / "TradingAgentsStrategy_logs" / "step_outputs" / analysis_date
+    step_output_base_dir.mkdir(parents=True, exist_ok=True)
+    
+    if update_progress:
+        update_progress(f"✅ 步骤输出目录已准备: {step_output_base_dir}")
+    
+    # 发布步骤8完成消息
+    publish_progress_message(
+        analysis_id=analysis_id,
+        current_step=current_step,
+        total_steps=total_steps,
+        step_name="📁 步骤输出目录准备",
+        step_description=f"步骤输出目录已准备: {step_output_base_dir}",
+        last_message=f"✅ 步骤输出目录已准备: {step_output_base_dir}",
+        module_name="step_output_directory",
+        node_status=NodeStatus.COMPLETE.value,
+        async_tracker=async_tracker,
+        analysis_start_time=analysis_start_time,
+        message_producer=message_producer
+    )
+    
+    return step_output_base_dir
+
+
+def execute_analysis(
+    graph: Any,
+    formatted_symbol: str,
+    analysis_date: str,
+    analysis_id: Optional[str],
+    session_id: str,
+    update_progress: Optional[Callable] = None,
+    async_tracker: Optional[Any] = None,
+    analysis_start_time: Optional[float] = None,
+    check_task_control: Optional[Callable] = None
+) -> tuple[Any, Any]:
+    """
+    步骤9: 执行分析
+    
+    Args:
+        graph: TradingAgentsGraph实例
+        formatted_symbol: 格式化后的股票代码
+        analysis_date: 分析日期
+        analysis_id: 分析ID
+        session_id: 会话ID
+        update_progress: 进度回调函数
+        async_tracker: 异步进度跟踪器
+        analysis_start_time: 分析开始时间
+        check_task_control: 任务控制检查函数
+        
+    Returns:
+        (state, decision)
+    """
+    from .message_utils import publish_progress_message, get_step_info, get_message_producer
+    
+    if update_progress:
+        update_progress(f"📊 开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
+    
+    # 发布步骤9开始消息
+    message_producer = get_message_producer()
+    current_step, total_steps = get_step_info(async_tracker, 8, 12)
+    
+    publish_progress_message(
+        analysis_id=analysis_id,
+        current_step=current_step,
+        total_steps=total_steps,
+        step_name="📊 执行分析",
+        step_description="开始多智能体分析执行",
+        last_message=f"📊 开始分析 {formatted_symbol} 股票",
+        module_name="analysis_execution",
+        node_status=NodeStatus.START.value,
+        async_tracker=async_tracker,
+        analysis_start_time=analysis_start_time,
+        message_producer=message_producer
+    )
+    
+    # 检查任务控制
+    if check_task_control and not check_task_control():
+        raise Exception('任务已被停止')
+    
+    logger.debug(f"🔍 [RUNNER DEBUG] ===== 调用graph.propagate =====")
+    logger.debug(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
+    logger.debug(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
+    logger.debug(f"🔍 [RUNNER DEBUG]   date: '{analysis_date}'")
+    logger.debug(f"🔍 [RUNNER DEBUG]   analysis_id: '{analysis_id}'")
+    logger.debug(f"🔍 [RUNNER DEBUG]   session_id: '{session_id}'")
+    
+    state, decision = graph.propagate(formatted_symbol, analysis_date, analysis_id=analysis_id, session_id=session_id)
+    
+    # 再次检查任务控制
+    if check_task_control and not check_task_control():
+        logger.warning(f"⚠️ [任务控制] 分析完成后检测到停止信号")
+        raise Exception('任务已被停止（分析已完成）')
+    
+    return state, decision
+
+
+def process_analysis_results(
+    state: Any,
+    decision: Any,
+    llm_provider: str,
+    llm_model: str,
+    session_id: str,
+    analysts: list,
+    research_depth: int,
+    market_type: str,
+    update_progress: Optional[Callable] = None,
+    analysis_id: Optional[str] = None,
+    async_tracker: Optional[Any] = None,
+    analysis_start_time: Optional[float] = None
+) -> Dict[str, Any]:
+    """
+    步骤10: 处理分析结果
+    
+    Args:
+        state: 分析状态
+        decision: 分析决策
+        llm_provider: LLM提供商
+        llm_model: 模型名称
+        session_id: 会话ID
+        analysts: 分析师列表
+        research_depth: 研究深度
+        market_type: 市场类型
+        update_progress: 进度回调函数
+        analysis_id: 分析ID
+        async_tracker: 异步进度跟踪器
+        analysis_start_time: 分析开始时间
+        
+    Returns:
+        处理后的结果字典
+    """
+    from .message_utils import publish_progress_message, get_step_info, get_message_producer
+    # 延迟导入以避免循环依赖
+    def extract_risk_assessment(state):
+        """从分析状态中提取风险评估数据（延迟导入版本）"""
+        try:
+            from .analysis_runner import extract_risk_assessment as _extract
+            return _extract(state)
+        except ImportError:
+            # 如果无法导入，返回None
+            return None
+    
+    # 发布步骤10开始消息
+    message_producer = get_message_producer()
+    current_step, total_steps = get_step_info(async_tracker, 9, 12)
+    
+    publish_progress_message(
+        analysis_id=analysis_id,
+        current_step=current_step,
+        total_steps=total_steps,
+        step_name="📋 处理分析结果",
+        step_description="开始处理分析结果",
+        last_message="📋 分析完成，正在整理结果...",
+        module_name="result_processing",
+        node_status=NodeStatus.START.value,
+        async_tracker=async_tracker,
+        analysis_start_time=analysis_start_time,
+        message_producer=message_producer
+    )
+    
+    if update_progress:
+        update_progress("📋 分析完成，正在整理结果...")
+    
+    # 提取风险评估数据
+    risk_assessment = extract_risk_assessment(state)
+    if risk_assessment:
+        state['risk_assessment'] = risk_assessment
+    
+    # 记录Token使用
+    track_token_usage(
+        llm_provider, llm_model, session_id, analysts, 
+        research_depth, market_type, update_progress
+    )
+    
+    # 发布步骤10完成消息
+    publish_progress_message(
+        analysis_id=analysis_id,
+        current_step=current_step,
+        total_steps=total_steps,
+        step_name="📋 处理分析结果",
+        step_description="分析结果处理完成",
+        last_message="📋 分析完成，正在整理结果...",
+        module_name="result_processing",
+        node_status=NodeStatus.COMPLETE.value,
+        async_tracker=async_tracker,
+        analysis_start_time=analysis_start_time,
+        message_producer=message_producer
+    )
+    
+    return {
+        'state': state,
+        'decision': decision
+    }
+
+
+def log_analysis_completion(
+    logger_manager: Any,
+    stock_symbol: str,
+    session_id: str,
+    analysis_start_time: float,
+    update_progress: Optional[Callable] = None,
+    analysis_id: Optional[str] = None,
+    async_tracker: Optional[Any] = None
+) -> float:
+    """
+    步骤11: 记录完成日志
+    
+    Args:
+        logger_manager: 日志管理器
+        stock_symbol: 股票代码
+        session_id: 会话ID
+        analysis_start_time: 分析开始时间
+        update_progress: 进度回调函数
+        analysis_id: 分析ID
+        async_tracker: 异步进度跟踪器
+        
+    Returns:
+        总成本
+    """
+    import time
+    from .message_utils import publish_progress_message, get_step_info, get_message_producer
+    
+    # 发布步骤11开始消息
+    message_producer = get_message_producer()
+    current_step, total_steps = get_step_info(async_tracker, 10, 12)
+    
+    publish_progress_message(
+        analysis_id=analysis_id,
+        current_step=current_step,
+        total_steps=total_steps,
+        step_name="✅ 记录完成日志",
+        step_description="开始记录完成日志",
+        last_message="✅ 记录完成日志...",
+        module_name="completion_logging",
+        node_status=NodeStatus.START.value,
+        async_tracker=async_tracker,
+        analysis_start_time=analysis_start_time,
+        message_producer=message_producer
+    )
+    
+    if update_progress:
+        update_progress("✅ 记录完成日志...")
+    
+    analysis_duration = time.time() - analysis_start_time
+    
+    total_cost = 0.0
+    try:
+        from tradingagents.config.config_manager import token_tracker
+        total_cost = token_tracker.get_session_cost(session_id)
+    except:
+        pass
+    
+    logger_manager.log_analysis_complete(
+        logger, stock_symbol, "comprehensive_analysis", session_id,
+        analysis_duration, total_cost
+    )
+    
+    logger.info(f"✅ [分析完成] 股票分析成功完成",
+               extra={
+                   'stock_symbol': stock_symbol,
+                   'session_id': session_id,
+                   'duration': analysis_duration,
+                   'total_cost': total_cost,
+                   'success': True,
+                   'event_type': 'web_analysis_complete'
+               })
+    
+    if update_progress:
+        update_progress(f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}")
+    
+    # 发布步骤11完成消息
+    publish_progress_message(
+        analysis_id=analysis_id,
+        current_step=current_step,
+        total_steps=total_steps,
+        step_name="✅ 记录完成日志",
+        step_description=f"完成日志已记录，总耗时: {analysis_duration:.1f}秒",
+        last_message=f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}",
+        module_name="completion_logging",
+        node_status=NodeStatus.COMPLETE.value,
+        async_tracker=async_tracker,
+        analysis_start_time=analysis_start_time,
+        message_producer=message_producer
+    )
+    
+    return total_cost

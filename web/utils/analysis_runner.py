@@ -137,7 +137,12 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         estimate_analysis_cost,
         check_task_control as check_task_control_helper,
         track_token_usage,
-        save_analysis_results
+        save_analysis_results,
+        log_analysis_start,
+        prepare_step_output_directory,
+        execute_analysis,
+        process_analysis_results,
+        log_analysis_completion
     )
 
     def update_progress(message, step=None, total_steps=None):
@@ -146,28 +151,19 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             progress_callback(message, step, total_steps)
         logger.info(f"[进度] {message}")
     
-    # 获取消息生产者（如果消息模式启用）
-    try:
-        from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
-        message_producer = get_message_producer() if is_message_mode_enabled() else None
-    except Exception as e:
-        logger.debug(f"消息生产者初始化失败（可能未启用消息模式）: {e}")
-        message_producer = None
-
     # ========== 步骤1: 记录分析开始日志 ==========
-    logger_manager = get_logger_manager()
-    import time
-    analysis_start_time = time.time()
-
-    update_progress("🚀 开始股票分析...")
-    
-    # 发布任务开始状态消息
-    if message_producer and analysis_id:
-        try:
-            from tradingagents.messaging.business.messages import TaskStatus
-            message_producer.publish_status(analysis_id, TaskStatus.RUNNING, "🚀 开始股票分析...")
-        except Exception as e:
-            logger.debug(f"发布任务开始消息失败: {e}")
+    logger_manager, analysis_start_time = log_analysis_start(
+        stock_symbol=stock_symbol,
+        analysis_date=analysis_date,
+        analysts=analysts,
+        research_depth=research_depth,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        market_type=market_type,
+        update_progress=update_progress,
+        analysis_id=analysis_id,
+        async_tracker=async_tracker
+    )
 
     # ========== 步骤2: 成本估算 ==========
     estimate_analysis_cost(
@@ -205,7 +201,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     formatted_symbol = prep_result['formatted_symbol']
     graph = prep_result['graph']
     session_id = prep_result['session_id']
-    
+
     # 记录分析开始日志
     logger_manager.log_analysis_start(
         logger, stock_symbol, "comprehensive_analysis", session_id
@@ -225,185 +221,49 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                })
 
     try:
-
         # ========== 步骤8: 步骤输出目录准备 ==========
-        # 发布步骤8开始消息
-        if message_producer and analysis_id and async_tracker:
-            try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-                current_step = 7  # 步骤8（索引从0开始）
-                total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                progress_msg = TaskProgressMessage(
-                    analysis_id=analysis_id,
-                    current_step=current_step,
-                    total_steps=total_steps,
-                    progress_percentage=progress_percentage,
-                    current_step_name="📁 步骤输出目录准备",
-                    current_step_description="正在准备步骤输出目录",
-                    elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else time.time() - analysis_start_time,
-                    remaining_time=0,
-                    last_message="📁 准备步骤输出目录...",
-                    module_name="step_output_directory",  # 任务节点名称（英文ID）
-                    node_status=NodeStatus.START.value  # 任务节点状态：开始
-                )
-                message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤8开始消息失败: {e}")
-        
-        update_progress("📁 准备步骤输出目录...")
-        from pathlib import Path
-        step_output_base_dir = Path("eval_results") / formatted_symbol / "TradingAgentsStrategy_logs" / "step_outputs" / analysis_date
-        step_output_base_dir.mkdir(parents=True, exist_ok=True)
-        update_progress(f"✅ 步骤输出目录已准备: {step_output_base_dir}")
-        
-        # 发布步骤8完成消息
-        if message_producer and analysis_id and async_tracker:
-            try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-                current_step = 7  # 步骤8（索引从0开始）
-                total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                progress_msg = TaskProgressMessage(
-                    analysis_id=analysis_id,
-                    current_step=current_step,
-                    total_steps=total_steps,
-                    progress_percentage=progress_percentage,
-                    current_step_name="📁 步骤输出目录准备",
-                    current_step_description=f"步骤输出目录已准备: {step_output_base_dir}",
-                    elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else time.time() - analysis_start_time,
-                    remaining_time=0,
-                    last_message=f"✅ 步骤输出目录已准备: {step_output_base_dir}",
-                    module_name="step_output_directory",  # 任务节点名称（英文ID）
-                    node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
-                )
-                message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤8完成消息失败: {e}")
+        prepare_step_output_directory(
+            formatted_symbol=formatted_symbol,
+            analysis_date=analysis_date,
+            update_progress=update_progress,
+            analysis_id=analysis_id,
+            async_tracker=async_tracker,
+            analysis_start_time=analysis_start_time
+        )
         
         # ========== 步骤9: 执行分析 ==========
-        update_progress(f"📊 开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
+        def check_task_control():
+            return check_task_control_helper(analysis_id, async_tracker)
         
-        # 发布步骤9开始消息
-        if message_producer and analysis_id:
-            try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage
-                if async_tracker:
-                    current_step = 8  # 步骤9（索引从0开始）
-                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                    progress_msg = TaskProgressMessage(
-                        analysis_id=analysis_id,
-                        current_step=current_step,
-                        total_steps=total_steps,
-                        progress_percentage=progress_percentage,
-                        current_step_name="📊 执行分析",
-                        current_step_description="开始多智能体分析执行",
-                        elapsed_time=time.time() - analysis_start_time,
-                        remaining_time=0,
-                        last_message=f"📊 开始分析 {formatted_symbol} 股票",
-                    module_name="analysis_execution",  # 任务节点名称（英文ID）
-                    node_status=NodeStatus.START.value  # 任务节点状态
-                    )
-                    message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤9消息失败: {e}")
-        
-        if not check_task_control_helper(analysis_id, async_tracker):
-            return {
-                'success': False,
-                'error': '任务已被停止',
-                'stock_symbol': stock_symbol,
-                'analysis_date': analysis_date,
-                'session_id': session_id
-            }
-        
-        logger.debug(f"🔍 [RUNNER DEBUG] ===== 调用graph.propagate =====")
-        logger.debug(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
-        logger.debug(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
-        logger.debug(f"🔍 [RUNNER DEBUG]   date: '{analysis_date}'")
-        logger.debug(f"🔍 [RUNNER DEBUG]   analysis_id: '{analysis_id}'")
-        logger.debug(f"🔍 [RUNNER DEBUG]   session_id: '{session_id}'")
-
-        state, decision = graph.propagate(formatted_symbol, analysis_date, analysis_id=analysis_id, session_id=session_id)
-        
-        if not check_task_control_helper(analysis_id, async_tracker):
-            logger.warning(f"⚠️ [任务控制] 分析完成后检测到停止信号")
-            return {
-                'success': False,
-                'error': '任务已被停止（分析已完成）',
-                'stock_symbol': stock_symbol,
-                'analysis_date': analysis_date,
-                'session_id': session_id,
-                'state': state,
-                'decision': decision
-            }
+        state, decision = execute_analysis(
+            graph=graph,
+            formatted_symbol=formatted_symbol,
+            analysis_date=analysis_date,
+            analysis_id=analysis_id,
+            session_id=session_id,
+            update_progress=update_progress,
+            async_tracker=async_tracker,
+            analysis_start_time=analysis_start_time,
+            check_task_control=check_task_control
+        )
 
         # ========== 步骤10: 处理分析结果 ==========
         logger.debug(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")
         logger.debug(f"🔍 [DEBUG] decision内容: {decision}")
-
-        # 发布步骤10开始消息
-        if message_producer and analysis_id:
-            try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-                if async_tracker:
-                    current_step = 9  # 步骤10（索引从0开始）
-                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                    progress_msg = TaskProgressMessage(
-                        analysis_id=analysis_id,
-                        current_step=current_step,
-                        total_steps=total_steps,
-                        progress_percentage=progress_percentage,
-                        current_step_name="📋 处理分析结果",
-                        current_step_description="开始处理分析结果",
-                        elapsed_time=time.time() - analysis_start_time,
-                        remaining_time=0,
-                        last_message="📋 分析完成，正在整理结果...",
-                        module_name="result_processing",  # 任务节点名称（英文ID）
-                        node_status=NodeStatus.START.value  # 任务节点状态：开始
-                    )
-                    message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤10开始消息失败: {e}")
-
-        update_progress("📋 分析完成，正在整理结果...")
         
-        # 发布步骤10完成消息
-        if message_producer and analysis_id:
-            try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-                if async_tracker:
-                    current_step = 9  # 步骤10（索引从0开始）
-                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                    progress_msg = TaskProgressMessage(
-                        analysis_id=analysis_id,
-                        current_step=current_step,
-                        total_steps=total_steps,
-                        progress_percentage=progress_percentage,
-                        current_step_name="📋 处理分析结果",
-                        current_step_description="分析结果处理完成",
-                        elapsed_time=time.time() - analysis_start_time,
-                        remaining_time=0,
-                        last_message="📋 分析完成，正在整理结果...",
-                        module_name="result_processing",  # 任务节点名称（英文ID）
-                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
-                    )
-                    message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤10完成消息失败: {e}")
-
-        # 提取风险评估数据
-        risk_assessment = extract_risk_assessment(state)
-        if risk_assessment:
-            state['risk_assessment'] = risk_assessment
-
-        # 记录Token使用
-        track_token_usage(
-            llm_provider, llm_model, session_id, analysts, 
-            research_depth, market_type, update_progress
+        processed_results = process_analysis_results(
+            state=state,
+            decision=decision,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            session_id=session_id,
+            analysts=analysts,
+            research_depth=research_depth,
+            market_type=market_type,
+            update_progress=update_progress,
+            analysis_id=analysis_id,
+            async_tracker=async_tracker,
+            analysis_start_time=analysis_start_time
         )
 
         results = {
@@ -413,92 +273,23 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             'research_depth': research_depth,
             'llm_provider': llm_provider,
             'llm_model': llm_model,
-            'state': state,
-            'decision': decision,
+            'state': processed_results['state'],
+            'decision': processed_results['decision'],
             'success': True,
             'error': None,
             'session_id': session_id if TOKEN_TRACKING_ENABLED else None
         }
 
         # ========== 步骤11: 记录完成日志 ==========
-        # 发布步骤11开始消息
-        if message_producer and analysis_id:
-            try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-                if async_tracker:
-                    current_step = 10  # 步骤11（索引从0开始）
-                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                    progress_msg = TaskProgressMessage(
-                        analysis_id=analysis_id,
-                        current_step=current_step,
-                        total_steps=total_steps,
-                        progress_percentage=progress_percentage,
-                        current_step_name="✅ 记录完成日志",
-                        current_step_description="开始记录完成日志",
-                        elapsed_time=time.time() - analysis_start_time,
-                        remaining_time=0,
-                        last_message="✅ 记录完成日志...",
-                        module_name="completion_logging",  # 任务节点名称（英文ID）
-                        node_status=NodeStatus.START.value  # 任务节点状态：开始
-                    )
-                    message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤11开始消息失败: {e}")
-
-        update_progress("✅ 记录完成日志...")
-        analysis_duration = time.time() - analysis_start_time
-        
-        total_cost = 0.0
-        if TOKEN_TRACKING_ENABLED:
-            try:
-                from tradingagents.config.config_manager import token_tracker
-                total_cost = token_tracker.get_session_cost(session_id)
-            except:
-                pass
-
-        logger_manager.log_analysis_complete(
-            logger, stock_symbol, "comprehensive_analysis", session_id,
-            analysis_duration, total_cost
+        log_analysis_completion(
+            logger_manager=logger_manager,
+            stock_symbol=stock_symbol,
+            session_id=session_id,
+            analysis_start_time=analysis_start_time,
+            update_progress=update_progress,
+            analysis_id=analysis_id,
+            async_tracker=async_tracker
         )
-
-        logger.info(f"✅ [分析完成] 股票分析成功完成",
-                   extra={
-                       'stock_symbol': stock_symbol,
-                       'session_id': session_id,
-                       'duration': analysis_duration,
-                       'total_cost': total_cost,
-                       'analysts_used': analysts,
-                       'success': True,
-                       'event_type': 'web_analysis_complete'
-                   })
-        
-        update_progress(f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}")
-        
-        # 发布步骤11完成消息
-        if message_producer and analysis_id:
-            try:
-                from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-                if async_tracker:
-                    current_step = 10  # 步骤11（索引从0开始）
-                    total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                    progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                    progress_msg = TaskProgressMessage(
-                        analysis_id=analysis_id,
-                        current_step=current_step,
-                        total_steps=total_steps,
-                        progress_percentage=progress_percentage,
-                        current_step_name="✅ 记录完成日志",
-                        current_step_description=f"完成日志已记录，总耗时: {analysis_duration:.1f}秒",
-                        elapsed_time=analysis_duration,
-                        remaining_time=0,
-                        last_message=f"✅ 完成日志已记录，总耗时: {analysis_duration:.1f}秒，总成本: ¥{total_cost:.4f}",
-                        module_name="completion_logging",  # 任务节点名称（英文ID）
-                        node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
-                    )
-                    message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤11完成消息失败: {e}")
 
         # ========== 步骤12: 保存分析结果 ==========
         save_analysis_results(results, stock_symbol, analysis_id, update_progress, async_tracker)
@@ -506,12 +297,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         update_progress("✅ 分析成功完成！")
         
         # 发布任务完成状态消息
-        if message_producer and analysis_id:
-            try:
-                from tradingagents.messaging.business.messages import TaskStatus
-                message_producer.publish_status(analysis_id, TaskStatus.COMPLETED, "✅ 分析成功完成！")
-            except Exception as e:
-                logger.debug(f"发布任务完成消息失败: {e}")
+        from .message_utils import publish_task_status
+        publish_task_status(analysis_id, "COMPLETED", "✅ 分析成功完成！")
+        
         return results
 
     except Exception as e:
@@ -539,12 +327,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                     }, exc_info=True)
         
         # 发布任务失败状态消息
-        if message_producer and analysis_id:
-            try:
-                from tradingagents.messaging.business.messages import TaskStatus
-                message_producer.publish_status(analysis_id, TaskStatus.FAILED, f"❌ 分析失败: {str(e)}")
-            except Exception as e2:
-                logger.debug(f"发布任务失败消息失败: {e2}")
+        from .message_utils import publish_task_status
+        publish_task_status(analysis_id, "FAILED", f"❌ 分析失败: {str(e)}")
 
         # 如果真实分析失败，返回错误信息而不是误导性演示数据
         return {
