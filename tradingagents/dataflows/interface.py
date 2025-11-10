@@ -359,7 +359,7 @@ def get_google_news(
     
     # 对A股查询添加中文关键词
     if is_china_stock:
-        logger.info(f"[Google新闻] 检测到A股查询: {query}，使用中文搜索")
+        logger.debug(f"[Google新闻] 检测到A股查询: {query}，使用中文搜索")
         if '股票' not in query and '股价' not in query and '公司' not in query:
             query = f"{query} 股票 公司 财报 新闻"
     
@@ -369,7 +369,7 @@ def get_google_news(
     before = start_date - relativedelta(days=look_back_days)
     before = before.strftime("%Y-%m-%d")
 
-    logger.info(f"[Google新闻] 开始获取新闻，查询: {query}, 时间范围: {before} 至 {curr_date}")
+    logger.debug(f"[Google新闻] 开始获取新闻，查询: {query}, 时间范围: {before} 至 {curr_date}")
     news_results = getNewsData(query, before, curr_date)
 
     news_str = ""

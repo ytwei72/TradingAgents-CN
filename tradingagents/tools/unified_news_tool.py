@@ -35,7 +35,7 @@ class UnifiedNewsAnalyzer:
         Returns:
             str: 格式化的新闻内容
         """
-        logger.info(f"[统一新闻工具] 开始获取 {stock_code} 的新闻，模型: {model_info}")
+        logger.debug(f"[统一新闻工具] 开始获取 {stock_code} 的新闻，模型: {model_info}")
         logger.debug(f"[统一新闻工具] 🤖 当前模型信息: {model_info}")
         
         # 识别股票类型

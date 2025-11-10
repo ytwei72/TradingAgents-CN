@@ -26,7 +26,7 @@ def create_news_analyst(llm, toolkit):
         
         logger.info(f"[新闻分析师] 开始分析 {ticker} 的新闻，交易日期: {current_date}")
         session_id = state.get("session_id", "未知会话")
-        logger.info(f"[新闻分析师] 会话ID: {session_id}，开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.debug(f"[新闻分析师] 会话ID: {session_id}，开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # 获取市场信息
         market_info = StockUtils.get_market_info(ticker)
@@ -255,7 +255,7 @@ def create_news_analyst(llm, toolkit):
         
         llm_end_time = datetime.now()
         llm_time_taken = (llm_end_time - llm_start_time).total_seconds()
-        logger.info(f"[新闻分析师] LLM调用完成，耗时: {llm_time_taken:.2f}秒")
+        logger.debug(f"[新闻分析师] LLM调用完成，耗时: {llm_time_taken:.2f}秒")
 
         # 使用统一的Google工具调用处理器
         if GoogleToolCallHandler.is_google_model(llm):

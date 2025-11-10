@@ -146,7 +146,7 @@ class NewsRelevanceFilter:
             logger.warning("[过滤器] 输入新闻DataFrame为空")
             return news_df
         
-        logger.info(f"[过滤器] 开始过滤新闻，原始数量: {len(news_df)}条，最低评分阈值: {min_score}")
+        logger.debug(f"[过滤器] 开始过滤新闻，原始数量: {len(news_df)}条，最低评分阈值: {min_score}")
         
         filtered_news = []
         
@@ -171,7 +171,7 @@ class NewsRelevanceFilter:
             filtered_df = pd.DataFrame(filtered_news)
             # 按相关性评分排序
             filtered_df = filtered_df.sort_values('relevance_score', ascending=False)
-            logger.info(f"[过滤器] 过滤完成，保留 {len(filtered_df)}条 新闻")
+            logger.debug(f"[过滤器] 过滤完成，保留 {len(filtered_df)}条 新闻")
         else:
             filtered_df = pd.DataFrame()
             logger.warning(f"[过滤器] 所有新闻都被过滤，无符合条件的新闻")

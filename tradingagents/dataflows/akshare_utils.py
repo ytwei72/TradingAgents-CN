@@ -553,7 +553,7 @@ def get_stock_news_em(symbol: str, max_news: int = 10) -> pd.DataFrame:
         pd.DataFrame: 包含新闻标题、内容、日期和链接的DataFrame
     """
     start_time = datetime.now()
-    logger.info(f"[东方财富新闻] 开始获取股票 {symbol} 的东方财富新闻数据")
+    logger.debug(f"[东方财富新闻] 开始获取股票 {symbol} 的东方财富新闻数据")
     
     try:
         provider = get_akshare_provider()
@@ -561,7 +561,7 @@ def get_stock_news_em(symbol: str, max_news: int = 10) -> pd.DataFrame:
             logger.error(f"[东方财富新闻] ❌ AKShare未连接，无法获取东方财富新闻")
             return pd.DataFrame()
 
-        logger.info(f"[东方财富新闻] 📰 准备调用AKShare API获取个股新闻: {symbol}")
+        logger.debug(f"[东方财富新闻] 📰 准备调用AKShare API获取个股新闻: {symbol}")
 
         # 使用线程超时包装（兼容Windows）
         import threading
@@ -609,14 +609,14 @@ def get_stock_news_em(symbol: str, max_news: int = 10) -> pd.DataFrame:
             # 限制新闻数量为最新的max_news条
             if len(news_df) > max_news:
                 news_df = news_df.head(max_news)
-                logger.info(f"[东方财富新闻] 📰 新闻数量限制: 从{len(news_df)}条限制为{max_news}条最新新闻")
+                logger.debug(f"[东方财富新闻] 📰 新闻数量限制: 从{len(news_df)}条限制为{max_news}条最新新闻")
             
             news_count = len(news_df)
             elapsed_time = (datetime.now() - start_time).total_seconds()
             
             # 记录一些新闻标题示例
             sample_titles = [row.get('标题', '无标题') for _, row in news_df.head(3).iterrows()]
-            logger.info(f"[东方财富新闻] 新闻标题示例: {', '.join(sample_titles)}")
+            logger.debug(f"[东方财富新闻] 新闻标题示例: {', '.join(sample_titles)}")
             
             logger.info(f"[东方财富新闻] ✅ 获取成功: {symbol}, 共{news_count}条记录，耗时: {elapsed_time:.2f}秒")
             return news_df

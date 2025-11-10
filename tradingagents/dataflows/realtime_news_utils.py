@@ -53,67 +53,67 @@ class RealtimeNewsAggregator:
             hours_back: 回溯小时数
             max_news: 最大新闻数量，默认10条
         """
-        logger.info(f"[新闻聚合器] 开始获取 {ticker} 的实时新闻，回溯时间: {hours_back}小时")
+        logger.debug(f"[新闻聚合器] 开始获取 {ticker} 的实时新闻，回溯时间: {hours_back}小时")
         start_time = datetime.now()
         all_news = []
         
         # 1. FinnHub实时新闻 (最高优先级)
-        logger.info(f"[新闻聚合器] 尝试从 FinnHub 获取 {ticker} 的新闻")
+        logger.debug(f"[新闻聚合器] 尝试从 FinnHub 获取 {ticker} 的新闻")
         finnhub_start = datetime.now()
         finnhub_news = self._get_finnhub_realtime_news(ticker, hours_back)
         finnhub_time = (datetime.now() - finnhub_start).total_seconds()
         
         if finnhub_news:
-            logger.info(f"[新闻聚合器] 成功从 FinnHub 获取 {len(finnhub_news)} 条新闻，耗时: {finnhub_time:.2f}秒")
+            logger.debug(f"[新闻聚合器] 成功从 FinnHub 获取 {len(finnhub_news)} 条新闻，耗时: {finnhub_time:.2f}秒")
         else:
-            logger.info(f"[新闻聚合器] FinnHub 未返回新闻，耗时: {finnhub_time:.2f}秒")
+            logger.debug(f"[新闻聚合器] FinnHub 未返回新闻，耗时: {finnhub_time:.2f}秒")
             
         all_news.extend(finnhub_news)
         
         # 2. Alpha Vantage新闻
-        logger.info(f"[新闻聚合器] 尝试从 Alpha Vantage 获取 {ticker} 的新闻")
+        logger.debug(f"[新闻聚合器] 尝试从 Alpha Vantage 获取 {ticker} 的新闻")
         av_start = datetime.now()
         av_news = self._get_alpha_vantage_news(ticker, hours_back)
         av_time = (datetime.now() - av_start).total_seconds()
         
         if av_news:
-            logger.info(f"[新闻聚合器] 成功从 Alpha Vantage 获取 {len(av_news)} 条新闻，耗时: {av_time:.2f}秒")
+            logger.debug(f"[新闻聚合器] 成功从 Alpha Vantage 获取 {len(av_news)} 条新闻，耗时: {av_time:.2f}秒")
         else:
-            logger.info(f"[新闻聚合器] Alpha Vantage 未返回新闻，耗时: {av_time:.2f}秒")
+            logger.debug(f"[新闻聚合器] Alpha Vantage 未返回新闻，耗时: {av_time:.2f}秒")
             
         all_news.extend(av_news)
         
         # 3. NewsAPI (如果配置了)
         if self.newsapi_key:
-            logger.info(f"[新闻聚合器] 尝试从 NewsAPI 获取 {ticker} 的新闻")
+            logger.debug(f"[新闻聚合器] 尝试从 NewsAPI 获取 {ticker} 的新闻")
             newsapi_start = datetime.now()
             newsapi_news = self._get_newsapi_news(ticker, hours_back)
             newsapi_time = (datetime.now() - newsapi_start).total_seconds()
             
             if newsapi_news:
-                logger.info(f"[新闻聚合器] 成功从 NewsAPI 获取 {len(newsapi_news)} 条新闻，耗时: {newsapi_time:.2f}秒")
+                logger.debug(f"[新闻聚合器] 成功从 NewsAPI 获取 {len(newsapi_news)} 条新闻，耗时: {newsapi_time:.2f}秒")
             else:
-                logger.info(f"[新闻聚合器] NewsAPI 未返回新闻，耗时: {newsapi_time:.2f}秒")
+                logger.debug(f"[新闻聚合器] NewsAPI 未返回新闻，耗时: {newsapi_time:.2f}秒")
                 
             all_news.extend(newsapi_news)
         else:
-            logger.info(f"[新闻聚合器] NewsAPI 密钥未配置，跳过此新闻源")
+            logger.debug(f"[新闻聚合器] NewsAPI 密钥未配置，跳过此新闻源")
         
         # 4. 中文财经新闻源
-        logger.info(f"[新闻聚合器] 尝试获取 {ticker} 的中文财经新闻")
+        logger.debug(f"[新闻聚合器] 尝试获取 {ticker} 的中文财经新闻")
         chinese_start = datetime.now()
         chinese_news = self._get_chinese_finance_news(ticker, hours_back)
         chinese_time = (datetime.now() - chinese_start).total_seconds()
         
         if chinese_news:
-            logger.info(f"[新闻聚合器] 成功获取 {len(chinese_news)} 条中文财经新闻，耗时: {chinese_time:.2f}秒")
+            logger.debug(f"[新闻聚合器] 成功获取 {len(chinese_news)} 条中文财经新闻，耗时: {chinese_time:.2f}秒")
         else:
-            logger.info(f"[新闻聚合器] 未获取到中文财经新闻，耗时: {chinese_time:.2f}秒")
+            logger.debug(f"[新闻聚合器] 未获取到中文财经新闻，耗时: {chinese_time:.2f}秒")
             
         all_news.extend(chinese_news)
         
         # 去重和排序
-        logger.info(f"[新闻聚合器] 开始对 {len(all_news)} 条新闻进行去重和排序")
+        logger.debug(f"[新闻聚合器] 开始对 {len(all_news)} 条新闻进行去重和排序")
         dedup_start = datetime.now()
         unique_news = self._deduplicate_news(all_news)
         sorted_news = sorted(unique_news, key=lambda x: x.publish_time, reverse=True)
@@ -121,7 +121,7 @@ class RealtimeNewsAggregator:
         
         # 记录去重结果
         removed_count = len(all_news) - len(unique_news)
-        logger.info(f"[新闻聚合器] 新闻去重完成，移除了 {removed_count} 条重复新闻，剩余 {len(sorted_news)} 条，耗时: {dedup_time:.2f}秒")
+        logger.debug(f"[新闻聚合器] 新闻去重完成，移除了 {removed_count} 条重复新闻，剩余 {len(sorted_news)} 条，耗时: {dedup_time:.2f}秒")
         
         # 记录总体情况
         total_time = (datetime.now() - start_time).total_seconds()
@@ -131,12 +131,12 @@ class RealtimeNewsAggregator:
         if len(sorted_news) > max_news:
             original_count = len(sorted_news)
             sorted_news = sorted_news[:max_news]
-            logger.info(f"[新闻聚合器] 📰 新闻数量限制: 从{original_count}条限制为{max_news}条最新新闻")
+            logger.debug(f"[新闻聚合器] 📰 新闻数量限制: 从{original_count}条限制为{max_news}条最新新闻")
         
         # 记录一些新闻标题示例
         if sorted_news:
             sample_titles = [item.title for item in sorted_news[:3]]
-            logger.info(f"[新闻聚合器] 新闻标题示例: {', '.join(sample_titles)}")
+            logger.debug(f"[新闻聚合器] 新闻标题示例: {', '.join(sample_titles)}")
         
         return sorted_news
     
@@ -299,7 +299,7 @@ class RealtimeNewsAggregator:
     def _get_chinese_finance_news(self, ticker: str, hours_back: int) -> List[NewsItem]:
         """获取中文财经新闻"""
         # 集成中文财经新闻API：财联社、东方财富等
-        logger.info(f"[中文财经新闻] 开始获取 {ticker} 的中文财经新闻，回溯时间: {hours_back}小时")
+        logger.debug(f"[中文财经新闻] 开始获取 {ticker} 的中文财经新闻，回溯时间: {hours_back}小时")
         start_time = datetime.now()
         
         try:
@@ -307,25 +307,25 @@ class RealtimeNewsAggregator:
             
             # 1. 尝试使用AKShare获取东方财富个股新闻
             try:
-                logger.info(f"[中文财经新闻] 尝试导入 AKShare 工具")
+                logger.debug(f"[中文财经新闻] 尝试导入 AKShare 工具")
                 from .akshare_utils import get_stock_news_em
                 
                 # 处理股票代码格式
                 # 如果是美股代码，不使用东方财富新闻
                 if '.' in ticker and any(suffix in ticker for suffix in ['.US', '.N', '.O', '.NYSE', '.NASDAQ']):
-                    logger.info(f"[中文财经新闻] 检测到美股代码 {ticker}，跳过东方财富新闻获取")
+                    logger.debug(f"[中文财经新闻] 检测到美股代码 {ticker}，跳过东方财富新闻获取")
                 else:
                     # 处理A股和港股代码
                     clean_ticker = ticker.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
                                     .replace('.HK', '').replace('.XSHE', '').replace('.XSHG', '')
                     
                     # 获取东方财富新闻
-                    logger.info(f"[中文财经新闻] 开始获取 {clean_ticker} 的东方财富新闻")
+                    logger.debug(f"[中文财经新闻] 开始获取 {clean_ticker} 的东方财富新闻")
                     em_start_time = datetime.now()
                     news_df = get_stock_news_em(clean_ticker)
                     
                     if not news_df.empty:
-                        logger.info(f"[中文财经新闻] 东方财富返回 {len(news_df)} 条新闻数据，开始处理")
+                        logger.debug(f"[中文财经新闻] 东方财富返回 {len(news_df)} 条新闻数据，开始处理")
                         processed_count = 0
                         skipped_count = 0
                         error_count = 0
@@ -678,90 +678,90 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
     """
     获取实时股票新闻的主要接口函数
     """
-    logger.info(f"[新闻分析] ========== 函数入口 ==========")
-    logger.info(f"[新闻分析] 函数: get_realtime_stock_news")
-    logger.info(f"[新闻分析] 参数: ticker={ticker}, curr_date={curr_date}, hours_back={hours_back}")
+    logger.debug(f"[新闻分析] ========== 函数入口 ==========")
+    logger.debug(f"[新闻分析] 函数: get_realtime_stock_news")
+    logger.debug(f"[新闻分析] 参数: ticker={ticker}, curr_date={curr_date}, hours_back={hours_back}")
     logger.info(f"[新闻分析] 开始获取 {ticker} 的实时新闻，日期: {curr_date}, 回溯时间: {hours_back}小时")
     start_total_time = datetime.now()
-    logger.info(f"[新闻分析] 开始时间: {start_total_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+    logger.debug(f"[新闻分析] 开始时间: {start_total_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
     
     # 判断股票类型
-    logger.info(f"[新闻分析] ========== 步骤1: 股票类型判断 ==========")
+    logger.debug(f"[新闻分析] ========== 步骤1: 股票类型判断 ==========")
     stock_type = "未知"
     is_china_stock = False
-    logger.info(f"[新闻分析] 原始ticker: {ticker}")
+    logger.debug(f"[新闻分析] 原始ticker: {ticker}")
     
     if '.' in ticker:
-        logger.info(f"[新闻分析] 检测到ticker包含点号，进行后缀匹配")
+        logger.debug(f"[新闻分析] 检测到ticker包含点号，进行后缀匹配")
         if any(suffix in ticker for suffix in ['.SH', '.SZ', '.SS', '.XSHE', '.XSHG']):
             stock_type = "A股"
             is_china_stock = True
-            logger.info(f"[新闻分析] 匹配到A股后缀，股票类型: {stock_type}")
+            logger.debug(f"[新闻分析] 匹配到A股后缀，股票类型: {stock_type}")
         elif '.HK' in ticker:
             stock_type = "港股"
-            logger.info(f"[新闻分析] 匹配到港股后缀，股票类型: {stock_type}")
+            logger.debug(f"[新闻分析] 匹配到港股后缀，股票类型: {stock_type}")
         elif any(suffix in ticker for suffix in ['.US', '.N', '.O', '.NYSE', '.NASDAQ']):
             stock_type = "美股"
-            logger.info(f"[新闻分析] 匹配到美股后缀，股票类型: {stock_type}")
+            logger.debug(f"[新闻分析] 匹配到美股后缀，股票类型: {stock_type}")
         else:
-            logger.info(f"[新闻分析] 未匹配到已知后缀")
+            logger.debug(f"[新闻分析] 未匹配到已知后缀")
     else:
-        logger.info(f"[新闻分析] ticker不包含点号，尝试使用StockUtils判断")
+        logger.debug(f"[新闻分析] ticker不包含点号，尝试使用StockUtils判断")
         # 尝试使用StockUtils判断股票类型
         try:
             from tradingagents.utils.stock_utils import StockUtils
-            logger.info(f"[新闻分析] 成功导入StockUtils，开始判断股票类型")
+            logger.debug(f"[新闻分析] 成功导入StockUtils，开始判断股票类型")
             market_info = StockUtils.get_market_info(ticker)
-            logger.info(f"[新闻分析] StockUtils返回市场信息: {market_info}")
+            logger.debug(f"[新闻分析] StockUtils返回市场信息: {market_info}")
             if market_info['is_china']:
                 stock_type = "A股"
                 is_china_stock = True
-                logger.info(f"[新闻分析] StockUtils判断为A股")
+                logger.debug(f"[新闻分析] StockUtils判断为A股")
             elif market_info['is_hk']:
                 stock_type = "港股"
-                logger.info(f"[新闻分析] StockUtils判断为港股")
+                logger.debug(f"[新闻分析] StockUtils判断为港股")
             elif market_info['is_us']:
                 stock_type = "美股"
-                logger.info(f"[新闻分析] StockUtils判断为美股")
+                logger.debug(f"[新闻分析] StockUtils判断为美股")
         except Exception as e:
             logger.warning(f"[新闻分析] 使用StockUtils判断股票类型失败: {e}")
     
-    logger.info(f"[新闻分析] 最终判断结果 - 股票 {ticker} 类型: {stock_type}, 是否A股: {is_china_stock}")
+    logger.debug(f"[新闻分析] 最终判断结果 - 股票 {ticker} 类型: {stock_type}, 是否A股: {is_china_stock}")
     
     # 对于A股，优先使用东方财富新闻源
     if is_china_stock:
-        logger.info(f"[新闻分析] ========== 步骤2: A股东方财富新闻获取 ==========")
-        logger.info(f"[新闻分析] 检测到A股股票 {ticker}，优先尝试使用东方财富新闻源")
+        logger.debug(f"[新闻分析] ========== 步骤2: A股东方财富新闻获取 ==========")
+        logger.debug(f"[新闻分析] 检测到A股股票 {ticker}，优先尝试使用东方财富新闻源")
         try:
-            logger.info(f"[新闻分析] 尝试导入 akshare_utils.get_stock_news_em")
+            logger.debug(f"[新闻分析] 尝试导入 akshare_utils.get_stock_news_em")
             from .akshare_utils import get_stock_news_em
-            logger.info(f"[新闻分析] 成功导入 get_stock_news_em 函数")
+            logger.debug(f"[新闻分析] 成功导入 get_stock_news_em 函数")
             
             # 处理A股代码
             clean_ticker = ticker.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
                             .replace('.XSHE', '').replace('.XSHG', '')
-            logger.info(f"[新闻分析] 原始ticker: {ticker} -> 清理后ticker: {clean_ticker}")
+            logger.debug(f"[新闻分析] 原始ticker: {ticker} -> 清理后ticker: {clean_ticker}")
             
-            logger.info(f"[新闻分析] 准备调用 get_stock_news_em({clean_ticker}, max_news=10)")
-            logger.info(f"[新闻分析] 开始从东方财富获取 {clean_ticker} 的新闻数据")
+            logger.debug(f"[新闻分析] 准备调用 get_stock_news_em({clean_ticker}, max_news=10)")
+            logger.debug(f"[新闻分析] 开始从东方财富获取 {clean_ticker} 的新闻数据")
             start_time = datetime.now()
-            logger.info(f"[新闻分析] 东方财富API调用开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+            logger.debug(f"[新闻分析] 东方财富API调用开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
             
             news_df = get_stock_news_em(clean_ticker, max_news=10)
             
             end_time = datetime.now()
             time_taken = (end_time - start_time).total_seconds()
-            logger.info(f"[新闻分析] 东方财富API调用结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
-            logger.info(f"[新闻分析] 东方财富API调用耗时: {time_taken:.2f}秒")
-            logger.info(f"[新闻分析] 东方财富API返回数据类型: {type(news_df)}")
+            logger.debug(f"[新闻分析] 东方财富API调用结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+            logger.debug(f"[新闻分析] 东方财富API调用耗时: {time_taken:.2f}秒")
+            logger.debug(f"[新闻分析] 东方财富API返回数据类型: {type(news_df)}")
             
             if hasattr(news_df, 'empty'):
-                logger.info(f"[新闻分析] 东方财富API返回DataFrame，是否为空: {news_df.empty}")
+                logger.debug(f"[新闻分析] 东方财富API返回DataFrame，是否为空: {news_df.empty}")
                 if not news_df.empty:
-                    logger.info(f"[新闻分析] 东方财富API返回DataFrame形状: {news_df.shape}")
-                    logger.info(f"[新闻分析] 东方财富API返回DataFrame列名: {list(news_df.columns) if hasattr(news_df, 'columns') else '无列名'}")
+                    logger.debug(f"[新闻分析] 东方财富API返回DataFrame形状: {news_df.shape}")
+                    logger.debug(f"[新闻分析] 东方财富API返回DataFrame列名: {list(news_df.columns) if hasattr(news_df, 'columns') else '无列名'}")
             else:
-                logger.info(f"[新闻分析] 东方财富API返回数据: {news_df}")
+                logger.debug(f"[新闻分析] 东方财富API返回数据: {news_df}")
             
             if not news_df.empty:
                 # 构建简单的新闻报告
@@ -775,12 +775,12 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
                 
                 # 记录一些新闻标题示例
                 sample_titles = [row.get('新闻标题', '无标题') for _, row in news_df.head(3).iterrows()]
-                logger.info(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
+                logger.debug(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
                 
-                logger.info(f"[新闻分析] 开始构建新闻报告")
+                logger.debug(f"[新闻分析] 开始构建新闻报告")
                 for idx, (_, row) in enumerate(news_df.iterrows()):
                     if idx < 3:  # 只记录前3条的详细信息
-                        logger.info(f"[新闻分析] 第{idx+1}条新闻: 标题={row.get('新闻标题', '无标题')}, 时间={row.get('发布时间', '无时间')}")
+                        logger.debug(f"[新闻分析] 第{idx+1}条新闻: 标题={row.get('新闻标题', '无标题')}, 时间={row.get('发布时间', '无时间')}")
                     report += f"### {row.get('新闻标题', '')}\n"
                     report += f"📅 {row.get('发布时间', '')}\n"
                     report += f"🔗 {row.get('新闻链接', '')}\n\n"
@@ -788,8 +788,8 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
                 
                 total_time_taken = (datetime.now() - start_total_time).total_seconds()
                 logger.info(f"[新闻分析] 成功生成 {ticker} 的新闻报告，总耗时 {total_time_taken:.2f} 秒，新闻来源: 东方财富")
-                logger.info(f"[新闻分析] 报告长度: {len(report)} 字符")
-                logger.info(f"[新闻分析] ========== 东方财富新闻获取成功，函数即将返回 ==========")
+                logger.debug(f"[新闻分析] 报告长度: {len(report)} 字符")
+                logger.debug(f"[新闻分析] ========== 东方财富新闻获取成功，函数即将返回 ==========")
                 return report
             else:
                 logger.warning(f"[新闻分析] 东方财富未获取到 {ticker} 的新闻，耗时 {time_taken:.2f} 秒，尝试使用其他新闻源")
@@ -799,27 +799,27 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
             import traceback
             logger.error(f"[新闻分析] 异常堆栈: {traceback.format_exc()}")
     else:
-        logger.info(f"[新闻分析] ========== 跳过A股东方财富新闻获取 ==========")
-        logger.info(f"[新闻分析] 股票类型为 {stock_type}，不是A股，跳过东方财富新闻源")
+        logger.debug(f"[新闻分析] ========== 跳过A股东方财富新闻获取 ==========")
+        logger.debug(f"[新闻分析] 股票类型为 {stock_type}，不是A股，跳过东方财富新闻源")
     
     # 如果不是A股或A股新闻获取失败，使用实时新闻聚合器
-    logger.info(f"[新闻分析] ========== 步骤3: 实时新闻聚合器 ==========")
+    logger.debug(f"[新闻分析] ========== 步骤3: 实时新闻聚合器 ==========")
     aggregator = RealtimeNewsAggregator()
-    logger.info(f"[新闻分析] 成功创建实时新闻聚合器实例")
+    logger.debug(f"[新闻分析] 成功创建实时新闻聚合器实例")
     try:
-        logger.info(f"[新闻分析] 尝试使用实时新闻聚合器获取 {ticker} 的新闻")
+        logger.debug(f"[新闻分析] 尝试使用实时新闻聚合器获取 {ticker} 的新闻")
         start_time = datetime.now()
-        logger.info(f"[新闻分析] 聚合器调用开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+        logger.debug(f"[新闻分析] 聚合器调用开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
         
         # 获取实时新闻
         news_items = aggregator.get_realtime_stock_news(ticker, hours_back, max_news=10)
         
         end_time = datetime.now()
         time_taken = (end_time - start_time).total_seconds()
-        logger.info(f"[新闻分析] 聚合器调用结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
-        logger.info(f"[新闻分析] 聚合器调用耗时: {time_taken:.2f}秒")
-        logger.info(f"[新闻分析] 聚合器返回数据类型: {type(news_items)}")
-        logger.info(f"[新闻分析] 聚合器返回数据: {news_items}")
+        logger.debug(f"[新闻分析] 聚合器调用结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+        logger.debug(f"[新闻分析] 聚合器调用耗时: {time_taken:.2f}秒")
+        logger.debug(f"[新闻分析] 聚合器返回数据类型: {type(news_items)}")
+        logger.debug(f"[新闻分析] 聚合器返回数据: {news_items}")
         
         # 如果成功获取到新闻
         if news_items and len(news_items) > 0:
@@ -828,16 +828,16 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
             
             # 记录一些新闻标题示例
             sample_titles = [item.title for item in news_items[:3]]
-            logger.info(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
+            logger.debug(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
             
             # 格式化报告
-            logger.info(f"[新闻分析] 开始格式化新闻报告")
+            logger.debug(f"[新闻分析] 开始格式化新闻报告")
             report = aggregator.format_news_report(news_items, ticker)
-            logger.info(f"[新闻分析] 报告格式化完成，长度: {len(report)} 字符")
+            logger.debug(f"[新闻分析] 报告格式化完成，长度: {len(report)} 字符")
             
             total_time_taken = (datetime.now() - start_total_time).total_seconds()
             logger.info(f"[新闻分析] 成功生成 {ticker} 的新闻报告，总耗时 {total_time_taken:.2f} 秒，新闻来源: 实时新闻聚合器")
-            logger.info(f"[新闻分析] ========== 实时新闻聚合器获取成功，函数即将返回 ==========")
+            logger.debug(f"[新闻分析] ========== 实时新闻聚合器获取成功，函数即将返回 ==========")
             return report
         else:
             logger.warning(f"[新闻分析] 实时新闻聚合器未获取到 {ticker} 的新闻，耗时 {time_taken:.2f} 秒，尝试使用备用新闻源")
@@ -851,14 +851,14 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
     
     # 备用方案1: 对于港股，优先尝试使用东方财富新闻（A股已在前面处理）
     if not is_china_stock and '.HK' in ticker:
-        logger.info(f"[新闻分析] 检测到港股代码 {ticker}，尝试使用东方财富新闻源")
+        logger.debug(f"[新闻分析] 检测到港股代码 {ticker}，尝试使用东方财富新闻源")
         try:
             from .akshare_utils import get_stock_news_em
             
             # 处理港股代码
             clean_ticker = ticker.replace('.HK', '')
             
-            logger.info(f"[新闻分析] 开始从东方财富获取港股 {clean_ticker} 的新闻数据")
+            logger.debug(f"[新闻分析] 开始从东方财富获取港股 {clean_ticker} 的新闻数据")
             start_time = datetime.now()
             news_df = get_stock_news_em(clean_ticker, max_news=10)
             end_time = datetime.now()
@@ -876,7 +876,7 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
                 
                 # 记录一些新闻标题示例
                 sample_titles = [row.get('新闻标题', '无标题') for _, row in news_df.head(3).iterrows()]
-                logger.info(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
+                logger.debug(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
                 
                 for _, row in news_df.iterrows():
                     report += f"### {row.get('新闻标题', '')}\n"
@@ -901,16 +901,16 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
             clean_ticker = ticker.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
                            .replace('.XSHE', '').replace('.XSHG', '')
             search_query = f"{clean_ticker} 股票 公司 财报 新闻"
-            logger.info(f"[新闻分析] 开始从Google获取A股 {clean_ticker} 的中文新闻数据，查询: {search_query}")
+            logger.debug(f"[新闻分析] 开始从Google获取A股 {clean_ticker} 的中文新闻数据，查询: {search_query}")
         elif stock_type == "港股":
             # 港股使用中文关键词
             clean_ticker = ticker.replace('.HK', '')
             search_query = f"{clean_ticker} 港股 公司"
-            logger.info(f"[新闻分析] 开始从Google获取港股 {clean_ticker} 的新闻数据，查询: {search_query}")
+            logger.debug(f"[新闻分析] 开始从Google获取港股 {clean_ticker} 的新闻数据，查询: {search_query}")
         else:
             # 美股使用英文关键词
             search_query = f"{ticker} stock news"
-            logger.info(f"[新闻分析] 开始从Google获取 {ticker} 的新闻数据，查询: {search_query}")
+            logger.debug(f"[新闻分析] 开始从Google获取 {ticker} 的新闻数据，查询: {search_query}")
         
         start_time = datetime.now()
         google_news = get_google_news(search_query, curr_date, 1)
@@ -927,7 +927,7 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
             # 记录一些新闻标题示例
             sample_titles = [line.replace('### ', '') for line in news_lines if line.startswith('### ')][:3]
             if sample_titles:
-                logger.info(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
+                logger.debug(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
                 
             logger.info(f"[新闻分析] 成功生成 Google 新闻报告，新闻来源: Google")
             return google_news
