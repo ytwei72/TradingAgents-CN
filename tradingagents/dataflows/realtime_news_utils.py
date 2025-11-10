@@ -43,7 +43,7 @@ class RealtimeNewsAggregator:
         self.alpha_vantage_key = os.getenv('ALPHA_VANTAGE_API_KEY')
         self.newsapi_key = os.getenv('NEWSAPI_KEY')
         
-    def get_realtime_stock_news(self, ticker: str, hours_back: int = 6, max_news: int = 10) -> List[NewsItem]:
+    def get_realtime_stock_news(self, ticker: str, hours_back: int = 6, max_news: int = 10, curr_date: str = None) -> List[NewsItem]:
         """
         获取实时股票新闻
         优先级：专业API > 新闻API > 搜索引擎
@@ -52,15 +52,23 @@ class RealtimeNewsAggregator:
             ticker: 股票代码
             hours_back: 回溯小时数
             max_news: 最大新闻数量，默认10条
+            curr_date: 指定日期（格式：YYYY-MM-DD），如果为None则使用当前日期
         """
-        logger.debug(f"[新闻聚合器] 开始获取 {ticker} 的实时新闻，回溯时间: {hours_back}小时")
+        # 如果没有提供日期，使用当前日期（向后兼容）
+        if curr_date is None:
+            end_date = datetime.now()
+        else:
+            # 解析指定日期，设置为当天的23:59:59
+            end_date = datetime.strptime(curr_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        
+        logger.debug(f"[新闻聚合器] 开始获取 {ticker} 的实时新闻，指定日期: {curr_date or '当前日期'}，回溯时间: {hours_back}小时")
         start_time = datetime.now()
         all_news = []
         
         # 1. FinnHub实时新闻 (最高优先级)
         logger.debug(f"[新闻聚合器] 尝试从 FinnHub 获取 {ticker} 的新闻")
         finnhub_start = datetime.now()
-        finnhub_news = self._get_finnhub_realtime_news(ticker, hours_back)
+        finnhub_news = self._get_finnhub_realtime_news(ticker, hours_back, end_date)
         finnhub_time = (datetime.now() - finnhub_start).total_seconds()
         
         if finnhub_news:
@@ -73,7 +81,7 @@ class RealtimeNewsAggregator:
         # 2. Alpha Vantage新闻
         logger.debug(f"[新闻聚合器] 尝试从 Alpha Vantage 获取 {ticker} 的新闻")
         av_start = datetime.now()
-        av_news = self._get_alpha_vantage_news(ticker, hours_back)
+        av_news = self._get_alpha_vantage_news(ticker, hours_back, end_date)
         av_time = (datetime.now() - av_start).total_seconds()
         
         if av_news:
@@ -87,7 +95,7 @@ class RealtimeNewsAggregator:
         if self.newsapi_key:
             logger.debug(f"[新闻聚合器] 尝试从 NewsAPI 获取 {ticker} 的新闻")
             newsapi_start = datetime.now()
-            newsapi_news = self._get_newsapi_news(ticker, hours_back)
+            newsapi_news = self._get_newsapi_news(ticker, hours_back, end_date)
             newsapi_time = (datetime.now() - newsapi_start).total_seconds()
             
             if newsapi_news:
@@ -102,7 +110,7 @@ class RealtimeNewsAggregator:
         # 4. 中文财经新闻源
         logger.debug(f"[新闻聚合器] 尝试获取 {ticker} 的中文财经新闻")
         chinese_start = datetime.now()
-        chinese_news = self._get_chinese_finance_news(ticker, hours_back)
+        chinese_news = self._get_chinese_finance_news(ticker, hours_back, end_date)
         chinese_time = (datetime.now() - chinese_start).total_seconds()
         
         if chinese_news:
@@ -140,14 +148,14 @@ class RealtimeNewsAggregator:
         
         return sorted_news
     
-    def _get_finnhub_realtime_news(self, ticker: str, hours_back: int) -> List[NewsItem]:
+    def _get_finnhub_realtime_news(self, ticker: str, hours_back: int, end_date: datetime) -> List[NewsItem]:
         """获取FinnHub实时新闻"""
         if not self.finnhub_key:
             return []
         
         try:
-            # 计算时间范围
-            end_time = datetime.now()
+            # 计算时间范围：使用指定的结束日期，而不是当前日期
+            end_time = end_date
             start_time = end_time - timedelta(hours=hours_back)
             
             # FinnHub API调用
@@ -166,9 +174,9 @@ class RealtimeNewsAggregator:
             news_items = []
             
             for item in news_data:
-                # 检查新闻时效性
+                # 检查新闻时效性：只获取指定日期及之前的新闻
                 publish_time = datetime.fromtimestamp(item.get('datetime', 0))
-                if publish_time < start_time:
+                if publish_time < start_time or publish_time > end_time:
                     continue
                 
                 # 评估紧急程度
@@ -190,7 +198,7 @@ class RealtimeNewsAggregator:
             logger.error(f"FinnHub新闻获取失败: {e}")
             return []
     
-    def _get_alpha_vantage_news(self, ticker: str, hours_back: int) -> List[NewsItem]:
+    def _get_alpha_vantage_news(self, ticker: str, hours_back: int, end_date: datetime) -> List[NewsItem]:
         """获取Alpha Vantage新闻"""
         if not self.alpha_vantage_key:
             return []
@@ -210,6 +218,9 @@ class RealtimeNewsAggregator:
             data = response.json()
             news_items = []
             
+            # 计算时间范围：使用指定的结束日期
+            start_time = end_date - timedelta(hours=hours_back)
+            
             if 'feed' in data:
                 for item in data['feed']:
                     # 解析时间
@@ -219,8 +230,8 @@ class RealtimeNewsAggregator:
                     except:
                         continue
                     
-                    # 检查时效性
-                    if publish_time < datetime.now() - timedelta(hours=hours_back):
+                    # 检查时效性：只获取指定日期及之前的新闻
+                    if publish_time < start_time or publish_time > end_date:
                         continue
                     
                     urgency = self._assess_news_urgency(item.get('title', ''), item.get('summary', ''))
@@ -241,7 +252,7 @@ class RealtimeNewsAggregator:
             logger.error(f"Alpha Vantage新闻获取失败: {e}")
             return []
     
-    def _get_newsapi_news(self, ticker: str, hours_back: int) -> List[NewsItem]:
+    def _get_newsapi_news(self, ticker: str, hours_back: int, end_date: datetime) -> List[NewsItem]:
         """获取NewsAPI新闻"""
         try:
             # 构建搜索查询
@@ -255,12 +266,16 @@ class RealtimeNewsAggregator:
             
             query = f"{ticker} OR {company_names.get(ticker, ticker)}"
             
+            # 计算时间范围：使用指定的结束日期
+            start_time = end_date - timedelta(hours=hours_back)
+            
             url = "https://newsapi.org/v2/everything"
             params = {
                 'q': query,
                 'language': 'en',
                 'sortBy': 'publishedAt',
-                'from': (datetime.now() - timedelta(hours=hours_back)).isoformat(),
+                'from': start_time.isoformat(),
+                'to': end_date.isoformat(),
                 'apiKey': self.newsapi_key
             }
             
@@ -296,11 +311,14 @@ class RealtimeNewsAggregator:
             logger.error(f"NewsAPI新闻获取失败: {e}")
             return []
     
-    def _get_chinese_finance_news(self, ticker: str, hours_back: int) -> List[NewsItem]:
+    def _get_chinese_finance_news(self, ticker: str, hours_back: int, end_date: datetime) -> List[NewsItem]:
         """获取中文财经新闻"""
         # 集成中文财经新闻API：财联社、东方财富等
-        logger.debug(f"[中文财经新闻] 开始获取 {ticker} 的中文财经新闻，回溯时间: {hours_back}小时")
+        logger.debug(f"[中文财经新闻] 开始获取 {ticker} 的中文财经新闻，指定日期: {end_date.strftime('%Y-%m-%d')}，回溯时间: {hours_back}小时")
         start_time = datetime.now()
+        
+        # 计算时间范围：使用指定的结束日期
+        start_time_filter = end_date - timedelta(hours=hours_back)
         
         try:
             news_items = []
@@ -344,14 +362,16 @@ class RealtimeNewsAggregator:
                                         try:
                                             publish_time = datetime.strptime(time_str, '%Y-%m-%d')
                                         except:
-                                            logger.warning(f"[中文财经新闻] 无法解析时间格式: {time_str}，使用当前时间")
-                                            publish_time = datetime.now()
+                                            logger.warning(f"[中文财经新闻] 无法解析时间格式: {time_str}，跳过该新闻")
+                                            skipped_count += 1
+                                            continue
                                 else:
-                                    logger.warning(f"[中文财经新闻] 新闻时间为空，使用当前时间")
-                                    publish_time = datetime.now()
+                                    logger.warning(f"[中文财经新闻] 新闻时间为空，跳过该新闻")
+                                    skipped_count += 1
+                                    continue
                                 
-                                # 检查时效性
-                                if publish_time < datetime.now() - timedelta(hours=hours_back):
+                                # 检查时效性：只获取指定日期及之前的新闻
+                                if publish_time < start_time_filter or publish_time > end_date:
                                     skipped_count += 1
                                     continue
                                 
@@ -396,7 +416,7 @@ class RealtimeNewsAggregator:
                 try:
                     logger.info(f"[中文财经新闻] 尝试解析RSS源: {rss_url}")
                     rss_item_start = datetime.now()
-                    items = self._parse_rss_feed(rss_url, ticker, hours_back)
+                    items = self._parse_rss_feed(rss_url, ticker, hours_back, end_date)
                     rss_item_time = (datetime.now() - rss_item_start).total_seconds()
                     
                     if items:
@@ -425,10 +445,13 @@ class RealtimeNewsAggregator:
             logger.error(f"[中文财经新闻] 中文财经新闻获取失败: {e}")
             return []
     
-    def _parse_rss_feed(self, rss_url: str, ticker: str, hours_back: int) -> List[NewsItem]:
+    def _parse_rss_feed(self, rss_url: str, ticker: str, hours_back: int, end_date: datetime) -> List[NewsItem]:
         """解析RSS源"""
-        logger.info(f"[RSS解析] 开始解析RSS源: {rss_url}，股票: {ticker}，回溯时间: {hours_back}小时")
+        logger.info(f"[RSS解析] 开始解析RSS源: {rss_url}，股票: {ticker}，指定日期: {end_date.strftime('%Y-%m-%d')}，回溯时间: {hours_back}小时")
         start_time = datetime.now()
+        
+        # 计算时间范围：使用指定的结束日期
+        start_time_filter = end_date - timedelta(hours=hours_back)
         
         try:
             # 实际实现需要使用feedparser库
@@ -453,11 +476,12 @@ class RealtimeNewsAggregator:
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         publish_time = datetime.fromtimestamp(time.mktime(entry.published_parsed))
                     else:
-                        logger.warning(f"[RSS解析] 条目缺少发布时间，使用当前时间")
-                        publish_time = datetime.now()
+                        logger.warning(f"[RSS解析] 条目缺少发布时间，跳过该条目")
+                        skipped_count += 1
+                        continue
                     
-                    # 检查时效性
-                    if publish_time < datetime.now() - timedelta(hours=hours_back):
+                    # 检查时效性：只获取指定日期及之前的新闻
+                    if publish_time < start_time_filter or publish_time > end_date:
                         skipped_count += 1
                         continue
                     
@@ -811,8 +835,8 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
         start_time = datetime.now()
         logger.debug(f"[新闻分析] 聚合器调用开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
         
-        # 获取实时新闻
-        news_items = aggregator.get_realtime_stock_news(ticker, hours_back, max_news=10)
+        # 获取实时新闻，传递指定日期
+        news_items = aggregator.get_realtime_stock_news(ticker, hours_back, max_news=10, curr_date=curr_date)
         
         end_time = datetime.now()
         time_taken = (end_time - start_time).total_seconds()

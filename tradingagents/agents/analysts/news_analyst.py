@@ -200,7 +200,7 @@ def create_news_analyst(llm, toolkit):
             try:
                 # 强制预先获取新闻数据
                 logger.debug(f"[新闻分析师] 🔧 预处理：强制调用统一新闻工具...")
-                pre_fetched_news = unified_news_tool(stock_code=ticker, max_news=10, model_info=model_info)
+                pre_fetched_news = unified_news_tool(stock_code=ticker, max_news=10, model_info=model_info, curr_date=current_date)
                 
                 if pre_fetched_news and len(pre_fetched_news.strip()) > 100:
                     logger.debug(f"[新闻分析师] ✅ 预处理成功获取新闻: {len(pre_fetched_news)} 字符")
@@ -292,7 +292,7 @@ def create_news_analyst(llm, toolkit):
                 try:
                     # 强制获取新闻数据
                     logger.debug(f"[新闻分析师] 🔧 强制调用统一新闻工具获取新闻数据...")
-                    forced_news = unified_news_tool(stock_code=ticker, max_news=10, model_info="")
+                    forced_news = unified_news_tool(stock_code=ticker, max_news=10, model_info="", curr_date=current_date)
                     
                     if forced_news and len(forced_news.strip()) > 100:
                         logger.debug(f"[新闻分析师] ✅ 强制获取新闻成功: {len(forced_news)} 字符")
