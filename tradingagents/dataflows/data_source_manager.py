@@ -376,15 +376,15 @@ class DataSourceManager:
         logger.debug(f"🔍 [股票代码追踪] _get_tushare_data 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
         logger.debug(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
         logger.debug(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
-        logger.info(f"🔍 [DataSourceManager详细日志] _get_tushare_data 开始执行")
-        logger.info(f"🔍 [DataSourceManager详细日志] 当前数据源: {self.current_source.value}")
+        logger.debug(f"🔍 [DataSourceManager详细日志] _get_tushare_data 开始执行")
+        logger.debug(f"🔍 [DataSourceManager详细日志] 当前数据源: {self.current_source.value}")
 
         start_time = time.time()
         try:
             # 直接调用适配器，避免循环调用interface
             from .tushare_adapter import get_tushare_adapter
             logger.debug(f"🔍 [股票代码追踪] 调用 tushare_adapter，传入参数: symbol='{symbol}'")
-            logger.info(f"🔍 [DataSourceManager详细日志] 开始调用tushare_adapter...")
+            logger.debug(f"🔍 [DataSourceManager详细日志] 开始调用tushare_adapter...")
 
             adapter = get_tushare_adapter()
             data = adapter.get_stock_data(symbol, start_date, end_date)
@@ -425,8 +425,8 @@ class DataSourceManager:
             duration = time.time() - start_time
             logger.info(f"🔍 [DataSourceManager详细日志] interface调用完成，耗时: {duration:.3f}秒")
             logger.debug(f"🔍 [股票代码追踪] get_china_stock_data_tushare 返回结果前200字符: {result[:200] if result else 'None'}")
-            logger.info(f"🔍 [DataSourceManager详细日志] 返回结果类型: {type(result)}")
-            logger.info(f"🔍 [DataSourceManager详细日志] 返回结果长度: {len(result) if result else 0}")
+            logger.debug(f"🔍 [DataSourceManager详细日志] 返回结果类型: {type(result)}")
+            logger.debug(f"🔍 [DataSourceManager详细日志] 返回结果长度: {len(result) if result else 0}")
 
             logger.debug(f"📊 [Tushare] 调用完成: 耗时={duration:.2f}s, 结果长度={len(result) if result else 0}")
 

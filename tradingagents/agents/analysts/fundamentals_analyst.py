@@ -3,6 +3,7 @@
 使用统一工具自动识别股票类型并调用相应数据源
 """
 
+from datetime import datetime, timedelta
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage
 
@@ -15,6 +16,9 @@ logger = get_logger("default")
 
 # 导入Google工具调用处理器
 from tradingagents.agents.utils.google_tool_handler import GoogleToolCallHandler
+
+# 模块级变量：基本面分析的时间窗口大小（天数）
+FUNDAMENTALS_ANALYSIS_WINDOW_DAYS = 60
 
 
 def _get_company_name_for_fundamentals(ticker: str, market_info: dict) -> str:
@@ -88,9 +92,26 @@ def create_fundamentals_analyst(llm, toolkit):
 
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
-        start_date = '2025-05-28'
+        
+        # 动态计算 start_date：基于 current_date 向前推窗口天数
+        try:
+            current_date_obj = datetime.strptime(current_date, '%Y-%m-%d')
+            start_date_obj = current_date_obj - timedelta(days=FUNDAMENTALS_ANALYSIS_WINDOW_DAYS)
+            start_date = start_date_obj.strftime('%Y-%m-%d')
+            logger.debug(f"📊 [DEBUG] 动态计算日期窗口: current_date={current_date}, start_date={start_date} (窗口={FUNDAMENTALS_ANALYSIS_WINDOW_DAYS}天)")
+        except Exception as e:
+            # 如果日期解析失败，使用默认值（当前日期向前推窗口天数）
+            logger.warning(f"⚠️ [基本面分析师] 日期解析失败，使用默认窗口: {e}")
+            try:
+                current_date_obj = datetime.now()
+                start_date_obj = current_date_obj - timedelta(days=FUNDAMENTALS_ANALYSIS_WINDOW_DAYS)
+                start_date = start_date_obj.strftime('%Y-%m-%d')
+            except:
+                # 最后的降级方案：使用固定日期
+                start_date = '2020-01-01'
+                logger.error(f"❌ [基本面分析师] 日期计算完全失败，使用降级方案: {start_date}")
 
-        logger.debug(f"📊 [DEBUG] 输入参数: ticker={ticker}, date={current_date}")
+        logger.debug(f"📊 [DEBUG] 输入参数: ticker={ticker}, date={current_date}, start_date={start_date}")
         logger.debug(f"📊 [DEBUG] 当前状态中的消息数量: {len(state.get('messages', []))}")
         logger.debug(f"📊 [DEBUG] 现有基本面报告: {state.get('fundamentals_report', 'None')}")
 
@@ -132,7 +153,7 @@ def create_fundamentals_analyst(llm, toolkit):
             logger.debug(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
         else:
             # 离线模式：优先使用FinnHub数据，SimFin作为补充
-            if is_china:
+            if market_info['is_china']:
                 # A股使用本地缓存数据
                 tools = [
                     toolkit.get_china_stock_data,

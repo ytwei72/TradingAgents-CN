@@ -728,7 +728,7 @@ class Toolkit:
         Returns:
             str: 基本面分析数据和报告
         """
-        logger.info(f"📊 [统一基本面工具] 分析股票: {ticker}")
+        logger.info(f"📊 [统一基本面工具] 分析股票: {ticker}, start_date={start_date}, end_date={end_date}, curr_date={curr_date}")
 
         # 添加详细的股票代码追踪日志
         logger.debug(f"🔍 [股票代码追踪] 统一基本面工具接收到的原始股票代码: '{ticker}' (类型: {type(ticker)})")
@@ -749,8 +749,8 @@ class Toolkit:
             is_us = market_info['is_us']
 
             logger.debug(f"🔍 [股票代码追踪] StockUtils.get_market_info 返回的市场信息: {market_info}")
-            logger.info(f"📊 [统一基本面工具] 股票类型: {market_info['market_name']}")
-            logger.info(f"📊 [统一基本面工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']})")
+            logger.debug(f"📊 [统一基本面工具] 股票类型: {market_info['market_name']}")
+            logger.debug(f"📊 [统一基本面工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']})")
 
             # 检查ticker是否在处理过程中发生了变化
             if str(ticker) != str(original_ticker):
@@ -768,7 +768,7 @@ class Toolkit:
 
             if is_china:
                 # 中国A股：获取股票数据 + 基本面数据
-                logger.info(f"🇨🇳 [统一基本面工具] 处理A股数据...")
+                logger.debug(f"🇨🇳 [统一基本面工具] 处理A股数据...")
                 logger.debug(f"🔍 [股票代码追踪] 进入A股处理分支，ticker: '{ticker}'")
 
                 try:
@@ -796,7 +796,7 @@ class Toolkit:
 
             elif is_hk:
                 # 港股：使用AKShare数据源，支持多重备用方案
-                logger.info(f"🇭🇰 [统一基本面工具] 处理港股数据...")
+                logger.debug(f"🇭🇰 [统一基本面工具] 处理港股数据...")
 
                 hk_data_success = False
 
@@ -809,7 +809,7 @@ class Toolkit:
                     if hk_data and len(hk_data) > 100 and "❌" not in hk_data:
                         result_data.append(f"## 港股数据\n{hk_data}")
                         hk_data_success = True
-                        logger.info(f"✅ [统一基本面工具] 港股主要数据源成功")
+                        logger.debug(f"✅ [统一基本面工具] 港股主要数据源成功")
                     else:
                         logger.warning(f"⚠️ [统一基本面工具] 港股主要数据源质量不佳")
 
@@ -838,7 +838,7 @@ class Toolkit:
 - 考虑汇率因素对投资的影响
 """
                         result_data.append(basic_info)
-                        logger.info(f"✅ [统一基本面工具] 港股备用信息成功")
+                        logger.debug(f"✅ [统一基本面工具] 港股备用信息成功")
 
                     except Exception as e2:
                         # 最终备用方案
@@ -862,7 +862,7 @@ class Toolkit:
 
             else:
                 # 美股：使用OpenAI/Finnhub数据源
-                logger.info(f"🇺🇸 [统一基本面工具] 处理美股数据...")
+                logger.debug(f"🇺🇸 [统一基本面工具] 处理美股数据...")
 
                 try:
                     from tradingagents.dataflows.interface import get_fundamentals_openai

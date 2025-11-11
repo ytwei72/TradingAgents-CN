@@ -40,7 +40,7 @@ class UnifiedNewsAnalyzer:
         if curr_date is None:
             curr_date = datetime.now().strftime("%Y-%m-%d")
         
-        logger.debug(f"[统一新闻工具] 开始获取 {stock_code} 的新闻，模型: {model_info}，指定日期: {curr_date}")
+        logger.info(f"[统一新闻工具] 开始获取 {stock_code} 的新闻，模型: {model_info}，指定日期: {curr_date}")
         logger.debug(f"[统一新闻工具] 🤖 当前模型信息: {model_info}")
         
         # 识别股票类型
