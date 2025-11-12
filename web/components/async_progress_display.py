@@ -453,7 +453,7 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
                 st.error(f"❌ 导出失败: {export_error}")
                 logger.error(f"📄 [进度导出] 导出Markdown失败: {export_error}", exc_info=True)
 
-    # 导出步骤日志HTML（与页面样式一致）
+    # 导出步骤日志HTML（与页面样式一致）已验证
     if st.button("🖼️ 导出步骤日志 HTML", key=f"export_progress_html_{analysis_id}"):
         stock_symbol = progress_data.get('stock_symbol') or st.session_state.get('last_stock_symbol')
         if not stock_symbol:
