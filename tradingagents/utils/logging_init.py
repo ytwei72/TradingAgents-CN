@@ -91,7 +91,7 @@ def log_startup_info():
     logger = get_logger('tradingagents.startup')
     
     logger.info("=" * 60)
-    logger.info("🎯 TradingAgents-CN 启动")
+    logger.info("🎯 投研智能体(TradingAgents) 启动")
     logger.info("=" * 60)
     
     # 系统信息

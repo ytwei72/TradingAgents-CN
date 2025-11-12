@@ -124,6 +124,10 @@ class MongoDBReportManager:
 
         try:
             timestamp = datetime.now()
+            # 优先使用传入的分析日期（字符串 'YYYY-MM-DD'）
+            analysis_date_str = analysis_results.get("analysis_date")
+            if not analysis_date_str:
+                analysis_date_str = timestamp.strftime('%Y-%m-%d')
             
             # 如果未提供analysis_id，则生成一个
             if analysis_id is None:
@@ -143,7 +147,7 @@ class MongoDBReportManager:
                 update_doc = {
                     "$set": {
                         "stock_symbol": stock_symbol,
-                        "analysis_date": timestamp.strftime('%Y-%m-%d'),
+                        "analysis_date": analysis_date_str,
                         "status": "completed",
                         "source": "mongodb",
                         
@@ -182,7 +186,7 @@ class MongoDBReportManager:
                 document = {
                     "analysis_id": analysis_id,
                     "stock_symbol": stock_symbol,
-                    "analysis_date": timestamp.strftime('%Y-%m-%d'),
+                    "analysis_date": analysis_date_str,
                     "timestamp": timestamp,
                     "status": "completed",
                     "source": "mongodb",

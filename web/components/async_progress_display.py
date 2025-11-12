@@ -6,9 +6,10 @@
 """
 
 from datetime import datetime
+from pathlib import Path
 import time
 import html
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from web.utils.async_progress_tracker import get_progress_by_id, format_time
 from web.utils.analysis_runner import format_analysis_results
 import streamlit as st
@@ -439,6 +440,32 @@ def display_static_progress_with_controls(analysis_id: str, show_refresh_control
     # 添加步骤日志记录 - 可展开/收缩的容器
     _render_step_log(progress_data, analysis_id)
 
+    # 导出进度报告按钮
+    if st.button("📝 导出进度 Markdown", key=f"export_progress_markdown_{analysis_id}"):
+        stock_symbol = progress_data.get('stock_symbol') or st.session_state.get('last_stock_symbol')
+        if not stock_symbol:
+            st.warning("⚠️ 无法确定股票代码，无法导出进度报告。")
+        else:
+            try:
+                export_path = export_progress_markdown(progress_data, stock_symbol)
+                st.success(f"✅ 进度报告已保存到 `{export_path}`")
+            except Exception as export_error:
+                st.error(f"❌ 导出失败: {export_error}")
+                logger.error(f"📄 [进度导出] 导出Markdown失败: {export_error}", exc_info=True)
+
+    # 导出步骤日志HTML（与页面样式一致）
+    if st.button("🖼️ 导出步骤日志 HTML", key=f"export_progress_html_{analysis_id}"):
+        stock_symbol = progress_data.get('stock_symbol') or st.session_state.get('last_stock_symbol')
+        if not stock_symbol:
+            st.warning("⚠️ 无法确定股票代码，无法导出步骤日志。")
+        else:
+            try:
+                export_path = export_progress_html(progress_data, stock_symbol)
+                st.success(f"✅ 步骤日志HTML已保存到 `{export_path}`")
+            except Exception as export_error:
+                st.error(f"❌ 导出失败: {export_error}")
+                logger.error(f"📄 [进度导出] 导出HTML失败: {export_error}", exc_info=True)
+
     # 显示当前状态
     status_icon = {
         'running': '🔄',
@@ -787,3 +814,491 @@ def _render_step_log(progress_data: Dict[str, Any], analysis_id: str):
             current_time = time.time()
             elapsed = current_time - start_time
             st.markdown(f"**⏱️ 当前用时**: {format_time(elapsed)}")
+
+
+def export_progress_markdown(progress_data: Dict[str, Any], stock_symbol: str) -> Path:
+    """
+    将进度数据导出为Markdown文件，并返回保存路径
+    """
+    markdown_content = generate_progress_markdown(progress_data, stock_symbol)
+    sanitized_symbol = sanitize_stock_symbol(stock_symbol)
+    export_dir = Path("eval_results") / sanitized_symbol / "export"
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{sanitized_symbol}_progress_{timestamp}.md"
+    export_path = export_dir / filename
+
+    export_path.write_text(markdown_content, encoding='utf-8')
+    logger.info(f"📄 [进度导出] Markdown导出成功: {export_path}")
+    return export_path
+
+
+def generate_progress_markdown(progress_data: Dict[str, Any], stock_symbol: str) -> str:
+    """根据进度数据生成Markdown内容"""
+    analysis_id = progress_data.get('analysis_id', 'unknown')
+    status = progress_data.get('status', 'unknown')
+    progress_percentage = progress_data.get('progress_percentage', 0.0)
+    current_step = progress_data.get('current_step', 0) + 1
+    total_steps = progress_data.get('total_steps') or len(progress_data.get('steps', [])) or 0
+    last_message = str(progress_data.get('last_message', '') or '').strip()
+    start_time = progress_data.get('start_time')
+    elapsed_time = progress_data.get('elapsed_time')
+    remaining_time = progress_data.get('remaining_time')
+
+    steps = progress_data.get('steps', [])
+    step_history = progress_data.get('step_history', [])
+    step_history_map = {
+        entry.get('step_index'): entry
+        for entry in step_history
+        if entry and entry.get('step_index') is not None
+    }
+
+    lines: List[str] = []
+    lines.append(f"# 📊 分析进度报告 - {stock_symbol}")
+    lines.append("")
+    lines.append(f"- 导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"- 分析ID：`{analysis_id}`")
+    lines.append(f"- 当前状态：{status}")
+    lines.append(f"- 当前进度：{progress_percentage:.1f}%")
+    lines.append(f"- 当前步骤：{current_step}/{total_steps if total_steps else '?'}")
+    if start_time:
+        lines.append(f"- 开始时间：{format_timestamp(start_time)}")
+    if elapsed_time is not None:
+        lines.append(f"- 已用时间：{format_duration(elapsed_time)}")
+    if remaining_time is not None:
+        lines.append(f"- 预计剩余：{format_duration(remaining_time)}")
+    if last_message:
+        lines.append(f"- 最近消息：{last_message}")
+    lines.append("")
+
+    if steps:
+        lines.append("## 🧭 步骤概览")
+        lines.append("")
+        lines.append("| 步骤 | 状态 | 用时 | 开始时间 | 结束时间 | 描述 |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
+
+        for index, step in enumerate(steps):
+            history = step_history_map.get(index)
+            status_label = resolve_step_status(index, current_step, status, history)
+            duration = resolve_step_duration(history)
+            start_at = history.get('start_time') if history else None
+            end_at = history.get('end_time') if history else None
+
+            name = step.get('name', f"步骤 {index + 1}")
+            description = (step.get('description') or '').replace("|", "\\|").replace("\n", " ")
+
+            lines.append(
+                f"| 第 {index + 1} 步：{name.replace('|', '\\|')} "
+                f"| {status_label} "
+                f"| {format_duration(duration)} "
+                f"| {format_timestamp(start_at)} "
+                f"| {format_timestamp(end_at)} "
+                f"| {description} |"
+            )
+        lines.append("")
+
+    if step_history:
+        lines.append("## 📝 步骤日志")
+        lines.append("")
+        sorted_history = sorted(
+            step_history,
+            key=lambda entry: (
+                entry.get('start_time') or 0,
+                entry.get('step_index') or 0
+            )
+        )
+        for entry in sorted_history:
+            index = entry.get('step_index', 0)
+            name = entry.get('step_name', f"步骤 {index + 1}")
+            node_status = entry.get('node_status') or 'unknown'
+            module_name = entry.get('module_name') or '未指定模块'
+            module_status = entry.get('module_status') or '未知'
+            message = str(entry.get('message') or '').strip()
+            start_at = format_timestamp(entry.get('start_time'))
+            end_at = format_timestamp(entry.get('end_time'))
+            duration = format_duration(resolve_step_duration(entry))
+
+            lines.append(f"### 第 {index + 1} 步：{name}")
+            lines.append(f"- 节点状态：{node_status}")
+            lines.append(f"- 模块：{module_name} ({module_status})")
+            lines.append(f"- 开始时间：{start_at}")
+            lines.append(f"- 结束时间：{end_at}")
+            lines.append(f"- 用时：{duration}")
+            if message:
+                lines.append(f"> {message}")
+            lines.append("")
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def resolve_step_status(step_index: int, current_step: int, tracker_status: str, history: Optional[Dict[str, Any]]) -> str:
+    """根据历史记录和当前状态计算步骤状态"""
+    if history:
+        node_status = (history.get('node_status') or '').lower()
+        if node_status in ('complete', 'completed', 'success'):
+            return "已完成"
+        if node_status in ('failed', 'error'):
+            return "失败"
+        if node_status in ('start', 'running', 'in_progress'):
+            return "进行中"
+    if tracker_status == 'completed' and step_index < current_step:
+        return "已完成"
+    if tracker_status == 'failed' and step_index == current_step - 1:
+        return "失败"
+    if step_index + 1 == current_step:
+        return "进行中"
+    if step_index + 1 < current_step:
+        return "已完成"
+    return "待执行"
+
+
+def resolve_step_duration(history: Optional[Dict[str, Any]]) -> Optional[float]:
+    """从历史记录计算步骤耗时"""
+    if not history:
+        return None
+    duration = history.get('duration')
+    if duration:
+        return duration
+    start_time = history.get('start_time')
+    end_time = history.get('end_time')
+    if start_time and end_time:
+        return max(0.0, end_time - start_time)
+    return None
+
+
+def format_duration(seconds: Optional[float]) -> str:
+    """格式化耗时显示"""
+    if seconds is None:
+        return "-"
+    try:
+        seconds_value = max(0.0, float(seconds))
+    except (TypeError, ValueError):
+        return "-"
+    return format_time(seconds_value)
+
+
+def format_timestamp(timestamp: Optional[float]) -> str:
+    """格式化时间戳"""
+    if not timestamp:
+        return "-"
+    try:
+        return datetime.fromtimestamp(float(timestamp)).strftime("%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError, OSError, OverflowError):
+        return "-"
+
+
+def sanitize_stock_symbol(symbol: str) -> str:
+    """将股票代码转换为适合文件系统的格式"""
+    if not symbol:
+        return "UNKNOWN"
+    sanitized_chars = [
+        char if char.isalnum() or char in ("-", "_", ".") else "_"
+        for char in symbol.strip()
+    ]
+    sanitized = "".join(sanitized_chars)
+    return sanitized or "UNKNOWN"
+
+
+def export_progress_html(progress_data: Dict[str, Any], stock_symbol: str) -> Path:
+    """
+    导出与页面“查看详细分析步骤日志”容器视觉一致的HTML文件
+    """
+    html_content = generate_progress_html(progress_data, stock_symbol)
+    sanitized_symbol = sanitize_stock_symbol(stock_symbol)
+    export_dir = Path("eval_results") / sanitized_symbol / "export"
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{sanitized_symbol}_progress_steps_{timestamp}.html"
+    export_path = export_dir / filename
+
+    export_path.write_text(html_content, encoding='utf-8')
+    logger.info(f"📄 [进度导出] HTML导出成功: {export_path}")
+    return export_path
+
+
+def generate_progress_html(progress_data: Dict[str, Any], stock_symbol: str) -> str:
+    """
+    生成完整HTML文档，内容与_expander步骤日志视觉一致（内联CSS）
+    """
+    # 基本信息
+    analysis_id = progress_data.get('analysis_id', 'unknown')
+    status = progress_data.get('status', 'running')
+    current_step = progress_data.get('current_step', 0)
+    start_time = progress_data.get('start_time', time.time())
+    progress_percentage = progress_data.get('progress_percentage', 0.0)
+
+    # 步骤与历史
+    analysis_steps = progress_data.get('steps', [])
+    step_history = progress_data.get('step_history', [])
+    step_history_map = {h.get('step_index'): h for h in step_history if h and 'step_index' in h}
+
+    # 构建steps_history（复用页面相同语义）
+    steps_history: List[Dict[str, Any]] = []
+
+    # 初始化步骤
+    steps_history.append({
+        'phase': '系统初始化',
+        'message': '分析系统启动，准备数据源和分析引擎',
+        'timestamp': start_time,
+        'step_duration': 0,
+        'total_elapsed': 0,
+        'status': 'completed',
+        'icon': '✅'
+    })
+
+    # 组装各步骤
+    for i, step_info in enumerate(analysis_steps):
+        step_name = step_info.get('name', f'步骤 {i+1}')
+        step_description = step_info.get('description', '')
+
+        if i in step_history_map:
+            history = step_history_map[i]
+            module_name = history.get('module_name', '')
+            node_status = history.get('node_status', '')
+
+            # end_time 推断完成
+            if 'end_time' in history and history['end_time']:
+                if not node_status or node_status == 'start':
+                    node_status = 'complete'
+
+            if node_status == 'error':
+                status_label = 'error'
+                icon = '❌'
+                status_text = '❌ 执行失败'
+            elif node_status in ['complete', 'completed']:
+                status_label = 'completed'
+                icon = '✅'
+                status_text = '✅ 已完成'
+            elif node_status == 'paused':
+                status_label = 'paused'
+                icon = '⏸️'
+                status_text = '⏸️ 已暂停'
+            elif node_status == 'start':
+                status_label = 'running'
+                icon = '🔄'
+                status_text = '🔄 执行中'
+            else:
+                if history.get('end_time'):
+                    status_label = 'completed'
+                    icon = '✅'
+                    status_text = '✅ 已完成'
+                else:
+                    status_label = 'pending'
+                    icon = '⏳'
+                    status_text = '⏳ 等待执行'
+
+            end_time = history.get('end_time')
+            step_duration = history.get('duration', 0)
+            if end_time is None:
+                now = time.time()
+                end_time = now
+                step_start = history.get('start_time', now)
+                step_duration = now - step_start
+
+            if module_name:
+                message_text = f'{step_description}\n{status_text} - 节点: {module_name} (状态: {node_status or "complete"})'
+            else:
+                message_text = f'{step_description} - {status_text}'
+
+            steps_history.append({
+                'phase': f'阶段 {i+1}: {step_name}',
+                'message': message_text,
+                'timestamp': end_time,
+                'step_duration': step_duration,
+                'total_elapsed': end_time - start_time,
+                'status': status_label,
+                'icon': icon,
+                'module_name': module_name,
+                'node_status': node_status
+            })
+        elif i == current_step:
+            current_message = progress_data.get('last_message', '')
+            current_module_name = progress_data.get('current_module_name', '')
+            current_node_status = progress_data.get('current_node_status', 'start')
+            now = time.time()
+
+            # 推断当前步骤开始时间
+            if i in step_history_map:
+                step_start = step_history_map[i].get('start_time', start_time)
+            else:
+                prev_step = i - 1
+                if prev_step in step_history_map:
+                    step_start = step_history_map[prev_step].get('end_time', start_time)
+                else:
+                    step_start = start_time
+            step_duration = now - step_start
+
+            if current_node_status == 'error':
+                status_label = 'error'
+                icon = '❌'
+            elif current_node_status == 'paused':
+                status_label = 'paused'
+                icon = '⏸️'
+            else:
+                status_label = 'running'
+                icon = '🔄'
+
+            if current_module_name:
+                message_text = f'{step_description}\n💬 {current_message}\n📦 节点: {current_module_name} ({current_node_status})'
+            else:
+                message_text = f'{step_description}\n💬 {current_message}'
+
+            steps_history.append({
+                'phase': f'阶段 {i+1}: {step_name}',
+                'message': message_text,
+                'timestamp': now,
+                'step_duration': step_duration,
+                'total_elapsed': now - start_time,
+                'status': status_label,
+                'icon': icon,
+                'module_name': current_module_name,
+                'node_status': current_node_status
+            })
+        else:
+            steps_history.append({
+                'phase': f'阶段 {i+1}: {step_name}',
+                'message': f'{step_description} - 等待执行',
+                'timestamp': None,
+                'step_duration': 0,
+                'total_elapsed': 0,
+                'status': 'pending',
+                'icon': '⏳'
+            })
+
+    # 完成标记
+    if progress_data.get('status') == 'completed':
+        completion_time = progress_data.get('last_update', time.time())
+        total_duration = completion_time - start_time
+        steps_history.append({
+            'phase': '分析完成',
+            'message': '所有分析步骤已完成，报告生成成功',
+            'timestamp': completion_time,
+            'step_duration': 0,
+            'total_elapsed': total_duration,
+            'status': 'completed',
+            'icon': '🎉'
+        })
+
+    # 内联CSS（与页面卡片风格一致）
+    styles = """
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji'; background:#fff; color:#222; }
+      .container { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
+      .header { margin-bottom: 12px; }
+      .metric-row { display: flex; gap: 16px; margin: 8px 0 16px; }
+      .metric { background:#f6f7f9; padding:10px 12px; border-radius:8px; border:1px solid #e1e5e9; }
+      .step-card { border-left: 4px solid #9e9e9e; background:#f5f5f5; padding:12px; margin-bottom:10px; border-radius:5px; }
+      .step-card.completed { background:#e8f5e9; border-left-color:#4caf50; }
+      .step-card.running { background:#e3f2fd; border-left-color:#2196f3; }
+      .step-card.error { background:#ffebee; border-left-color:#f44336; }
+      .step-card.paused { background:#fff3e0; border-left-color:#ff9800; }
+      .step-header { display:flex; justify-content:space-between; align-items:center; }
+      .step-title { font-size:16px; font-weight:700; }
+      .step-msg { margin:5px 0; color:#555; white-space: pre-wrap; }
+      .right { text-align:right; margin-left:15px; min-width:180px; }
+      .badge { margin-left:8px; padding:2px 8px; border-radius:12px; font-size:11px; color:#fff; }
+      .badge.start { background:#2196f3; }
+      .badge.completed { background:#4caf50; }
+      .badge.error { background:#f44336; }
+      .badge.paused { background:#ff9800; }
+      .footer { margin-top:20px; }
+      .muted { color:#666; font-size:12px; }
+      .title { margin: 0 0 6px; }
+    </style>
+    """
+
+    # 顶部信息
+    header_html = f"""
+    <div class="header">
+      <h2 class="title">📋 {stock_symbol} - 详细分析步骤日志</h2>
+      <div class="metric-row">
+        <div class="metric">分析ID：<strong>{html.escape(str(analysis_id))}</strong></div>
+        <div class="metric">状态：<strong>{html.escape(str(status))}</strong></div>
+        <div class="metric">当前进度：<strong>{progress_percentage:.1f}%</strong></div>
+      </div>
+    </div>
+    """
+
+    # 步骤卡片
+    card_html_parts: List[str] = []
+    for step in steps_history:
+        status_label = step.get('status', 'pending')
+        icon = step.get('icon', '⏳')
+        phase = html.escape(str(step.get('phase', '')))
+        message = html.escape(str(step.get('message', '')))
+
+        # 时间
+        if step.get('timestamp'):
+            time_str = datetime.fromtimestamp(step['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+            step_duration_str = format_time(step.get('step_duration', 0))
+            total_elapsed_str = format_time(step.get('total_elapsed', 0))
+        else:
+            time_str = '未开始'
+            total_elapsed_str = '-'
+            step_duration_str = None
+
+        # badge
+        node_status = step.get('node_status', '')
+        status_label_map = {
+            'complete': '已完成',
+            'completed': '已完成',
+            'start': '执行中',
+            'error': '失败',
+            'paused': '已暂停'
+        }
+        badge_text = status_label_map.get(node_status, node_status) if node_status else ''
+        badge_class = node_status if node_status in ['start', 'completed', 'complete', 'error', 'paused'] else ''
+        if badge_class == 'complete':
+            badge_class = 'completed'
+
+        # 标题含用时
+        if step_duration_str and step.get('step_duration', 0) > 0:
+            phase_title = f"{phase} <span class='muted'>(用时: {html.escape(step_duration_str)})</span>"
+        else:
+            phase_title = phase
+
+        card_html = f"""
+        <div class="step-card {status_label}">
+          <div class="step-header">
+            <div class="step-title">{icon} {phase_title}{" " + f"<span class='badge {badge_class}'>{html.escape(badge_text)}</span>" if badge_text else ""}</div>
+            <div class="right">
+              <div class="muted">🕐 {html.escape(time_str)}</div>
+              <div class="muted">📊 总用时: {html.escape(total_elapsed_str)}</div>
+            </div>
+          </div>
+          <p class="step-msg">{message}</p>
+        </div>
+        """
+        card_html_parts.append(card_html)
+
+    # 底部统计
+    completed_count = sum(1 for s in steps_history if s.get('status') == 'completed')
+    total_count = len(steps_history)
+    footer_html = f"""
+    <div class="footer">
+      <hr />
+      <div><strong>📈 进度统计</strong>：已完成 {completed_count}/{total_count} 个步骤</div>
+      <div class="muted">导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+    </div>
+    """
+
+    # 完整HTML
+    html_doc = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{html.escape(stock_symbol)} - 分析步骤日志</title>
+  {styles}
+</head>
+<body>
+  <div class="container">
+    {header_html}
+    {''.join(card_html_parts)}
+    {footer_html}
+  </div>
+</body>
+</html>"""
+    return html_doc

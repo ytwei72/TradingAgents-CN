@@ -659,7 +659,8 @@ def save_modular_reports_to_results_dir(results: Dict[str, Any], stock_symbol: s
             results_dir = project_root / "results"
 
         # 创建股票专用目录
-        analysis_date = datetime.now().strftime('%Y-%m-%d')
+        # 优先使用传入的分析日期，其次回退到今天
+        analysis_date = results.get('analysis_date') or datetime.now().strftime('%Y-%m-%d')
         stock_dir = results_dir / stock_symbol / analysis_date
         reports_dir = stock_dir / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
@@ -852,7 +853,7 @@ def save_modular_reports_to_results_dir(results: Dict[str, Any], stock_symbol: s
         return {}
 
 
-def save_report_to_results_dir(content: bytes, filename: str, stock_symbol: str) -> str:
+def save_report_to_results_dir(content: bytes, filename: str, stock_symbol: str, analysis_date: Optional[str] = None) -> str:
     """保存报告到results目录"""
     try:
         import os
@@ -875,7 +876,8 @@ def save_report_to_results_dir(content: bytes, filename: str, stock_symbol: str)
             results_dir = project_root / "results"
 
         # 创建股票专用目录
-        analysis_date = datetime.now().strftime('%Y-%m-%d')
+        # 优先使用指定的分析日期，其次回退到今天
+        analysis_date = analysis_date or datetime.now().strftime('%Y-%m-%d')
         stock_dir = results_dir / stock_symbol / analysis_date / "reports"
         stock_dir.mkdir(parents=True, exist_ok=True)
 
@@ -973,7 +975,7 @@ def render_export_buttons(results: Dict[str, Any]):
                 logger.info(f"✅ Markdown导出成功，文件名: {filename}")
 
                 # 3. 保存汇总报告到results目录
-                saved_path = save_report_to_results_dir(content, filename, stock_symbol)
+                saved_path = save_report_to_results_dir(content, filename, stock_symbol, results.get('analysis_date'))
 
                 # 4. 显示保存结果
                 if modular_files and saved_path:
@@ -1018,7 +1020,7 @@ def render_export_buttons(results: Dict[str, Any]):
                         logger.info(f"✅ Word导出成功，文件名: {filename}, 大小: {len(content)} 字节")
 
                         # 3. 保存Word汇总报告到results目录
-                        saved_path = save_report_to_results_dir(content, filename, stock_symbol)
+                        saved_path = save_report_to_results_dir(content, filename, stock_symbol, results.get('analysis_date'))
 
                         # 4. 显示保存结果
                         if modular_files and saved_path:
@@ -1092,7 +1094,7 @@ def render_export_buttons(results: Dict[str, Any]):
                         logger.info(f"✅ PDF导出成功，文件名: {filename}, 大小: {len(content)} 字节")
 
                         # 3. 保存PDF汇总报告到results目录
-                        saved_path = save_report_to_results_dir(content, filename, stock_symbol)
+                        saved_path = save_report_to_results_dir(content, filename, stock_symbol, results.get('analysis_date'))
 
                         # 4. 显示保存结果
                         if modular_files and saved_path:
