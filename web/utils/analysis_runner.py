@@ -207,6 +207,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         logger, stock_symbol, "comprehensive_analysis", session_id
     )
 
+    # TODO: 需解决extra参数中字段未输出的问题
     logger.info(f"🚀 [分析开始] 股票分析启动",
                extra={
                    'stock_symbol': stock_symbol,
