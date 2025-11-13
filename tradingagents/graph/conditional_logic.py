@@ -48,7 +48,51 @@ class ConditionalLogic:
     def should_continue_fundamentals(self, state: AgentState):
         """Determine if fundamentals analysis should continue."""
         messages = state["messages"]
-        last_message = messages[-1]
+        
+        # 检查是否已经有完整的报告（避免死循环）
+        fundamentals_report = state.get('fundamentals_report', '')
+        if fundamentals_report and len(fundamentals_report) > 100:
+            # 检查报告是否包含错误信息（如果是错误，允许重试一次）
+            error_indicators = ['失败', '错误', '异常', '不可用', '无法获取', '调用失败']
+            is_error_report = any(indicator in fundamentals_report for indicator in error_indicators)
+            
+            if not is_error_report:
+                logger.info(f"📊 [条件判断] 基本面分析已有完整报告（{len(fundamentals_report)}字符），结束分析")
+                return "Msg Clear Fundamentals"
+        
+        # 检查消息历史中的工具调用次数，避免无限循环
+        tool_call_count = 0
+        tool_message_count = 0
+        for msg in messages:
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                tool_call_count += len(msg.tool_calls)
+            # 检查工具返回的消息
+            if hasattr(msg, '__class__') and 'ToolMessage' in msg.__class__.__name__:
+                tool_message_count += 1
+        
+        # 如果工具调用次数过多（>=3次），强制结束
+        if tool_call_count >= 3:
+            logger.warning(f"📊 [条件判断] 工具调用次数过多（{tool_call_count}次），强制结束基本面分析以避免死循环")
+            return "Msg Clear Fundamentals"
+        
+        # 如果已经有工具返回的消息，检查是否有错误
+        if tool_message_count > 0:
+            # 检查最后几条消息中是否有工具返回的错误
+            recent_messages = messages[-min(5, len(messages)):]
+            for msg in recent_messages:
+                if hasattr(msg, '__class__') and 'ToolMessage' in msg.__class__.__name__:
+                    if hasattr(msg, 'content') and msg.content:
+                        content = str(msg.content)
+                        error_indicators = ['失败', '错误', '异常', '不可用', '无法获取', '调用失败', '数据为空', '获取失败', '❌']
+                        if any(indicator in content for indicator in error_indicators):
+                            # 如果工具返回错误且已经调用过工具，强制结束
+                            if tool_call_count >= 1:
+                                logger.warning(f"📊 [条件判断] 检测到工具返回错误且已调用过工具，强制结束基本面分析")
+                                return "Msg Clear Fundamentals"
+        
+        last_message = messages[-1] if messages else None
+        if not last_message:
+            return "Msg Clear Fundamentals"
 
         # 只有AIMessage才有tool_calls属性
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:

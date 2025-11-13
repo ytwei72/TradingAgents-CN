@@ -132,10 +132,42 @@ class TushareDataAdapter:
                     if cached_data is not None:
                         # 检查是否为DataFrame且不为空
                         if hasattr(cached_data, 'empty') and not cached_data.empty:
-                            logger.debug(f"📦 从缓存获取{symbol}数据: {len(cached_data)}条")
-                            logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据有效，确保标准化后返回")
-                            # 确保缓存数据也经过标准化验证（修复KeyError: 'volume'问题）
-                            return self._validate_and_standardize_data(cached_data)
+                            # 验证缓存数据的日期范围是否覆盖请求的日期范围
+                            if start_date or end_date:
+                                date_valid = self._validate_cache_date_range(
+                                    cached_data, start_date, end_date
+                                )
+                                if not date_valid:
+                                    logger.warning(
+                                        f"⚠️ 缓存数据日期范围不匹配请求范围 "
+                                        f"(请求: {start_date} 到 {end_date})，跳过缓存，重新获取"
+                                    )
+                                    # 缓存日期范围不匹配，继续从API获取
+                                else:
+                                    logger.debug(f"📦 从缓存获取{symbol}数据: {len(cached_data)}条")
+                                    logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据有效，确保标准化后返回")
+                                    # 确保缓存数据也经过标准化验证（修复KeyError: 'volume'问题）
+                                    standardized_data = self._validate_and_standardize_data(cached_data)
+                                    # 如果请求了特定日期范围，过滤数据
+                                    if start_date or end_date:
+                                        filtered_data = self._filter_data_by_date_range(
+                                            standardized_data, start_date, end_date
+                                        )
+                                        if not filtered_data.empty:
+                                            return filtered_data
+                                        else:
+                                            logger.warning(
+                                                f"⚠️ 缓存数据过滤后为空 "
+                                                f"(请求: {start_date} 到 {end_date})，跳过缓存，重新获取"
+                                            )
+                                            # 过滤后为空，继续从API获取
+                                    else:
+                                        return standardized_data
+                            else:
+                                # 没有指定日期范围，直接返回缓存数据
+                                logger.debug(f"📦 从缓存获取{symbol}数据: {len(cached_data)}条")
+                                logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据有效，确保标准化后返回")
+                                return self._validate_and_standardize_data(cached_data)
                         elif isinstance(cached_data, str) and cached_data.strip():
                             logger.debug(f"📦 从缓存获取{symbol}数据: 字符串格式")
                             logger.debug(f"🔍 [TushareAdapter详细日志] 缓存数据为字符串格式")
@@ -306,6 +338,132 @@ class TushareDataAdapter:
         """标准化数据格式 - 保持向后兼容性，调用增强版本"""
         return self._validate_and_standardize_data(data)
     
+    def _validate_cache_date_range(self, data: pd.DataFrame, start_date: str = None, end_date: str = None) -> bool:
+        """
+        验证缓存数据的日期范围是否覆盖请求的日期范围
+        
+        Args:
+            data: 缓存数据DataFrame
+            start_date: 请求的开始日期
+            end_date: 请求的结束日期
+            
+        Returns:
+            bool: 如果缓存数据覆盖请求的日期范围，返回True
+        """
+        if data.empty:
+            return False
+        
+        try:
+            # 确定日期列名
+            date_column = None
+            for col in ['date', 'trade_date', 'Date', 'DATE']:
+                if col in data.columns:
+                    date_column = col
+                    break
+            
+            if not date_column:
+                logger.warning(f"⚠️ [日期验证] 无法找到日期列，列名: {list(data.columns)}")
+                # 如果没有日期列，假设数据有效（向后兼容）
+                return True
+            
+            # 转换日期列为datetime
+            data_dates = pd.to_datetime(data[date_column], errors='coerce')
+            data_dates = data_dates.dropna()
+            
+            if data_dates.empty:
+                logger.warning(f"⚠️ [日期验证] 日期列转换后为空")
+                return False
+            
+            # 获取缓存数据的日期范围
+            cache_min_date = data_dates.min()
+            cache_max_date = data_dates.max()
+            
+            logger.debug(f"🔍 [日期验证] 缓存数据日期范围: {cache_min_date.date()} 到 {cache_max_date.date()}")
+            
+            # 验证请求的日期范围
+            if start_date:
+                try:
+                    request_start = pd.to_datetime(start_date)
+                    if request_start < cache_min_date:
+                        logger.debug(f"⚠️ [日期验证] 请求开始日期 {start_date} 早于缓存最早日期 {cache_min_date.date()}")
+                        return False
+                except Exception as e:
+                    logger.warning(f"⚠️ [日期验证] 解析开始日期失败: {e}")
+            
+            if end_date:
+                try:
+                    request_end = pd.to_datetime(end_date)
+                    if request_end > cache_max_date:
+                        logger.debug(f"⚠️ [日期验证] 请求结束日期 {end_date} 晚于缓存最晚日期 {cache_max_date.date()}")
+                        return False
+                except Exception as e:
+                    logger.warning(f"⚠️ [日期验证] 解析结束日期失败: {e}")
+            
+            logger.debug(f"✅ [日期验证] 缓存数据日期范围有效")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ [日期验证] 验证日期范围失败: {e}")
+            # 验证失败时，为了安全起见，返回False，强制重新获取
+            return False
+    
+    def _filter_data_by_date_range(self, data: pd.DataFrame, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        根据请求的日期范围过滤数据
+        
+        Args:
+            data: 数据DataFrame
+            start_date: 开始日期
+            end_date: 结束日期
+            
+        Returns:
+            DataFrame: 过滤后的数据
+        """
+        if data.empty:
+            return data
+        
+        try:
+            # 确定日期列名
+            date_column = None
+            for col in ['date', 'trade_date', 'Date', 'DATE']:
+                if col in data.columns:
+                    date_column = col
+                    break
+            
+            if not date_column:
+                logger.warning(f"⚠️ [日期过滤] 无法找到日期列，返回原始数据")
+                return data
+            
+            # 复制数据避免修改原始数据
+            filtered = data.copy()
+            
+            # 转换日期列为datetime
+            filtered[date_column] = pd.to_datetime(filtered[date_column], errors='coerce')
+            
+            # 应用日期过滤
+            if start_date:
+                try:
+                    start_dt = pd.to_datetime(start_date)
+                    filtered = filtered[filtered[date_column] >= start_dt]
+                    logger.debug(f"🔍 [日期过滤] 应用开始日期过滤: {start_date}, 剩余 {len(filtered)} 条")
+                except Exception as e:
+                    logger.warning(f"⚠️ [日期过滤] 解析开始日期失败: {e}")
+            
+            if end_date:
+                try:
+                    end_dt = pd.to_datetime(end_date)
+                    filtered = filtered[filtered[date_column] <= end_dt]
+                    logger.debug(f"🔍 [日期过滤] 应用结束日期过滤: {end_date}, 剩余 {len(filtered)} 条")
+                except Exception as e:
+                    logger.warning(f"⚠️ [日期过滤] 解析结束日期失败: {e}")
+            
+            return filtered
+            
+        except Exception as e:
+            logger.error(f"❌ [日期过滤] 过滤数据失败: {e}")
+            # 过滤失败时，返回原始数据
+            return data
+    
     def get_stock_info(self, symbol: str) -> Dict:
         """
         获取股票基本信息
@@ -359,12 +517,13 @@ class TushareDataAdapter:
             logger.error(f"❌ 搜索股票失败: {e}")
             return pd.DataFrame()
     
-    def get_fundamentals(self, symbol: str) -> str:
+    def get_fundamentals(self, symbol: str, analysis_date: str = None) -> str:
         """
         获取基本面数据
         
         Args:
             symbol: 股票代码
+            analysis_date: 分析日期（格式：YYYY-MM-DD），如果为None则使用当前日期
             
         Returns:
             str: 基本面分析报告
@@ -373,7 +532,7 @@ class TushareDataAdapter:
             return f"❌ Tushare数据源不可用，无法获取{symbol}基本面数据"
         
         try:
-            logger.debug(f"📊 获取{symbol}基本面数据...")
+            logger.debug(f"📊 获取{symbol}基本面数据... (分析日期: {analysis_date})")
 
             # 获取股票基本信息
             stock_info = self.get_stock_info(symbol)
@@ -381,8 +540,8 @@ class TushareDataAdapter:
             # 获取财务数据
             financial_data = self.provider.get_financial_data(symbol)
             
-            # 生成基本面分析报告
-            report = self._generate_fundamentals_report(symbol, stock_info, financial_data)
+            # 生成基本面分析报告（传入分析日期）
+            report = self._generate_fundamentals_report(symbol, stock_info, financial_data, analysis_date=analysis_date)
             
             # 缓存基本面数据
             if self.enable_cache and self.cache_manager:
@@ -402,8 +561,33 @@ class TushareDataAdapter:
             logger.error(f"❌ 获取{symbol}基本面数据失败: {e}")
             return f"❌ 获取{symbol}基本面数据失败: {e}"
     
-    def _generate_fundamentals_report(self, symbol: str, stock_info: Dict, financial_data: Dict) -> str:
-        """生成基本面分析报告"""
+    def _generate_fundamentals_report(self, symbol: str, stock_info: Dict, financial_data: Dict, analysis_date: str = None) -> str:
+        """
+        生成基本面分析报告
+        
+        Args:
+            symbol: 股票代码
+            stock_info: 股票基本信息
+            financial_data: 财务数据
+            analysis_date: 分析日期（格式：YYYY-MM-DD），如果为None则使用当前日期
+            
+        Returns:
+            str: 基本面分析报告
+        """
+        # 确定分析日期和生成时间
+        if analysis_date:
+            try:
+                # 验证分析日期格式
+                datetime.strptime(analysis_date, '%Y-%m-%d')
+                analysis_date_str = analysis_date
+            except ValueError:
+                logger.warning(f"⚠️ 分析日期格式无效: {analysis_date}，使用当前日期")
+                analysis_date_str = datetime.now().strftime('%Y-%m-%d')
+        else:
+            analysis_date_str = datetime.now().strftime('%Y-%m-%d')
+        
+        # 报告生成时间（实际生成报告的时间戳）
+        generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         report = f"📊 {symbol} 基本面分析报告 (Tushare数据源)\n"
         report += "=" * 50 + "\n\n"
@@ -445,7 +629,9 @@ class TushareDataAdapter:
         else:
             report += "💰 财务数据: 暂无数据\n"
         
-        report += f"\n📅 报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        # 区分分析日期和报告生成时间
+        report += f"\n📅 分析日期: {analysis_date_str}\n"
+        report += f"🕐 报告生成时间: {generated_at}\n"
         report += f"📊 数据来源: Tushare\n"
         
         return report

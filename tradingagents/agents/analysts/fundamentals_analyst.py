@@ -311,23 +311,235 @@ def create_fundamentals_analyst(llm, toolkit):
                 analyst_name="基本面分析师"
             )
             
-            return {"fundamentals_report": report}
+            # 检查返回的消息，确保最后一条消息不包含tool_calls
+            clean_messages = []
+            for msg in messages:
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    # 如果消息包含tool_calls，创建一个清洁版本
+                    from langchain_core.messages import AIMessage
+                    clean_msg = AIMessage(
+                        content=msg.content if hasattr(msg, 'content') else str(msg),
+                        name="fundamentals_analyst"
+                    )
+                    clean_messages.append(clean_msg)
+                    logger.debug(f"📊 [基本面分析师] 清理包含tool_calls的消息")
+                else:
+                    clean_messages.append(msg)
+            
+            # 确保最后一条消息是清洁的（不包含tool_calls）
+            if clean_messages:
+                last_msg = clean_messages[-1]
+                if hasattr(last_msg, 'tool_calls') and last_msg.tool_calls:
+                    # 创建最终的清洁消息
+                    from langchain_core.messages import AIMessage
+                    final_clean_msg = AIMessage(
+                        content=report,
+                        name="fundamentals_analyst"
+                    )
+                    clean_messages[-1] = final_clean_msg
+                    logger.info(f"📊 [基本面分析师] 确保最后一条消息不包含tool_calls")
+            
+            return {
+                "messages": clean_messages if clean_messages else [AIMessage(content=report, name="fundamentals_analyst")],
+                "fundamentals_report": report
+            }
         else:
             # 非Google模型的处理逻辑
             logger.debug(f"📊 [DEBUG] 非Google模型 ({fresh_llm.__class__.__name__})，使用标准处理逻辑")
+            
+            # 检查是否已经有完整的报告（避免重复执行）
+            existing_report = state.get('fundamentals_report', '')
+            if existing_report and len(existing_report) > 100:
+                # 检查报告是否包含错误信息（如果是错误，允许重试）
+                error_indicators = ['失败', '错误', '异常', '不可用', '无法获取', '调用失败']
+                is_error_report = any(indicator in existing_report for indicator in error_indicators)
+                
+                if not is_error_report:
+                    logger.info(f"📊 [基本面分析师] 检测到已有完整报告（{len(existing_report)}字符），跳过重复执行")
+                    # 返回清洁消息，不包含tool_calls，确保节点完成
+                    from langchain_core.messages import AIMessage
+                    clean_message = AIMessage(
+                        content=existing_report,
+                        name="fundamentals_analyst"
+                    )
+                    return {"messages": [clean_message], "fundamentals_report": existing_report}
+            
+            # 检查消息历史，避免重复工具调用导致的死循环
+            messages = state.get("messages", [])
+            tool_call_attempts = 0
+            tool_messages_count = 0
+            last_tool_message = None
+            
+            for msg in messages:
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    tool_call_attempts += len(msg.tool_calls)
+                # 检查是否是工具返回的消息（ToolMessage）
+                if hasattr(msg, '__class__') and 'ToolMessage' in msg.__class__.__name__:
+                    tool_messages_count += 1
+                    last_tool_message = msg
+            
+            # 如果已经有工具返回的消息，检查工具执行结果
+            if tool_messages_count > 0 and last_tool_message:
+                # 检查工具返回的内容是否包含错误
+                tool_result = str(last_tool_message.content) if hasattr(last_tool_message, 'content') else str(last_tool_message)
+                error_indicators = ['失败', '错误', '异常', '不可用', '无法获取', '调用失败', '数据为空', '获取失败', '❌']
+                
+                if any(indicator in tool_result for indicator in error_indicators):
+                    logger.warning(f"📊 [基本面分析师] 检测到工具执行返回错误，工具调用次数: {tool_call_attempts}")
+                    
+                    # 如果工具调用次数>=2或工具返回错误，生成降级报告
+                    if tool_call_attempts >= 2:
+                        logger.warning(f"📊 [基本面分析师] 工具调用失败多次（{tool_call_attempts}次），生成降级报告以避免死循环")
+                        fallback_report = f"""## {company_name}（股票代码：{ticker}）基本面分析报告
+
+**分析日期**: {current_date}
+
+### ⚠️ 数据获取说明
+
+由于指定日期为历史日期（{current_date}），基本面数据获取遇到以下问题：
+
+**工具执行结果**:
+{tool_result[:500]}
+
+### 📊 分析建议
+
+1. **数据限制**: 历史日期的实时基本面数据可能不可用或已过期
+2. **建议**: 如需完整的基本面分析，建议使用当前日期或近期日期进行分析
+3. **替代方案**: 可以查看该股票的历史财务报告和公开信息
+
+**注意**: 本报告基于有限的数据生成，建议结合其他分析结果进行投资决策。
+"""
+                        # 返回清洁消息，不包含tool_calls
+                        from langchain_core.messages import AIMessage
+                        clean_message = AIMessage(
+                            content=fallback_report,
+                            name="fundamentals_analyst"
+                        )
+                        return {"messages": [clean_message], "fundamentals_report": fallback_report}
+            
+            # 如果已经尝试过多次工具调用，检查是否有工具返回的错误
+            if tool_call_attempts > 0:
+                # 检查最后几条消息，看是否有工具返回的错误
+                recent_messages = messages[-min(5, len(messages)):]
+                has_tool_error = False
+                for msg in recent_messages:
+                    if hasattr(msg, 'content') and msg.content:
+                        content = str(msg.content)
+                        error_indicators = ['失败', '错误', '异常', '不可用', '无法获取', '调用失败', '数据为空']
+                        if any(indicator in content for indicator in error_indicators):
+                            has_tool_error = True
+                            logger.warning(f"📊 [基本面分析师] 检测到工具调用错误，尝试生成降级报告")
+                            break
+                
+                # 如果检测到工具错误且已经尝试过多次，生成降级报告（降低到1次）
+                if has_tool_error and tool_call_attempts >= 1:
+                    logger.warning(f"📊 [基本面分析师] 工具调用失败多次（{tool_call_attempts}次），生成降级报告以避免死循环")
+                    # 生成基于错误信息的降级报告
+                    error_summary = "\n".join([
+                        str(msg.content) for msg in recent_messages 
+                        if hasattr(msg, 'content') and msg.content
+                    ])
+                    fallback_report = f"""## {company_name}（股票代码：{ticker}）基本面分析报告
+
+**分析日期**: {current_date}
+
+### ⚠️ 数据获取说明
+
+由于指定日期为历史日期（{current_date}），部分基本面数据可能无法获取或已过期。
+
+**数据获取情况**:
+{error_summary[:500]}
+
+### 📊 分析建议
+
+1. **数据限制**: 历史日期的实时基本面数据可能不可用
+2. **建议**: 如需完整的基本面分析，建议使用当前日期或近期日期进行分析
+3. **替代方案**: 可以查看该股票的历史财务报告和公开信息
+
+**注意**: 本报告基于有限的数据生成，建议结合其他分析结果进行投资决策。
+"""
+                    # 返回清洁消息，不包含tool_calls
+                    from langchain_core.messages import AIMessage
+                    clean_message = AIMessage(
+                        content=fallback_report,
+                        name="fundamentals_analyst"
+                    )
+                    return {"messages": [clean_message], "fundamentals_report": fallback_report}
             
             # 检查工具调用情况
             tool_call_count = len(result.tool_calls) if hasattr(result, 'tool_calls') else 0
             logger.debug(f"📊 [DEBUG] 工具调用数量: {tool_call_count}")
             
             if tool_call_count > 0:
-                # 有工具调用，返回状态让工具执行
+                # 有工具调用，检查是否已经尝试过多次
+                # 降低限制到2次，避免死循环
+                if tool_call_attempts >= 2:
+                    logger.warning(f"📊 [基本面分析师] 工具调用次数过多（{tool_call_attempts}次），生成降级报告以避免死循环")
+                    # 生成降级报告
+                    fallback_report = f"""## {company_name}（股票代码：{ticker}）基本面分析报告
+
+**分析日期**: {current_date}
+
+### ⚠️ 分析说明
+
+基本面分析过程中工具调用次数过多，为避免死循环，生成此降级报告。
+
+**可能原因**:
+1. 指定日期为历史日期，数据可能不可用
+2. 工具调用失败或返回错误
+3. 数据源连接问题
+
+**建议**: 尝试使用当前日期或近期日期进行分析。
+"""
+                    # 返回清洁消息，不包含tool_calls
+                    from langchain_core.messages import AIMessage
+                    clean_message = AIMessage(
+                        content=fallback_report,
+                        name="fundamentals_analyst"
+                    )
+                    return {"messages": [clean_message], "fundamentals_report": fallback_report}
+                
+                # 检查是否已经有工具返回的消息，如果有且包含错误，立即停止
+                if tool_messages_count > 0 and last_tool_message:
+                    tool_result = str(last_tool_message.content) if hasattr(last_tool_message, 'content') else str(last_tool_message)
+                    error_indicators = ['失败', '错误', '异常', '不可用', '无法获取', '调用失败', '数据为空', '获取失败', '❌']
+                    
+                    if any(indicator in tool_result for indicator in error_indicators):
+                        logger.warning(f"📊 [基本面分析师] 检测到工具执行返回错误，立即生成降级报告（工具调用次数: {tool_call_attempts}）")
+                        fallback_report = f"""## {company_name}（股票代码：{ticker}）基本面分析报告
+
+**分析日期**: {current_date}
+
+### ⚠️ 数据获取说明
+
+由于指定日期为历史日期（{current_date}），基本面数据获取遇到以下问题：
+
+**工具执行结果**:
+{tool_result[:500]}
+
+### 📊 分析建议
+
+1. **数据限制**: 历史日期的实时基本面数据可能不可用或已过期
+2. **建议**: 如需完整的基本面分析，建议使用当前日期或近期日期进行分析
+3. **替代方案**: 可以查看该股票的历史财务报告和公开信息
+
+**注意**: 本报告基于有限的数据生成，建议结合其他分析结果进行投资决策。
+"""
+                        # 返回清洁消息，不包含tool_calls
+                        from langchain_core.messages import AIMessage
+                        clean_message = AIMessage(
+                            content=fallback_report,
+                            name="fundamentals_analyst"
+                        )
+                        return {"messages": [clean_message], "fundamentals_report": fallback_report}
+                
+                # 有工具调用，返回状态让工具执行（但限制最多2次）
                 tool_calls_info = []
                 for tc in result.tool_calls:
                     tool_calls_info.append(tc['name'])
                     logger.debug(f"📊 [DEBUG] 工具调用 {len(tool_calls_info)}: {tc}")
                 
-                logger.info(f"📊 [基本面分析师] 工具调用: {tool_calls_info}")
+                logger.info(f"📊 [基本面分析师] 工具调用: {tool_calls_info} (尝试 {tool_call_attempts + 1}/2)")
                 return {
                     "messages": [result],
                     "fundamentals_report": result.content if hasattr(result, 'content') else str(result)
@@ -389,33 +601,97 @@ def create_fundamentals_analyst(llm, toolkit):
 - 分析要详细且专业"""
 
                 try:
-                    # 创建简单的分析链
-                    analysis_prompt_template = ChatPromptTemplate.from_messages([
-                        ("system", "你是专业的股票基本面分析师，基于提供的真实数据进行分析。"),
-                        ("human", "{analysis_request}")
-                    ])
-                    
-                    analysis_chain = analysis_prompt_template | fresh_llm
-                    analysis_result = analysis_chain.invoke({"analysis_request": analysis_prompt})
-                    
-                    if hasattr(analysis_result, 'content'):
-                        report = analysis_result.content
-                    else:
-                        report = str(analysis_result)
+                    # 检查工具返回的数据是否包含错误
+                    if "失败" in combined_data or "错误" in combined_data or "异常" in combined_data or "不可用" in combined_data:
+                        logger.warning(f"📊 [基本面分析师] 工具返回错误数据，生成降级报告")
+                        # 生成降级报告
+                        report = f"""## {company_name}（股票代码：{ticker}）基本面分析报告
 
-                    logger.info(f"📊 [基本面分析师] 强制工具调用完成，报告长度: {len(report)}")
+**分析日期**: {current_date}
+
+### ⚠️ 数据获取说明
+
+由于指定日期为历史日期（{current_date}），基本面数据获取遇到以下问题：
+
+{combined_data[:300]}
+
+### 📊 分析建议
+
+1. **数据限制**: 历史日期的实时基本面数据可能不可用或已过期
+2. **建议**: 如需完整的基本面分析，建议使用当前日期或近期日期进行分析
+3. **替代方案**: 可以查看该股票的历史财务报告和公开信息
+
+**注意**: 本报告基于有限的数据生成，建议结合其他分析结果进行投资决策。
+"""
+                    else:
+                        # 创建简单的分析链
+                        analysis_prompt_template = ChatPromptTemplate.from_messages([
+                            ("system", "你是专业的股票基本面分析师，基于提供的真实数据进行分析。"),
+                            ("human", "{analysis_request}")
+                        ])
+                        
+                        analysis_chain = analysis_prompt_template | fresh_llm
+                        analysis_result = analysis_chain.invoke({"analysis_request": analysis_prompt})
+                        
+                        if hasattr(analysis_result, 'content'):
+                            report = analysis_result.content
+                        else:
+                            report = str(analysis_result)
+
+                        logger.info(f"📊 [基本面分析师] 强制工具调用完成，报告长度: {len(report)}")
                     
                 except Exception as e:
                     logger.error(f"❌ [DEBUG] 强制工具调用分析失败: {e}")
-                    report = f"基本面分析失败：{str(e)}"
+                    report = f"""## {company_name}（股票代码：{ticker}）基本面分析报告
+
+**分析日期**: {current_date}
+
+### ⚠️ 分析失败
+
+基本面分析过程中遇到错误：{str(e)}
+
+**可能原因**:
+1. 指定日期为历史日期，数据可能不可用
+2. 数据源连接问题
+3. API调用限制
+
+**建议**: 尝试使用当前日期或近期日期进行分析。
+"""
                 
-                return {"fundamentals_report": report}
+                # 返回清洁消息，不包含tool_calls，确保节点完成
+                from langchain_core.messages import AIMessage
+                clean_message = AIMessage(
+                    content=report,
+                    name="fundamentals_analyst"
+                )
+                return {"messages": [clean_message], "fundamentals_report": report}
 
         # 这里不应该到达，但作为备用
-        logger.debug(f"📊 [DEBUG] 返回状态: fundamentals_report长度={len(result.content) if hasattr(result, 'content') else 0}")
+        logger.warning(f"📊 [DEBUG] 到达备用返回路径，生成最终报告")
+        report_content = result.content if hasattr(result, 'content') else str(result)
+        
+        # 如果报告内容为空或太短，生成一个默认报告
+        if not report_content or len(report_content) < 50:
+            report_content = f"""## {company_name}（股票代码：{ticker}）基本面分析报告
+
+**分析日期**: {current_date}
+
+### 📊 分析说明
+
+基本面分析已完成，但报告内容可能不完整。
+
+**建议**: 如需完整的基本面分析，建议使用当前日期或近期日期进行分析。
+"""
+        
+        # 返回清洁消息，不包含tool_calls，确保节点完成
+        from langchain_core.messages import AIMessage
+        clean_message = AIMessage(
+            content=report_content,
+            name="fundamentals_analyst"
+        )
         return {
-            "messages": [result],
-            "fundamentals_report": result.content if hasattr(result, 'content') else str(result)
+            "messages": [clean_message],
+            "fundamentals_report": report_content
         }
 
     return fundamentals_analyst_node
