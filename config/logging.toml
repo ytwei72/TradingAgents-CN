@@ -30,7 +30,7 @@ directory = "./logs"
 
 # 结构化日志处理器（JSON格式）
 [logging.handlers.structured]
-enabled = false  # 默认关闭，生产环境可启用
+enabled = true  # 默认关闭，生产环境可启用
 level = "INFO"
 directory = "./logs"
 

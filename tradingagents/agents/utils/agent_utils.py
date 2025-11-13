@@ -1,21 +1,13 @@
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage, AIMessage
-from typing import List
 from typing import Annotated
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import RemoveMessage
 from langchain_core.tools import tool
 from datetime import date, timedelta, datetime
-import functools
-import pandas as pd
-import os
-from dateutil.relativedelta import relativedelta
-from langchain_openai import ChatOpenAI
 import tradingagents.dataflows.interface as interface
 from tradingagents.default_config import DEFAULT_CONFIG
 from langchain_core.messages import HumanMessage
+from tradingagents.utils.stock_utils import StockUtils
 
 # 导入统一日志系统和工具日志装饰器
-from tradingagents.utils.logging_init import get_logger
 from tradingagents.utils.tool_logging import log_tool_call, log_analysis_step
 
 # 导入日志模块
@@ -912,25 +904,23 @@ class Toolkit:
         Returns:
             str: 市场数据和技术分析报告
         """
-        logger.info(f"📈 [统一市场工具] 分析股票: {ticker}")
+        logger.info(f"📈 [统一市场工具] 分析股票: {ticker}, 开始日期: {start_date}, 结束日期: {end_date}")
 
         try:
-            from tradingagents.utils.stock_utils import StockUtils
-
             # 自动识别股票类型
             market_info = StockUtils.get_market_info(ticker)
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
 
-            logger.info(f"📈 [统一市场工具] 股票类型: {market_info['market_name']}")
-            logger.info(f"📈 [统一市场工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']}")
+            logger.debug(f"📈 [统一市场工具] 股票类型: {market_info['market_name']}")
+            logger.debug(f"📈 [统一市场工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']}")
 
             result_data = []
 
             if is_china:
                 # 中国A股：使用中国股票数据源
-                logger.info(f"🇨🇳 [统一市场工具] 处理A股市场数据...")
+                logger.debug(f"🇨🇳 [统一市场工具] 处理A股市场数据...")
 
                 try:
                     from tradingagents.dataflows.interface import get_china_stock_data_unified
@@ -941,7 +931,7 @@ class Toolkit:
 
             elif is_hk:
                 # 港股：使用AKShare数据源
-                logger.info(f"🇭🇰 [统一市场工具] 处理港股市场数据...")
+                logger.debug(f"🇭🇰 [统一市场工具] 处理港股市场数据...")
 
                 try:
                     from tradingagents.dataflows.interface import get_hk_stock_data_unified
@@ -952,7 +942,7 @@ class Toolkit:
 
             else:
                 # 美股：优先使用FINNHUB API数据源
-                logger.info(f"🇺🇸 [统一市场工具] 处理美股市场数据...")
+                logger.debug(f"🇺🇸 [统一市场工具] 处理美股市场数据...")
 
                 try:
                     from tradingagents.dataflows.optimized_us_data import get_us_stock_data_cached
@@ -974,7 +964,7 @@ class Toolkit:
 *数据来源: 根据股票类型自动选择最适合的数据源*
 """
 
-            logger.info(f"📈 [统一市场工具] 数据获取完成，总长度: {len(combined_result)}")
+            logger.debug(f"📈 [统一市场工具] 数据获取完成，总长度: {len(combined_result)}")
             return combined_result
 
         except Exception as e:

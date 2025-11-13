@@ -5,6 +5,7 @@
 """
 
 import requests
+import pandas as pd
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
@@ -401,7 +402,7 @@ class RealtimeNewsAggregator:
                 logger.error(f"[中文财经新闻] 获取东方财富新闻失败: {ak_e}")
             
             # 2. 财联社RSS (如果可用)
-            logger.info(f"[中文财经新闻] 开始获取财联社RSS新闻")
+            logger.debug(f"[中文财经新闻] 开始获取财联社RSS新闻")
             rss_start_time = datetime.now()
             rss_sources = [
                 "https://www.cls.cn/api/sw?app=CailianpressWeb&os=web&sv=7.7.5",
@@ -414,18 +415,18 @@ class RealtimeNewsAggregator:
             
             for rss_url in rss_sources:
                 try:
-                    logger.info(f"[中文财经新闻] 尝试解析RSS源: {rss_url}")
+                    logger.debug(f"[中文财经新闻] 尝试解析RSS源: {rss_url}")
                     rss_item_start = datetime.now()
                     items = self._parse_rss_feed(rss_url, ticker, hours_back, end_date)
                     rss_item_time = (datetime.now() - rss_item_start).total_seconds()
                     
                     if items:
-                        logger.info(f"[中文财经新闻] 成功从RSS源获取 {len(items)} 条新闻，耗时: {rss_item_time:.2f}秒")
+                        logger.debug(f"[中文财经新闻] 成功从RSS源获取 {len(items)} 条新闻，耗时: {rss_item_time:.2f}秒")
                         news_items.extend(items)
                         total_rss_items += len(items)
                         rss_success_count += 1
                     else:
-                        logger.info(f"[中文财经新闻] RSS源未返回相关新闻，耗时: {rss_item_time:.2f}秒")
+                        logger.debug(f"[中文财经新闻] RSS源未返回相关新闻，耗时: {rss_item_time:.2f}秒")
                 except Exception as rss_e:
                     logger.error(f"[中文财经新闻] 解析RSS源失败: {rss_e}")
                     rss_error_count += 1
@@ -433,11 +434,11 @@ class RealtimeNewsAggregator:
             
             # 记录RSS获取总结
             rss_total_time = (datetime.now() - rss_start_time).total_seconds()
-            logger.info(f"[中文财经新闻] RSS新闻获取完成，成功源: {rss_success_count}个，失败源: {rss_error_count}个，获取新闻: {total_rss_items}条，总耗时: {rss_total_time:.2f}秒")
+            logger.debug(f"[中文财经新闻] RSS新闻获取完成，成功源: {rss_success_count}个，失败源: {rss_error_count}个，获取新闻: {total_rss_items}条，总耗时: {rss_total_time:.2f}秒")
             
             # 记录中文财经新闻获取总结
             total_time = (datetime.now() - start_time).total_seconds()
-            logger.info(f"[中文财经新闻] {ticker} 的中文财经新闻获取完成，总共获取 {len(news_items)} 条新闻，总耗时: {total_time:.2f}秒")
+            logger.debug(f"[中文财经新闻] {ticker} 的中文财经新闻获取完成，总共获取 {len(news_items)} 条新闻，总耗时: {total_time:.2f}秒")
             
             return news_items
             
@@ -458,14 +459,14 @@ class RealtimeNewsAggregator:
             # 这里是简化实现，实际项目中应该替换为真实的RSS解析逻辑
             import feedparser
             
-            logger.info(f"[RSS解析] 尝试获取RSS源内容")
+            logger.debug(f"[RSS解析] 尝试获取RSS源内容")
             feed = feedparser.parse(rss_url)
             
             if not feed or not feed.entries:
                 logger.warning(f"[RSS解析] RSS源未返回有效内容")
                 return []
             
-            logger.info(f"[RSS解析] 成功获取RSS源，包含 {len(feed.entries)} 条条目")
+            logger.debug(f"[RSS解析] 成功获取RSS源，包含 {len(feed.entries)} 条条目")
             news_items = []
             processed_count = 0
             skipped_count = 0
@@ -588,7 +589,7 @@ class RealtimeNewsAggregator:
     
     def _deduplicate_news(self, news_items: List[NewsItem]) -> List[NewsItem]:
         """去重新闻"""
-        logger.info(f"[新闻去重] 开始对 {len(news_items)} 条新闻进行去重处理")
+        logger.debug(f"[新闻去重] 开始对 {len(news_items)} 条新闻进行去重处理")
         start_time = datetime.now()
         
         seen_titles = set()
@@ -618,8 +619,8 @@ class RealtimeNewsAggregator:
         
         # 记录去重结果
         time_taken = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[新闻去重] 去重完成，原始新闻: {len(news_items)}条，去重后: {len(unique_news)}条，")
-        logger.info(f"[新闻去重] 去除重复: {duplicate_count}条，标题过短: {short_title_count}条，耗时: {time_taken:.2f}秒")
+        logger.debug(f"[新闻去重] 去重完成，原始新闻: {len(news_items)}条，去重后: {len(unique_news)}条，")
+        logger.debug(f"[新闻去重] 去除重复: {duplicate_count}条，标题过短: {short_title_count}条，耗时: {time_taken:.2f}秒")
         
         return unique_news
     
@@ -704,7 +705,6 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
     """
     logger.debug(f"[新闻分析] ========== 函数入口 ==========")
     logger.debug(f"[新闻分析] 函数: get_realtime_stock_news")
-    logger.debug(f"[新闻分析] 参数: ticker={ticker}, curr_date={curr_date}, hours_back={hours_back}")
     logger.info(f"[新闻分析] 开始获取 {ticker} 的实时新闻，日期: {curr_date}, 回溯时间: {hours_back}小时")
     start_total_time = datetime.now()
     logger.debug(f"[新闻分析] 开始时间: {start_total_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
@@ -788,33 +788,67 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
                 logger.debug(f"[新闻分析] 东方财富API返回数据: {news_df}")
             
             if not news_df.empty:
-                # 构建简单的新闻报告
-                news_count = len(news_df)
-                logger.info(f"[新闻分析] 成功获取 {news_count} 条东方财富新闻，耗时 {time_taken:.2f} 秒")
+                # 计算 end_date 和 start_time_filter 用于过滤
+                end_date = datetime.strptime(curr_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                start_time_filter = end_date - timedelta(hours=hours_back)
                 
-                report = f"# {ticker} 东方财富新闻报告\n\n"
-                report += f"📅 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                report += f"📊 新闻总数: {news_count}条\n"
-                report += f"🕒 获取耗时: {time_taken:.2f}秒\n\n"
+                # 过滤新闻：只包括指定日期范围内的新闻
+                filtered_rows = []
+                skipped_count = 0
+                for _, row in news_df.iterrows():
+                    time_str = row.get('时间', '')  # 注意：akshare 使用 '时间' 列
+                    if time_str:
+                        try:
+                            if ' ' in time_str:  # 完整时间格式
+                                publish_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+                            else:  # 只日期
+                                publish_time = datetime.strptime(time_str, '%Y-%m-%d')
+                        except ValueError:
+                            logger.warning(f"无法解析新闻时间格式: {time_str}，跳过该新闻")
+                            skipped_count += 1
+                            continue
+                    else:
+                        skipped_count += 1
+                        continue
+                    
+                    # 检查时效性：只获取指定日期及之前的新闻
+                    if publish_time < start_time_filter or publish_time > end_date:
+                        skipped_count += 1
+                        continue
+                    
+                    filtered_rows.append(row)
                 
-                # 记录一些新闻标题示例
-                sample_titles = [row.get('新闻标题', '无标题') for _, row in news_df.head(3).iterrows()]
-                logger.debug(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
+                filtered_df = pd.DataFrame(filtered_rows)
+                news_count = len(filtered_df)
+                logger.debug(f"[新闻分析] 东方财富新闻过滤后: {news_count} 条 (原始 {len(news_df)} 条，跳过 {skipped_count} 条)")
                 
-                logger.debug(f"[新闻分析] 开始构建新闻报告")
-                for idx, (_, row) in enumerate(news_df.iterrows()):
-                    if idx < 3:  # 只记录前3条的详细信息
-                        logger.debug(f"[新闻分析] 第{idx+1}条新闻: 标题={row.get('新闻标题', '无标题')}, 时间={row.get('发布时间', '无时间')}")
-                    report += f"### {row.get('新闻标题', '')}\n"
-                    report += f"📅 {row.get('发布时间', '')}\n"
-                    report += f"🔗 {row.get('新闻链接', '')}\n\n"
-                    report += f"{row.get('新闻内容', '无内容')}\n\n"
-                
-                total_time_taken = (datetime.now() - start_total_time).total_seconds()
-                logger.info(f"[新闻分析] 成功生成 {ticker} 的新闻报告，总耗时 {total_time_taken:.2f} 秒，新闻来源: 东方财富")
-                logger.debug(f"[新闻分析] 报告长度: {len(report)} 字符")
-                logger.debug(f"[新闻分析] ========== 东方财富新闻获取成功，函数即将返回 ==========")
-                return report
+                if news_count > 0:
+                    # 构建报告，只使用过滤后的新闻
+                    report = f"# {ticker} 东方财富新闻报告\n\n"
+                    report += f"📅 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    report += f"📊 新闻总数: {news_count}条 (分析日期: {curr_date})\n"
+                    report += f"🕒 获取耗时: {time_taken:.2f}秒\n\n"
+                    
+                    # 记录一些新闻标题示例
+                    sample_titles = [row.get('标题', '无标题') for _, row in filtered_df.head(3).iterrows()]
+                    logger.debug(f"[新闻分析] 过滤后新闻标题示例: {', '.join(sample_titles)}")
+                    
+                    logger.debug(f"[新闻分析] 开始构建过滤后新闻报告")
+                    for idx, (_, row) in enumerate(filtered_df.iterrows()):
+                        if idx < 3:  # 只记录前3条的详细信息
+                            logger.debug(f"[新闻分析] 第{idx+1}条新闻: 标题={row.get('标题', '无标题')}, 时间={row.get('时间', '无时间')}")
+                        report += f"### {row.get('标题', '')}\n"
+                        report += f"📅 {row.get('时间', '')}\n"
+                        report += f"🔗 {row.get('链接', '')}\n\n"
+                        report += f"{row.get('内容', '无内容')}\n\n"
+                    
+                    total_time_taken = (datetime.now() - start_total_time).total_seconds()
+                    logger.debug(f"[新闻分析] 成功生成 {ticker} 的过滤后新闻报告，总耗时 {total_time_taken:.2f} 秒，新闻来源: 东方财富")
+                    logger.debug(f"[新闻分析] 报告长度: {len(report)} 字符")
+                    logger.debug(f"[新闻分析] ========== 东方财富新闻获取成功，函数即将返回 ==========")
+                    return report
+                else:
+                    logger.warning(f"[新闻分析] 东方财富新闻过滤后为空 (原始 {len(news_df)} 条，跳过 {skipped_count} 条)，尝试使用其他新闻源")
             else:
                 logger.warning(f"[新闻分析] 东方财富未获取到 {ticker} 的新闻，耗时 {time_taken:.2f} 秒，尝试使用其他新闻源")
         except Exception as e:
@@ -848,7 +882,7 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
         # 如果成功获取到新闻
         if news_items and len(news_items) > 0:
             news_count = len(news_items)
-            logger.info(f"[新闻分析] 实时新闻聚合器成功获取 {news_count} 条 {ticker} 的新闻，耗时 {time_taken:.2f} 秒")
+            logger.debug(f"[新闻分析] 实时新闻聚合器成功获取 {news_count} 条 {ticker} 的新闻，耗时 {time_taken:.2f} 秒")
             
             # 记录一些新闻标题示例
             sample_titles = [item.title for item in news_items[:3]]
@@ -908,7 +942,7 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
                     report += f"🔗 {row.get('新闻链接', '')}\n\n"
                     report += f"{row.get('新闻内容', '无内容')}\n\n"
                 
-                logger.info(f"[新闻分析] 成功生成东方财富新闻报告，新闻来源: 东方财富")
+                logger.debug(f"[新闻分析] 成功生成东方财富新闻报告，新闻来源: 东方财富")
                 return report
             else:
                 logger.warning(f"[新闻分析] 东方财富未获取到 {clean_ticker} 的新闻数据，耗时 {time_taken:.2f} 秒，尝试下一个备用方案")
@@ -953,7 +987,7 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
             if sample_titles:
                 logger.debug(f"[新闻分析] 新闻标题示例: {', '.join(sample_titles)}")
                 
-            logger.info(f"[新闻分析] 成功生成 Google 新闻报告，新闻来源: Google")
+            logger.debug(f"[新闻分析] 成功生成 Google 新闻报告，新闻来源: Google")
             return google_news
         else:
             logger.warning(f"[新闻分析] Google 新闻未获取到 {ticker} 的新闻数据，耗时 {time_taken:.2f} 秒")

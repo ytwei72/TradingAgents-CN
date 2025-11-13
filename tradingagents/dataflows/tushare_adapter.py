@@ -537,8 +537,8 @@ class TushareDataAdapter:
             # 获取股票基本信息
             stock_info = self.get_stock_info(symbol)
             
-            # 获取财务数据
-            financial_data = self.provider.get_financial_data(symbol)
+            # 获取财务数据，传递分析日期用于过滤
+            financial_data = self.provider.get_financial_data(symbol, end_date=analysis_date)
             
             # 生成基本面分析报告（传入分析日期）
             report = self._generate_fundamentals_report(symbol, stock_info, financial_data, analysis_date=analysis_date)
@@ -580,11 +580,14 @@ class TushareDataAdapter:
                 # 验证分析日期格式
                 datetime.strptime(analysis_date, '%Y-%m-%d')
                 analysis_date_str = analysis_date
+                analysis_date_obj = datetime.strptime(analysis_date, '%Y-%m-%d')
             except ValueError:
                 logger.warning(f"⚠️ 分析日期格式无效: {analysis_date}，使用当前日期")
                 analysis_date_str = datetime.now().strftime('%Y-%m-%d')
+                analysis_date_obj = datetime.now()
         else:
             analysis_date_str = datetime.now().strftime('%Y-%m-%d')
+            analysis_date_obj = datetime.now()
         
         # 报告生成时间（实际生成报告的时间戳）
         generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -603,38 +606,81 @@ class TushareDataAdapter:
         
         # 财务数据
         if financial_data:
-            report += "💰 财务数据\n"
+            report += "💰 财务数据 (截止日期: {})\n".format(analysis_date_str)
             
-            # 资产负债表
+            # 资产负债表 - 过滤到 <= analysis_date 的最新报告
             balance_sheet = financial_data.get('balance_sheet', [])
-            if balance_sheet:
-                latest_balance = balance_sheet[0] if balance_sheet else {}
+            filtered_balance = self._filter_financial_reports(balance_sheet, analysis_date_obj)
+            if filtered_balance:
+                latest_balance = filtered_balance[-1]  # 最新的过滤后报告
                 report += f"总资产: {latest_balance.get('total_assets', 'N/A')}\n"
                 report += f"总负债: {latest_balance.get('total_liab', 'N/A')}\n"
                 report += f"股东权益: {latest_balance.get('total_hldr_eqy_exc_min_int', 'N/A')}\n"
+                report += f"报告日期: {latest_balance.get('report_date', 'N/A')}\n"
+            else:
+                report += "资产负债表: 无可用历史数据 (最新报告晚于分析日期)\n"
             
             # 利润表
             income_statement = financial_data.get('income_statement', [])
-            if income_statement:
-                latest_income = income_statement[0] if income_statement else {}
+            filtered_income = self._filter_financial_reports(income_statement, analysis_date_obj)
+            if filtered_income:
+                latest_income = filtered_income[-1]
                 report += f"营业收入: {latest_income.get('total_revenue', 'N/A')}\n"
                 report += f"营业利润: {latest_income.get('operate_profit', 'N/A')}\n"
                 report += f"净利润: {latest_income.get('n_income', 'N/A')}\n"
+                report += f"报告日期: {latest_income.get('report_date', 'N/A')}\n"
+            else:
+                report += "利润表: 无可用历史数据 (最新报告晚于分析日期)\n"
             
             # 现金流量表
             cash_flow = financial_data.get('cash_flow', [])
-            if cash_flow:
-                latest_cash = cash_flow[0] if cash_flow else {}
+            filtered_cash = self._filter_financial_reports(cash_flow, analysis_date_obj)
+            if filtered_cash:
+                latest_cash = filtered_cash[-1]
                 report += f"经营活动现金流: {latest_cash.get('c_fr_sale_sg', 'N/A')}\n"
+                report += f"报告日期: {latest_cash.get('report_date', 'N/A')}\n"
+            else:
+                report += "现金流量表: 无可用历史数据 (最新报告晚于分析日期)\n"
         else:
             report += "💰 财务数据: 暂无数据\n"
         
         # 区分分析日期和报告生成时间
         report += f"\n📅 分析日期: {analysis_date_str}\n"
         report += f"🕐 报告生成时间: {generated_at}\n"
-        report += f"📊 数据来源: Tushare\n"
+        report += f"📊 数据来源: Tushare (历史数据截止 {analysis_date_str})\n"
         
         return report
+
+    def _filter_financial_reports(self, reports: List[Dict], end_date: datetime) -> List[Dict]:
+        """
+        过滤财务报告，只保留报告日期 <= end_date 的报告
+        
+        Args:
+            reports: 财务报告列表
+            end_date: 截止日期
+            
+        Returns:
+            List[Dict]: 过滤后的报告列表
+        """
+        if not reports:
+            return []
+        
+        filtered = []
+        for report in reports:
+            report_date_str = report.get('report_date') or report.get('ann_date') or report.get('end_date')
+            if not report_date_str:
+                continue
+            
+            try:
+                report_date = datetime.strptime(report_date_str, '%Y-%m-%d')
+                if report_date <= end_date:
+                    filtered.append(report)
+            except ValueError:
+                logger.warning(f"无法解析报告日期: {report_date_str}")
+                continue
+        
+        logger.debug(f"[财务过滤] 原始报告: {len(reports)}, 过滤后: {len(filtered)} (截止 {end_date.strftime('%Y-%m-%d')})")
+        return filtered
 
 
 # 全局适配器实例
