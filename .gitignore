@@ -7,6 +7,9 @@ __pycache__/
 .Python
 *.egg-info/
 
+# 参照系（其他系统代码或别的版本）
+reference/
+
 # 环境变量文件 (包含敏感API密钥)
 .env
 .env.local

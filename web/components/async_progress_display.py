@@ -888,8 +888,9 @@ def generate_progress_markdown(progress_data: Dict[str, Any], stock_symbol: str)
             name = step.get('name', f"步骤 {index + 1}")
             description = (step.get('description') or '').replace("|", "\\|").replace("\n", " ")
 
+            new_name = name.replace('|', '\\|')
             lines.append(
-                f"| 第 {index + 1} 步：{name.replace('|', '\\|')} "
+                f"| 第 {index + 1} 步：{new_name} "
                 f"| {status_label} "
                 f"| {format_duration(duration)} "
                 f"| {format_timestamp(start_at)} "
