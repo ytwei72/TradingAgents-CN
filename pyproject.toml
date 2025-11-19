@@ -7,7 +7,7 @@ name = "tradingagents"
 version = "0.1.13-preview"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "akshare>=1.16.98",
     "backtrader>=1.9.78.123",
@@ -51,7 +51,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-qianfan = ["qianfan>=0.4.20"]
+qianfan = ["qianfan>=0.4.12"]
 
 [project.scripts]
 tradingagents = "main:main"
