@@ -4,7 +4,11 @@ from typing import List, Optional, Dict, Any
 import uuid
 import datetime
 import asyncio
-from web.utils.analysis_runner import run_stock_analysis
+from tradingagents.utils.analysis_runner import run_stock_analysis
+from tradingagents.utils.task_control_manager import (
+    register_task, unregister_task, pause_task, resume_task, 
+    stop_task, get_task_state
+)
 from tradingagents.utils.logging_manager import get_logger
 
 router = APIRouter()
@@ -82,6 +86,9 @@ def run_analysis_task(analysis_id: str, request: AnalysisRequest):
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks):
     analysis_id = str(uuid.uuid4())
     
+    # Register task with control manager
+    register_task(analysis_id)
+    
     analysis_tasks[analysis_id] = {
         'id': analysis_id,
         'status': 'pending',
@@ -123,3 +130,60 @@ async def get_analysis_result(analysis_id: str):
         raise HTTPException(status_code=400, detail=f"Analysis not completed. Current status: {task['status']}")
         
     return task.get('result')
+
+@router.post("/{analysis_id}/pause", response_model=AnalysisResponse)
+async def pause_analysis(analysis_id: str):
+    """暂停分析任务"""
+    if analysis_id not in analysis_tasks:
+        raise HTTPException(status_code=404, detail="Analysis ID not found")
+    
+    success = pause_task(analysis_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to pause task")
+    
+    # Update task status in memory
+    analysis_tasks[analysis_id]['status'] = 'paused'
+    
+    return {
+        "analysis_id": analysis_id,
+        "status": "paused",
+        "message": "Analysis task paused"
+    }
+
+@router.post("/{analysis_id}/resume", response_model=AnalysisResponse)
+async def resume_analysis(analysis_id: str):
+    """恢复分析任务"""
+    if analysis_id not in analysis_tasks:
+        raise HTTPException(status_code=404, detail="Analysis ID not found")
+    
+    success = resume_task(analysis_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to resume task")
+    
+    # Update task status in memory
+    analysis_tasks[analysis_id]['status'] = 'running'
+    
+    return {
+        "analysis_id": analysis_id,
+        "status": "running",
+        "message": "Analysis task resumed"
+    }
+
+@router.post("/{analysis_id}/stop", response_model=AnalysisResponse)
+async def stop_analysis(analysis_id: str):
+    """停止分析任务"""
+    if analysis_id not in analysis_tasks:
+        raise HTTPException(status_code=404, detail="Analysis ID not found")
+    
+    success = stop_task(analysis_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to stop task")
+    
+    # Update task status in memory
+    analysis_tasks[analysis_id]['status'] = 'stopped'
+    
+    return {
+        "analysis_id": analysis_id,
+        "status": "stopped",
+        "message": "Analysis task stopped"
+    }

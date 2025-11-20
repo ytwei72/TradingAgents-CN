@@ -376,7 +376,7 @@ def check_task_control(
         return True  # 没有analysis_id，继续执行
     
     try:
-        from .task_control_manager import should_stop, should_pause, wait_if_paused
+        from tradingagents.utils.task_control_manager import should_stop, should_pause, wait_if_paused
         
         # 检查停止信号
         if should_stop(analysis_id):
@@ -810,7 +810,7 @@ def save_analysis_results(
     
     try:
         from .report_exporter import save_analysis_report, save_modular_reports_to_results_dir
-        from .analysis_runner import format_analysis_results
+        from tradingagents.utils.analysis_runner import format_analysis_results
         
         # 格式化结果
         formatted_results = format_analysis_results(results)
@@ -1147,7 +1147,7 @@ def process_analysis_results(
     def extract_risk_assessment(state):
         """从分析状态中提取风险评估数据（延迟导入版本）"""
         try:
-            from .analysis_runner import extract_risk_assessment as _extract
+            from tradingagents.utils.analysis_runner import extract_risk_assessment as _extract
             return _extract(state)
         except ImportError:
             # 如果无法导入，返回None

@@ -11,7 +11,7 @@ import time
 import html
 from typing import Optional, Dict, Any, List
 from web.utils.async_progress_tracker import get_progress_by_id, format_time
-from web.utils.analysis_runner import format_analysis_results
+from tradingagents.utils.analysis_runner import format_analysis_results
 import streamlit as st
 
 # 导入日志模块

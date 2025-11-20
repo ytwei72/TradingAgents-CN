@@ -19,7 +19,7 @@ def test_web_integration():
     
     try:
         # 导入Web分析运行器
-        from web.utils.analysis_runner import run_stock_analysis
+        from tradingagents.utils.analysis_runner import run_stock_analysis
         
         # 模拟Web界面的进度更新函数
         progress_messages = []

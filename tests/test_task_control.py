@@ -25,7 +25,7 @@ def test_task_control_manager():
     print("测试任务控制管理器")
     print("=" * 60)
     
-    from web.utils.task_control_manager import (
+    from tradingagents.utils.task_control_manager import (
         TaskControlManager, register_task, pause_task, 
         resume_task, stop_task, should_stop, should_pause, 
         wait_if_paused, get_task_state
@@ -149,7 +149,7 @@ def test_simulated_task_with_control():
     print("测试模拟任务的暂停/恢复/停止")
     print("=" * 60)
     
-    from web.utils.task_control_manager import (
+    from tradingagents.utils.task_control_manager import (
         register_task, pause_task, resume_task, 
         stop_task, should_stop, wait_if_paused
     )
@@ -231,7 +231,7 @@ def test_checkpoint_saving():
     print("测试检查点保存和加载")
     print("=" * 60)
     
-    from web.utils.task_control_manager import (
+    from tradingagents.utils.task_control_manager import (
         register_task, save_checkpoint, load_checkpoint
     )
     

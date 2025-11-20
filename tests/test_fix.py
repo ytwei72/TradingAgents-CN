@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from web.utils.analysis_runner import run_stock_analysis
+from tradingagents.utils.analysis_runner import run_stock_analysis
 
 def test_analysis_fix():
     """测试基本面分析师修复是否有效"""

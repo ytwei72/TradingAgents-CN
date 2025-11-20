@@ -163,7 +163,7 @@ def check_analysis_status(analysis_id: str) -> str:
     """
     # 首先检查任务控制状态
     try:
-        from .task_control_manager import get_task_state
+        from tradingagents.utils.task_control_manager import get_task_state
         control_state = get_task_state(analysis_id)
         if control_state in ['paused', 'stopped']:
             return control_state
