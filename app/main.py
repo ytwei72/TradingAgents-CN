@@ -20,7 +20,7 @@ import asyncio
 
 from app.core.config import settings
 from app.core.startup_validator import validate_startup_config
-from app.routers import health
+from app.routers import health, analysis
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -50,45 +50,15 @@ if not settings.DEBUG:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=settings.ALLOWED_ORIGINS + ["http://localhost:5173"], # Add Vue dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include health router
+# Include routers
 app.include_router(health.router, prefix="/api", tags=["health"])
-
-class AnalysisRequest(BaseModel):
-    symbol: str
-    trade_date: Optional[str] = None
-
-class AnalysisResponse(BaseModel):
-    decision: str
-    full_report: str
-
-@app.post("/api/analysis", response_model=AnalysisResponse)
-async def analyze_stock(request: AnalysisRequest):
-    """Run stock analysis using agents"""
-    symbol = request.symbol.upper()
-    trade_date = request.trade_date or datetime.now().strftime("%Y-%m-%d")
-
-    try:
-        config = DEFAULT_CONFIG.copy()
-        # Update with env vars if needed
-        config["llm_provider"] = os.getenv("LLM_PROVIDER", "openai")
-        config["deep_think_llm"] = os.getenv("DEEP_THINK_LLM", "gpt-4o-mini")
-        config["quick_think_llm"] = os.getenv("QUICK_THINK_LLM", "gpt-4o-mini")
-
-        graph = TradingAgentsGraph(config=config, debug=False)
-        final_state, processed_signal = graph.propagate(symbol, trade_date)
-
-        return {
-            "decision": str(processed_signal),
-            "full_report": str(final_state.get("final_trade_decision", "No decision available"))
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 
 @app.get("/")
 async def root():

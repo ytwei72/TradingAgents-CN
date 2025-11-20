@@ -16,9 +16,10 @@ reference/
 .env.*.local
 .env.db
 .env.mongodb*
-frontend
-backend
+
+# 环境依赖包（库）目录
 .venv
+node_modules/
 
 
 # 系统文件
@@ -32,11 +33,11 @@ Thumbs.db
 *.xls
 
 # 项目特定目录
-src/
 eval_results/
 eval_data/
 logs/
 temp/
+log/
 
 # 数据缓存目录 (不纳入版本控制)
 cache/
@@ -125,3 +126,6 @@ COMMIT_SUMMARY.md
 *.temp
 *.pyc.*
 *.pyo.*
+
+
+
