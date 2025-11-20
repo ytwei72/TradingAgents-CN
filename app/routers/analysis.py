@@ -77,10 +77,18 @@ def run_analysis_task(analysis_id: str, request: AnalysisRequest):
         analysis_tasks[analysis_id]['status'] = 'completed'
         analysis_tasks[analysis_id]['result'] = results
         
+    except asyncio.CancelledError:
+        # Gracefully handle task cancellation during shutdown
+        logger.info(f"Analysis task {analysis_id} was cancelled (server shutdown)")
+        if analysis_id in analysis_tasks:
+            analysis_tasks[analysis_id]['status'] = 'cancelled'
+            analysis_tasks[analysis_id]['error'] = 'Task cancelled due to server shutdown'
+        raise  # Re-raise to allow proper cleanup
     except Exception as e:
         logger.error(f"Analysis failed for {analysis_id}: {e}")
-        analysis_tasks[analysis_id]['status'] = 'failed'
-        analysis_tasks[analysis_id]['error'] = str(e)
+        if analysis_id in analysis_tasks:
+            analysis_tasks[analysis_id]['status'] = 'failed'
+            analysis_tasks[analysis_id]['error'] = str(e)
 
 @router.post("/start", response_model=AnalysisResponse)
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks):
