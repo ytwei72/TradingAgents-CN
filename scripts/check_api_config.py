@@ -13,6 +13,11 @@ from dotenv import load_dotenv
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from tradingagents.utils.embedding_config import (
+    get_dashscope_embedding_model,
+    test_dashscope_embedding
+)
+
 def check_env_file():
     """检查.env文件是否存在"""
     env_file = project_root / ".env"
@@ -37,31 +42,15 @@ def check_dashscope_config():
     
     print(f"✅ DASHSCOPE_API_KEY已配置: {api_key[:12]}...{api_key[-4:]}")
     
+    # 获取配置的模型
+    model = get_dashscope_embedding_model()
+    print(f"ℹ️  使用模型: {model}")
+    
     # 测试API可用性
-    try:
-        import dashscope
-        from dashscope import TextEmbedding
-        
-        dashscope.api_key = api_key
-        
-        response = TextEmbedding.call(
-            model="text-embedding-v3",
-            input="测试文本"
-        )
-        
-        if response.status_code == 200:
-            print("✅ DashScope API测试成功")
-            return True
-        else:
-            print(f"❌ DashScope API测试失败: {response.code} - {response.message}")
-            return False
-            
-    except ImportError:
-        print("⚠️ dashscope包未安装，无法测试API")
-        return False
-    except Exception as e:
-        print(f"❌ DashScope API测试异常: {e}")
-        return False
+    success, message = test_dashscope_embedding(api_key=api_key, model=model)
+    print(message)
+    
+    return success
 
 def check_other_apis():
     """检查其他API配置"""

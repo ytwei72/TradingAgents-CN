@@ -10,6 +10,11 @@ from typing import Dict, Optional
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
+from tradingagents.utils.embedding_config import (
+    get_dashscope_embedding_model, 
+    call_dashscope_embedding, 
+    is_length_limit_error
+)
 logger = get_logger("agents.utils.memory")
 
 
@@ -121,7 +126,7 @@ class FinancialSituationMemory:
         self.fallback_available = False
         
         if self.llm_provider == "dashscope" or self.llm_provider == "alibaba":
-            self.embedding = "text-embedding-v3"
+            self.embedding = get_dashscope_embedding_model()
             self.client = None  # DashScope不需要OpenAI客户端
 
             # 设置DashScope API密钥
@@ -165,7 +170,7 @@ class FinancialSituationMemory:
                     from dashscope import TextEmbedding
 
                     dashscope.api_key = dashscope_key
-                    self.embedding = "text-embedding-v3"
+                    self.embedding = get_dashscope_embedding_model()
                     self.client = None
                     logger.info(f"💡 千帆使用阿里百炼嵌入服务")
                 except ImportError as e:
@@ -196,7 +201,7 @@ class FinancialSituationMemory:
 
                         dashscope.api_key = dashscope_key
                         # 验证TextEmbedding可用性（不需要实际调用）
-                        self.embedding = "text-embedding-v3"
+                        self.embedding = get_dashscope_embedding_model()
                         self.client = None
                         logger.info(f"💡 DeepSeek使用阿里百炼嵌入服务")
                     except ImportError as e:
@@ -248,7 +253,7 @@ class FinancialSituationMemory:
                     import dashscope
                     from dashscope import TextEmbedding
 
-                    self.embedding = "text-embedding-v3"
+                    self.embedding = get_dashscope_embedding_model()
                     self.client = None
                     dashscope.api_key = dashscope_key
                     
@@ -285,7 +290,7 @@ class FinancialSituationMemory:
                     import dashscope
                     from dashscope import TextEmbedding
 
-                    self.embedding = "text-embedding-v3"
+                    self.embedding = get_dashscope_embedding_model()
                     self.client = None
                     dashscope.api_key = dashscope_key
                     logger.info(f"💡 OpenRouter使用阿里百炼嵌入服务")
@@ -414,64 +419,21 @@ class FinancialSituationMemory:
             (self.llm_provider == "deepseek" and self.client is None) or
             (self.llm_provider == "openrouter" and self.client is None)):
             # 使用阿里百炼的嵌入模型
-            try:
-                # 导入DashScope模块
-                import dashscope
-                from dashscope import TextEmbedding
-
-                # 检查DashScope API密钥是否可用
-                if not hasattr(dashscope, 'api_key') or not dashscope.api_key:
-                    logger.warning(f"⚠️ DashScope API密钥未设置，记忆功能降级")
-                    return [0.0] * 1024  # 返回空向量
-
-                # 尝试调用DashScope API
-                response = TextEmbedding.call(
-                    model=self.embedding,
-                    input=text
-                )
-
-                # 检查响应状态
-                if response.status == 200:
-                    # 成功获取embedding
-                    embedding = response.output['embeddings'][0]['embedding']
-                    logger.debug(f"✅ DashScope embedding成功，维度: {len(embedding)}")
-                    return embedding
-                else:
-                    # API返回错误状态码
-                    error_msg = f"{response.code} - {response.message}"
-                    
-                    # 检查是否为长度限制错误
-                    if any(keyword in error_msg.lower() for keyword in ['length', 'token', 'limit', 'exceed']):
-                        logger.warning(f"⚠️ DashScope长度限制: {error_msg}")
-                        
-                        # 检查是否有降级选项
-                        if hasattr(self, 'fallback_available') and self.fallback_available:
-                            logger.info(f"💡 尝试使用OpenAI降级处理长文本")
-                            try:
-                                response = self.fallback_client.embeddings.create(
-                                    model=self.fallback_embedding,
-                                    input=text
-                                )
-                                embedding = response.data[0].embedding
-                                logger.info(f"✅ OpenAI降级成功，维度: {len(embedding)}")
-                                return embedding
-                            except Exception as fallback_error:
-                                logger.error(f"❌ OpenAI降级失败: {str(fallback_error)}")
-                                logger.info(f"💡 所有降级选项失败，记忆功能降级")
-                                return [0.0] * 1024
-                        else:
-                            logger.info(f"💡 无可用降级选项，记忆功能降级")
-                            return [0.0] * 1024
-                    else:
-                        logger.error(f"❌ DashScope API错误: {error_msg}")
-                        return [0.0] * 1024  # 返回空向量而不是抛出异常
-
-            except Exception as e:
-                error_str = str(e).lower()
-                
+            # 使用阿里百炼的嵌入模型
+            # 使用统一的API调用函数
+            success, embedding, error_msg = call_dashscope_embedding(
+                text=text,
+                model=self.embedding
+            )
+            
+            if success:
+                logger.debug(f"✅ DashScope embedding成功，维度: {len(embedding)}")
+                return embedding
+            else:
+                # 处理错误
                 # 检查是否为长度限制错误
-                if any(keyword in error_str for keyword in ['length', 'token', 'limit', 'exceed', 'too long']):
-                    logger.warning(f"⚠️ DashScope长度限制异常: {str(e)}")
+                if is_length_limit_error(error_msg):
+                    logger.warning(f"⚠️ DashScope长度限制: {error_msg}")
                     
                     # 检查是否有降级选项
                     if hasattr(self, 'fallback_available') and self.fallback_available:
@@ -491,17 +453,10 @@ class FinancialSituationMemory:
                     else:
                         logger.info(f"💡 无可用降级选项，记忆功能降级")
                         return [0.0] * 1024
-                elif 'import' in error_str:
-                    logger.error(f"❌ DashScope包未安装: {str(e)}")
-                elif 'connection' in error_str:
-                    logger.error(f"❌ DashScope网络连接错误: {str(e)}")
-                elif 'timeout' in error_str:
-                    logger.error(f"❌ DashScope请求超时: {str(e)}")
                 else:
-                    logger.error(f"❌ DashScope embedding异常: {str(e)}")
-                
-                logger.warning(f"⚠️ 记忆功能降级，返回空向量")
-                return [0.0] * 1024
+                    logger.error(f"❌ DashScope API错误: {error_msg}")
+                    logger.warning(f"⚠️ 记忆功能降级，返回空向量")
+                    return [0.0] * 1024
         else:
             # 使用OpenAI兼容的嵌入模型
             if self.client is None:
