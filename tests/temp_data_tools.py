@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 
 try:
-    from web.utils.mongodb_report_manager import mongodb_report_manager
+    from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
 except Exception:
     mongodb_report_manager = None
 

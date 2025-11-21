@@ -16,7 +16,7 @@ import re
 logger = logging.getLogger(__name__)
 
 try:
-    from web.utils.mongodb_report_manager import MongoDBReportManager, MONGODB_AVAILABLE
+    from tradingagents.utils.mongodb_report_manager import MongoDBReportManager, MONGODB_AVAILABLE
 except ImportError:
     MONGODB_AVAILABLE = False
     logger.warning("MongoDB模块不可用")

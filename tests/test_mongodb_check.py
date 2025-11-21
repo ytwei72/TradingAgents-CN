@@ -14,7 +14,7 @@ sys.path.insert(0, str(project_root))
 
 # 导入MongoDB报告管理器
 try:
-    from web.utils.mongodb_report_manager import mongodb_report_manager
+    from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
     print(f"✅ MongoDB报告管理器导入成功")
 except ImportError as e:
     print(f"❌ MongoDB报告管理器导入失败: {e}")
