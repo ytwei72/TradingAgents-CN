@@ -53,7 +53,7 @@ def _restore_latest_analysis_results():
     
     try:
         from utils.async_progress_tracker import get_latest_analysis_id, get_progress_by_id
-        from utils.analysis_runner import format_analysis_results
+        from tradingagents.utils.analysis_runner import format_analysis_results
 
         latest_id = get_latest_analysis_id()
         if not latest_id:

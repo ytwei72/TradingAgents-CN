@@ -8,9 +8,9 @@ import datetime
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 
-from utils.thread_tracker import check_analysis_status
-from utils.smart_session_manager import smart_session_manager
-from utils.task_control_manager import pause_task, resume_task, stop_task
+from web.utils.thread_tracker import check_analysis_status
+from web.utils.smart_session_manager import smart_session_manager
+from tradingagents.utils.task_control_manager import pause_task, resume_task, stop_task
 import time
 
 # 导入用户活动记录器

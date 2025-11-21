@@ -40,7 +40,7 @@ from components.login import render_login_form, check_authentication, render_use
 from components.user_activity_dashboard import render_user_activity_dashboard, render_activity_summary_widget
 from components.task_status_display import render_task_status_card, render_progress_hint
 from utils.api_checker import check_api_keys
-from utils.analysis_runner import run_stock_analysis, validate_analysis_params, format_analysis_results
+from tradingagents.utils.analysis_runner import run_stock_analysis, validate_analysis_params, format_analysis_results
 from utils.progress_tracker import SmartStreamlitProgressDisplay, create_smart_progress_callback
 from utils.async_progress_tracker import AsyncProgressTracker
 from components.async_progress_display import display_unified_progress
@@ -569,7 +569,7 @@ def main():
                     finally:
                         # 分析结束后注销线程和任务控制
                         from utils.thread_tracker import unregister_analysis_thread
-                        from utils.task_control_manager import unregister_task
+                        from tradingagents.utils.task_control_manager import unregister_task
                         
                         unregister_analysis_thread(analysis_id)
                         unregister_task(analysis_id)
@@ -582,7 +582,7 @@ def main():
 
                 # 注册任务控制和线程跟踪
                 from utils.thread_tracker import register_analysis_thread
-                from utils.task_control_manager import register_task
+                from tradingagents.utils.task_control_manager import register_task
                 
                 register_task(analysis_id)
                 register_analysis_thread(analysis_id, analysis_thread)
@@ -651,7 +651,6 @@ def main():
             if is_completed and not st.session_state.get('analysis_results') and progress_data:
                 if 'raw_results' in progress_data:
                     try:
-                        from utils.analysis_runner import format_analysis_results
                         raw_results = progress_data['raw_results']
                         formatted_results = format_analysis_results(raw_results)
                         if formatted_results:

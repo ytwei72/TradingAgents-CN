@@ -168,13 +168,13 @@ UI显示更新
 ### 1. 启动分析任务
 ```python
 # 任务自动注册控制管理器
-from web.utils.task_control_manager import register_task
+from tradingagents.utils.task_control_manager import register_task
 register_task(analysis_id)
 ```
 
 ### 2. 暂停正在运行的任务
 ```python
-from web.utils.task_control_manager import pause_task
+from tradingagents.utils.task_control_manager import pause_task
 
 if pause_task(analysis_id):
     print("任务已暂停")
@@ -182,7 +182,7 @@ if pause_task(analysis_id):
 
 ### 3. 恢复暂停的任务
 ```python
-from web.utils.task_control_manager import resume_task
+from tradingagents.utils.task_control_manager import resume_task
 
 if resume_task(analysis_id):
     print("任务已恢复")
@@ -190,7 +190,7 @@ if resume_task(analysis_id):
 
 ### 4. 停止任务
 ```python
-from web.utils.task_control_manager import stop_task
+from tradingagents.utils.task_control_manager import stop_task
 
 if stop_task(analysis_id):
     print("任务已停止")
@@ -198,7 +198,7 @@ if stop_task(analysis_id):
 
 ### 5. 在分析代码中检查控制信号
 ```python
-from web.utils.task_control_manager import should_stop, wait_if_paused
+from tradingagents.utils.task_control_manager import should_stop, wait_if_paused
 
 # 在分析循环中
 for step in analysis_steps:

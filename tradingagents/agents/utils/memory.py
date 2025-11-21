@@ -431,7 +431,7 @@ class FinancialSituationMemory:
                 )
 
                 # 检查响应状态
-                if response.status_code == 200:
+                if response.status == 200:
                     # 成功获取embedding
                     embedding = response.output['embeddings'][0]['embedding']
                     logger.debug(f"✅ DashScope embedding成功，维度: {len(embedding)}")
