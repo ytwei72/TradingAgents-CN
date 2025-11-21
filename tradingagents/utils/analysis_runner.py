@@ -132,7 +132,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     """
     
     # 导入辅助模块
-    from web.utils.analysis_helpers import (
+    from .analysis_helpers import (
         prepare_analysis_steps,
         estimate_analysis_cost,
         check_task_control as check_task_control_helper,
@@ -298,7 +298,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         update_progress("✅ 分析成功完成！")
         
         # 发布任务完成状态消息
-        from web.utils.message_utils import publish_task_status
+        from .message_utils import publish_task_status
         publish_task_status(analysis_id, "COMPLETED", "✅ 分析成功完成！")
         
         return results
@@ -328,7 +328,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                     }, exc_info=True)
         
         # 发布任务失败状态消息
-        from web.utils.message_utils import publish_task_status
+        from .message_utils import publish_task_status
         publish_task_status(analysis_id, "FAILED", f"❌ 分析失败: {str(e)}")
 
         # 如果真实分析失败，返回错误信息而不是误导性演示数据
