@@ -39,7 +39,25 @@ def parse_news_time(time_str: str) -> Optional[datetime]:
     if not time_str:
         return None
     
-    # 尝试多种时间格式
+    # 尝试ISO 8601格式（带时区，如：2025-10-30T20:00:00+00:00）
+    try:
+        # Python 3.7+支持fromisoformat，但需要处理时区
+        from datetime import timezone
+        # 移除时区信息中的冒号（如果有）
+        if '+' in time_str or time_str.endswith('Z'):
+            # 处理Z结尾（UTC时间）
+            if time_str.endswith('Z'):
+                time_str = time_str[:-1] + '+00:00'
+            # 使用fromisoformat解析
+            dt = datetime.fromisoformat(time_str)
+            # 转换为本地时间（移除时区信息）
+            if dt.tzinfo is not None:
+                dt = dt.replace(tzinfo=None)
+            return dt
+    except Exception:
+        pass
+    
+    # 尝试多种常见时间格式
     time_formats = [
         '%Y-%m-%d %H:%M:%S',
         '%Y-%m-%d',

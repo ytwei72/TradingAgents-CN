@@ -72,7 +72,7 @@ def test_get_stock_news_items(provider, symbol='600519', ticker='600519.SHG'):
     
     # 设置日期范围
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=70)).strftime('%Y-%m-%d')
     
     print(f"日期范围: {start_date} 到 {end_date}")
     print(f"Ticker: {ticker}")
@@ -150,10 +150,10 @@ def main():
         return
     
     # 测试2: 股票代码标准化
-    test_symbol_normalization(provider)
+    # test_symbol_normalization(provider)
     
     # 测试3: 获取新闻DataFrame (贵州茅台)
-    news_df = test_get_stock_news(provider, symbol='600519')
+    # news_df = test_get_stock_news(provider, symbol='600519')
     
     # 测试4: 获取NewsItem列表
     news_items = test_get_stock_news_items(provider, symbol='600519', ticker='600519.SHG')
@@ -169,7 +169,7 @@ def main():
     print("测试总结")
     print("=" * 80)
     print(f"✅ EODHD Provider: {'已连接' if provider else '未连接'}")
-    print(f"✅ A股新闻DataFrame: {'获取成功' if news_df is not None and not news_df.empty else '未获取'}")
+    # print(f"✅ A股新闻DataFrame: {'获取成功' if news_df is not None and not news_df.empty else '未获取'}")
     print(f"✅ A股NewsItem列表: {'获取成功' if news_items else '未获取'}")
     print(f"✅ 美股新闻DataFrame: {'获取成功' if us_news is not None and not us_news.empty else '未获取'}")
     

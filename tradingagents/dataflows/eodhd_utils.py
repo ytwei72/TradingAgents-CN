@@ -204,7 +204,7 @@ class EODHDProvider:
     
     def get_stock_news_items(self, symbol: str, start_date: str, end_date: str, ticker: str, max_news: int = 10):
         """
-        获取股票新闻并转换为NewsItem列表（包含后处理）
+        获取股票新闻并转换为NewsItem列表（直接从JSON处理）
         
         Args:
             symbol: 股票代码（用于过滤新闻）
@@ -216,29 +216,123 @@ class EODHDProvider:
         Returns:
             List[NewsItem]: 新闻项目列表
         """
-        from .news_helper import convert_news_df_to_items
+        from .realtime_news_utils import NewsItem
+        from .news_helper import assess_news_urgency, calculate_relevance_score, parse_news_time, filter_news_by_date_range
         
-        # 获取新闻DataFrame
-        news_df = self.get_stock_news(symbol, start_date, end_date, max_news)
+        start_time = datetime.now()
+        logger.debug(f"[EODHD新闻] 开始获取NewsItem列表，股票: {symbol}, 日期范围: {start_date} 到 {end_date}")
         
-        if news_df.empty:
+        if not self.connected:
+            logger.error(f"[EODHD新闻] ❌ EODHD未连接，无法获取新闻")
             return []
         
-        # 计算时间范围
-        from datetime import datetime
-        end_datetime = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-        start_datetime = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
-        
-        # 使用helper函数转换并后处理
-        news_items = convert_news_df_to_items(
-            news_df=news_df,
-            source='EODHD',
-            ticker=ticker,
-            start_time_filter=start_datetime,
-            end_time=end_datetime
-        )
-        
-        return news_items
+        try:
+            # 标准化股票代码
+            eodhd_symbol = self._normalize_symbol_for_eodhd(symbol)
+            
+            # 设置默认日期
+            if end_date is None:
+                end_date_str = datetime.now().strftime('%Y-%m-%d')
+            else:
+                end_date_str = end_date
+            
+            if start_date is None:
+                start_date_str = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            else:
+                start_date_str = start_date
+            
+            logger.debug(f"[EODHD新闻] 📰 调用EODHD API获取新闻: symbol={eodhd_symbol}, from={start_date_str}, to={end_date_str}")
+            
+            # 构建API URL
+            url = f'https://eodhd.com/api/news'
+            params = {
+                's': eodhd_symbol,
+                'from': start_date_str,
+                'to': end_date_str,
+                'offset': 0,
+                'limit': max_news,
+                'api_token': self.api_token,
+                'fmt': 'json'
+            }
+            
+            # 调用API
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            
+            news_data = response.json()
+            
+            if not news_data or not isinstance(news_data, list):
+                logger.warning(f"[EODHD新闻] ⚠️ API返回空数据或格式错误")
+                return []
+            
+            logger.debug(f"[EODHD新闻] API返回 {len(news_data)} 条新闻")
+            
+            # 计算时间范围
+            end_datetime = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+            start_datetime = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+            
+            # 直接转换JSON为NewsItem列表
+            news_items = []
+            for item in news_data:
+                try:
+                    # 解析时间
+                    time_str = item.get('date', '')
+                    publish_time = parse_news_time(time_str)
+                    
+                    if not publish_time:
+                        logger.warning(f"[EODHD新闻] 无法解析时间: {time_str}，跳过该新闻")
+                        continue
+                    
+                    # 过滤日期范围
+                    if not filter_news_by_date_range(publish_time, start_datetime, end_datetime):
+                        continue
+                    
+                    # 获取新闻内容
+                    title = item.get('title', '')
+                    content = item.get('content', '')
+                    url_link = item.get('link', '')
+                    
+                    # 评估紧急度和相关性
+                    urgency = assess_news_urgency(title, content)
+                    relevance_score = calculate_relevance_score(title, ticker)
+                    
+                    # 创建NewsItem对象
+                    news_item = NewsItem(
+                        title=title,
+                        content=content,
+                        source='EODHD',
+                        publish_time=publish_time,
+                        url=url_link,
+                        urgency=urgency,
+                        relevance_score=relevance_score
+                    )
+                    
+                    news_items.append(news_item)
+                    
+                except Exception as e:
+                    logger.error(f"[EODHD新闻] 处理新闻项失败: {e}")
+                    continue
+            
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            logger.info(f"[EODHD新闻] ✅ 获取成功: {symbol}, 共{len(news_items)}条NewsItem，耗时: {elapsed_time:.2f}秒")
+            
+            # 记录新闻标题示例
+            if news_items:
+                sample_titles = [item.title[:50] for item in news_items[:3]]
+                logger.debug(f"[EODHD新闻] 新闻标题示例: {', '.join(sample_titles)}")
+            
+            return news_items
+            
+        except requests.exceptions.RequestException as e:
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            logger.error(f"[EODHD新闻] ❌ API请求失败: {e}, 耗时: {elapsed_time:.2f}秒")
+            return []
+        except Exception as e:
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            logger.error(f"[EODHD新闻] ❌ 获取失败: {symbol}, 错误: {e}, 耗时: {elapsed_time:.2f}秒")
+            import traceback
+            logger.error(f"[EODHD新闻] 异常堆栈: {traceback.format_exc()}")
+            return []
 
 
 # 全局提供器实例
