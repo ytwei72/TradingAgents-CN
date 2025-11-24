@@ -314,95 +314,90 @@ class RealtimeNewsAggregator:
     
     def _get_chinese_finance_news(self, ticker: str, hours_back: int, end_date: datetime) -> List[NewsItem]:
         """获取中文财经新闻"""
-        # 集成中文财经新闻API：财联社、东方财富等
         logger.debug(f"[中文财经新闻] 开始获取 {ticker} 的中文财经新闻，指定日期: {end_date.strftime('%Y-%m-%d')}，回溯时间: {hours_back}小时")
         start_time = datetime.now()
         
         # 计算时间范围：使用指定的结束日期
         start_time_filter = end_date - timedelta(hours=hours_back)
+        start_date_str = start_time_filter.strftime('%Y-%m-%d')
+        end_date_str = end_date.strftime('%Y-%m-%d')
         
         try:
+            # 处理股票代码格式
+            # 如果是美股代码，跳过中文新闻源
+            if '.' in ticker and any(suffix in ticker for suffix in ['.US', '.N', '.O', '.NYSE', '.NASDAQ']):
+                logger.debug(f"[中文财经新闻] 检测到美股代码 {ticker}，跳过中文新闻获取")
+                return []
+            
+            # 处理A股和港股代码
+            clean_ticker = ticker.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
+                            .replace('.HK', '').replace('.XSHE', '').replace('.XSHG', '')
+            
+            # 定义provider列表（按优先级顺序）
+            # 每个provider是一个元组: (名称, 获取函数, 导入模块)
+            providers = [
+                ('Tushare', 'get_tushare_provider', '.tushare_utils'),
+                ('AKShare', 'get_akshare_provider', '.akshare_utils'),
+                ('EODHD', 'get_eodhd_provider', '.eodhd_utils'),
+            ]
+            
             news_items = []
             
-            # 1. 尝试使用AKShare获取东方财富个股新闻
-            try:
-                logger.debug(f"[中文财经新闻] 尝试导入 AKShare 工具")
-                from .akshare_utils import get_stock_news_em
-                
-                # 处理股票代码格式
-                # 如果是美股代码，不使用东方财富新闻
-                if '.' in ticker and any(suffix in ticker for suffix in ['.US', '.N', '.O', '.NYSE', '.NASDAQ']):
-                    logger.debug(f"[中文财经新闻] 检测到美股代码 {ticker}，跳过东方财富新闻获取")
-                else:
-                    # 处理A股和港股代码
-                    clean_ticker = ticker.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
-                                    .replace('.HK', '').replace('.XSHE', '').replace('.XSHG', '')
+            # 按顺序尝试每个provider
+            for provider_name, provider_func_name, module_path in providers:
+                try:
+                    logger.debug(f"[中文财经新闻] 尝试使用 {provider_name} provider 获取新闻")
                     
-                    # 获取东方财富新闻
-                    logger.debug(f"[中文财经新闻] 开始获取 {clean_ticker} 的东方财富新闻")
-                    em_start_time = datetime.now()
-                    news_df = get_stock_news_em(clean_ticker)
+                    # 动态导入provider
+                    if module_path == '.tushare_utils':
+                        from .tushare_utils import get_tushare_provider
+                        provider = get_tushare_provider()
+                    elif module_path == '.akshare_utils':
+                        from .akshare_utils import get_akshare_provider
+                        provider = get_akshare_provider()
+                    elif module_path == '.eodhd_utils':
+                        from .eodhd_utils import get_eodhd_provider
+                        provider = get_eodhd_provider()
+                    else:
+                        logger.warning(f"[中文财经新闻] 未知的provider模块: {module_path}")
+                        continue
                     
-                    if not news_df.empty:
-                        logger.debug(f"[中文财经新闻] 东方财富返回 {len(news_df)} 条新闻数据，开始处理")
-                        processed_count = 0
-                        skipped_count = 0
-                        error_count = 0
+                    # 检查连接状态
+                    if not provider.connected:
+                        logger.warning(f"[中文财经新闻] {provider_name}未连接，跳过")
+                        continue
+                    
+                    # 获取新闻
+                    logger.debug(f"[中文财经新闻] {provider_name}已连接，开始获取 {clean_ticker} 的新闻")
+                    provider_start_time = datetime.now()
+                    
+                    news_items = provider.get_stock_news_items(
+                        symbol=clean_ticker,
+                        start_date=start_date_str,
+                        end_date=end_date_str,
+                        ticker=ticker,
+                        max_news=10
+                    )
+                    
+                    provider_time = (datetime.now() - provider_start_time).total_seconds()
+                    
+                    # 如果成功获取到新闻，记录并退出循环
+                    if news_items:
+                        logger.info(f"[中文财经新闻] ✅ {provider_name}新闻获取成功，共{len(news_items)}条，耗时: {provider_time:.2f}秒")
+                        break  # 成功获取，退出provider循环
+                    else:
+                        logger.debug(f"[中文财经新闻] {provider_name}未返回新闻数据，耗时: {provider_time:.2f}秒")
                         
-                        # 转换为NewsItem格式
-                        for _, row in news_df.iterrows():
-                            try:
-                                # 解析时间
-                                time_str = row.get('时间', '')
-                                if time_str:
-                                    # 尝试解析时间格式，可能是'2023-01-01 12:34:56'格式
-                                    try:
-                                        publish_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
-                                    except:
-                                        # 尝试其他可能的格式
-                                        try:
-                                            publish_time = datetime.strptime(time_str, '%Y-%m-%d')
-                                        except:
-                                            logger.warning(f"[中文财经新闻] 无法解析时间格式: {time_str}，跳过该新闻")
-                                            skipped_count += 1
-                                            continue
-                                else:
-                                    logger.warning(f"[中文财经新闻] 新闻时间为空，跳过该新闻")
-                                    skipped_count += 1
-                                    continue
-                                
-                                # 检查时效性：只获取指定日期及之前的新闻
-                                if publish_time < start_time_filter or publish_time > end_date:
-                                    skipped_count += 1
-                                    continue
-                                
-                                # 评估紧急程度
-                                title = row.get('标题', '')
-                                content = row.get('内容', '')
-                                urgency = self._assess_news_urgency(title, content)
-                                
-                                news_items.append(NewsItem(
-                                    title=title,
-                                    content=content,
-                                    source='东方财富',
-                                    publish_time=publish_time,
-                                    url=row.get('链接', ''),
-                                    urgency=urgency,
-                                    relevance_score=self._calculate_relevance(title, ticker)
-                                ))
-                                processed_count += 1
-                            except Exception as item_e:
-                                logger.error(f"[中文财经新闻] 处理东方财富新闻项目失败: {item_e}")
-                                error_count += 1
-                                continue
-                        
-                        em_time = (datetime.now() - em_start_time).total_seconds()
-                        logger.info(f"[中文财经新闻] 东方财富新闻处理完成，成功: {processed_count}条，跳过: {skipped_count}条，错误: {error_count}条，耗时: {em_time:.2f}秒")
-            except Exception as ak_e:
-                logger.error(f"[中文财经新闻] 获取东方财富新闻失败: {ak_e}")
+                except Exception as e:
+                    logger.error(f"[中文财经新闻] {provider_name}新闻获取失败: {e}")
+                    continue  # 继续尝试下一个provider
             
-            # 2. 财联社RSS (如果可用)
-            logger.debug(f"[中文财经新闻] 开始获取财联社RSS新闻")
+            # 如果所有provider都失败，记录警告
+            if not news_items:
+                logger.warning(f"[中文财经新闻] ⚠️ 所有provider均未能获取到 {ticker} 的新闻数据")
+            
+            # 3. 财联社RSS (如果可用) - 保留作为补充
+            logger.debug(f"[中文财经新闻] 开始获取财联社RSS新闻作为补充")
             rss_start_time = datetime.now()
             rss_sources = [
                 "https://www.cls.cn/api/sw?app=CailianpressWeb&os=web&sv=7.7.5",

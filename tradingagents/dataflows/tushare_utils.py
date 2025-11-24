@@ -798,6 +798,171 @@ class TushareProvider:
         except Exception as e:
             logger.error(f"❌ 搜索股票失败: {e}")
             return pd.DataFrame()
+    
+    def get_stock_news(self, symbol: str = None, start_date: str = None, end_date: str = None, max_news: int = 10) -> pd.DataFrame:
+        """
+        获取股票新闻（使用Tushare新闻接口）
+        
+        **重要提示**:
+        - Tushare新闻接口有访问频率限制
+        - 免费用户：每小时最多访问2次
+        - 如遇到权限限制错误，请等待1小时后再试
+        - 权限详情: https://tushare.pro/document/1?doc_id=108
+        
+        Args:
+            symbol: 股票代码（可选，如果提供则过滤相关新闻）
+            start_date: 开始日期（YYYY-MM-DD）
+            end_date: 结束日期（YYYY-MM-DD）
+            max_news: 最大新闻数量，默认10条
+            
+        Returns:
+            DataFrame: 新闻数据，包含标题、内容、时间等
+                      列名: 标题, 内容, 时间, 链接
+                      
+        Raises:
+            如果超过访问频率限制，会记录警告日志并返回空DataFrame
+        """
+        start_time = datetime.now()
+        logger.debug(f"[Tushare新闻] 开始获取新闻，股票: {symbol}, 日期范围: {start_date} 到 {end_date}")
+        
+        if not self.connected:
+            logger.error(f"[Tushare新闻] ❌ Tushare未连接，无法获取新闻")
+            return pd.DataFrame()
+        
+        try:
+            # 设置默认日期
+            if end_date is None:
+                end_date = datetime.now().strftime('%Y%m%d')
+            else:
+                end_date = end_date.replace('-', '')
+            
+            if start_date is None:
+                # 默认获取最近7天的新闻
+                start_date = (datetime.now() - timedelta(days=7)).strftime('%Y%m%d')
+            else:
+                start_date = start_date.replace('-', '')
+            
+            logger.debug(f"[Tushare新闻] 📰 调用Tushare API获取新闻: start_date={start_date}, end_date={end_date}")
+            
+            # 调用Tushare新闻接口
+            # 注意：Tushare的news接口返回的是通用新闻，不是个股新闻
+            # 需要通过关键词过滤
+            news_df = self.api.news(
+                src='sina',  # 新浪财经
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            if news_df is None or news_df.empty:
+                logger.warning(f"[Tushare新闻] ⚠️ API返回空数据")
+                return pd.DataFrame()
+            
+            logger.debug(f"[Tushare新闻] API返回 {len(news_df)} 条新闻")
+            
+            # 如果指定了股票代码，过滤相关新闻
+            if symbol:
+                # 获取股票名称用于过滤
+                stock_info = self.get_stock_info(symbol)
+                stock_name = stock_info.get('name', '')
+                
+                # 清理股票代码（移除后缀）
+                clean_symbol = symbol.replace('.SZ', '').replace('.SH', '').replace('.BJ', '')
+                
+                logger.debug(f"[Tushare新闻] 过滤条件: 股票代码={clean_symbol}, 股票名称={stock_name}")
+                
+                # 过滤包含股票代码或名称的新闻
+                if stock_name:
+                    mask = (
+                        news_df['title'].str.contains(clean_symbol, na=False) |
+                        news_df['title'].str.contains(stock_name, na=False) |
+                        news_df['content'].str.contains(clean_symbol, na=False) |
+                        news_df['content'].str.contains(stock_name, na=False)
+                    )
+                    news_df = news_df[mask]
+                    logger.debug(f"[Tushare新闻] 过滤后剩余 {len(news_df)} 条相关新闻")
+            
+            # 限制新闻数量
+            if len(news_df) > max_news:
+                news_df = news_df.head(max_news)
+                logger.debug(f"[Tushare新闻] 📰 新闻数量限制: 限制为{max_news}条最新新闻")
+            
+            # 标准化列名
+            result_df = pd.DataFrame()
+            if not news_df.empty:
+                result_df['标题'] = news_df['title']
+                result_df['内容'] = news_df['content']
+                result_df['时间'] = news_df['datetime']
+                result_df['链接'] = news_df.get('url', '')  # Tushare可能没有url字段
+                
+                # 记录新闻标题示例
+                sample_titles = [row.get('标题', '无标题') for _, row in result_df.head(3).iterrows()]
+                logger.debug(f"[Tushare新闻] 新闻标题示例: {', '.join(sample_titles)}")
+            
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            logger.info(f"[Tushare新闻] ✅ 获取成功: {symbol or '全部'}, 共{len(result_df)}条记录，耗时: {elapsed_time:.2f}秒")
+            
+            return result_df
+            
+        except Exception as e:
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            error_msg = str(e)
+            
+            # 检查是否是权限限制错误
+            if '每小时最多访问该接口' in error_msg or '权限' in error_msg:
+                logger.warning(f"[Tushare新闻] ⚠️ API访问频率限制: {error_msg}")
+                logger.warning(f"[Tushare新闻] 💡 提示: Tushare新闻接口免费用户每小时最多访问2次")
+                logger.warning(f"[Tushare新闻] 💡 请等待1小时后再试，或访问 https://tushare.pro/document/1?doc_id=108 了解权限详情")
+            else:
+                logger.error(f"[Tushare新闻] ❌ 获取失败: {symbol}, 错误: {e}, 耗时: {elapsed_time:.2f}秒")
+                import traceback
+                logger.error(f"[Tushare新闻] 异常堆栈: {traceback.format_exc()}")
+            
+            return pd.DataFrame()
+    
+    
+    def get_stock_news_items(self, symbol: str, start_date: str, end_date: str, ticker: str, max_news: int = 10):
+        """
+        获取股票新闻并转换为NewsItem列表（包含后处理）
+        
+        **重要提示**:
+        - 此方法调用Tushare新闻接口，有访问频率限制
+        - 免费用户：每小时最多访问2次
+        - 如遇到权限限制错误，请等待1小时后再试
+        
+        Args:
+            symbol: 股票代码（用于过滤新闻）
+            start_date: 开始日期（YYYY-MM-DD）
+            end_date: 结束日期（YYYY-MM-DD）
+            ticker: 原始ticker（用于相关性计算）
+            max_news: 最大新闻数量
+            
+        Returns:
+            List[NewsItem]: 新闻项目列表
+        """
+        from .news_helper import convert_news_df_to_items
+        
+        # 获取新闻DataFrame
+        news_df = self.get_stock_news(symbol, start_date, end_date, max_news)
+        
+        if news_df.empty:
+            return []
+        
+        # 计算时间范围
+        from datetime import datetime, timedelta
+        end_datetime = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        start_datetime = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        
+        # 使用helper函数转换并后处理
+        news_items = convert_news_df_to_items(
+            news_df=news_df,
+            source='Tushare',
+            ticker=ticker,
+            start_time_filter=start_datetime,
+            end_time=end_datetime
+        )
+        
+        return news_items
+
 
 
 # 全局提供器实例
