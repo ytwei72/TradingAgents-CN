@@ -17,6 +17,12 @@ reference/
 .env.db
 .env.mongodb*
 
+# 模块级环境变量文件 (不包括示例文件)
+# 允许 .env.example 和 .env.*.example 文件
+tradingagents/**/.env
+!tradingagents/**/.env.example
+!tradingagents/**/.env.*.example
+
 # 环境依赖包（库）目录
 .venv
 node_modules/
