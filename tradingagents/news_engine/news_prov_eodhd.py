@@ -2,7 +2,7 @@
 """
 EODHD News Provider
 
-EODHD 新闻提供�?
+EODHD 新闻提供器
 """
 
 from datetime import datetime

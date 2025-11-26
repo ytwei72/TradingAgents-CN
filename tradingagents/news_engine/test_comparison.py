@@ -31,7 +31,7 @@ def test_old_interface():
         stock_code = "000002"
         curr_date = datetime.now().strftime("%Y-%m-%d")
         
-        print(f"\n获取 {stock_code} 的新�?(日期: {curr_date})...")
+        print(f"\n获取 {stock_code} 的新闻(日期: {curr_date})...")
         start_time = time.time()
         
         news_result = aggregator.get_realtime_stock_news(
@@ -115,8 +115,8 @@ def test_new_interface():
         else:
             print("\n未获取到新闻数据")
         
-        # 生成格式化报�?
-        print(f"\n生成格式化报�?..")
+        # 生成格式化报告
+        print(f"\n生成格式化报告..")
         report = response.format_report()
         print(f"📏 报告长度: {len(report)} 字符")
         

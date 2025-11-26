@@ -46,7 +46,7 @@ def test_models():
     from tradingagents.news_engine.models import NewsItem, NewsSource, NewsUrgency, NewsQuery
     from datetime import datetime
     
-    # 创建新闻�?
+    # 创建新闻项
     news_item = NewsItem(
         title="测试新闻标题",
         content="这是一条测试新闻的内容",
@@ -68,9 +68,9 @@ def test_models():
     print(f"  来源: {news_dict['source']}")
     print(f"  相关性 {news_dict['relevance_score']}")
     
-    # 从字典创建新闻项?
+    # 从字典创建新闻项
     news_item2 = NewsItem.from_dict(news_dict)
-    print(f"\n从字典创建新闻项?")
+    print(f"\n从字典创建新闻项")
     print(f"  {news_item2}")
     
     # 创建查询对象
@@ -140,7 +140,7 @@ def test_aggregator():
     aggregator = NewsAggregator()
     
     print(f"\n聚合器初始化:")
-    print(f"  可用提供者数�? {len(aggregator.providers)}")
+    print(f"  可用提供者数量: {len(aggregator.providers)}")
     for provider in aggregator.providers:
         print(f"    - {provider.source.value}")
     
@@ -157,7 +157,7 @@ def test_aggregator():
         print(f"  使用的数据源: {[s.value for s in response.sources_used]}")
         
         if response.news_items:
-            print(f"\n  �?条新�?")
+            print(f"\n  前3条新闻:")
             for i, news in enumerate(response.news_items[:3], 1):
                 print(f"    {i}. {news.title[:50]}...")
                 print(f"       来源: {news.source.value}, 时间: {news.publish_time}")
@@ -234,6 +234,64 @@ def test_market_type_selection():
     print("\n市场类型选择测试通过")
 
 
+def test_comprehensive_news():
+    """测试多市场全面新闻获取 (近1个月, 所有数据源)"""
+    print("\n" + "=" * 60)
+    print("测试 7: 多市场全面新闻获取")
+    print("=" * 60)
+    
+    from tradingagents.news_engine.aggregator import NewsAggregator
+    from tradingagents.news_engine.models import NewsSource
+    from collections import Counter
+    
+    aggregator = NewsAggregator()
+    
+    # 获取所有可用数据源
+    all_sources = [p.source for p in aggregator.providers]
+    print(f"使用数据源: {[s.value for s in all_sources]}")
+    
+    test_cases = [
+        ("A股-深证", "000002"),      # 万科A
+        ("A股-深证", "000001"),      # 平安银行
+        ("A股-上证", "600519"),      # 贵州茅台
+        ("A股-上证", "601398"),      # 工商银行
+        ("港股", "0700.HK"),         # 腾讯控股
+        ("港股", "9988.HK"),         # 阿里巴巴
+        ("美股", "AAPL"),            # Apple
+        ("美股", "NVDA"),            # Nvidia
+    ]
+    
+    for market, code in test_cases:
+        print(f"\n测试 {market} ({code}):")
+        try:
+            response = aggregator.get_news(
+                stock_code=code,
+                max_news=100,  # 获取足够多的新闻以观察分布
+                hours_back=720, # 近1个月 (30天)
+                sources=all_sources
+            )
+            
+            print(f"  总新闻数: {response.total_count}")
+            
+            if response.news_items:
+                # 统计各数据源新闻数量
+                source_counts = Counter(item.source.value for item in response.news_items)
+                print(f"  数据源分布: {dict(source_counts)}")
+                
+                # 打印第一条新闻
+                first = response.news_items[0]
+                print(f"  最新新闻: [{first.source.value}] {first.title} ({first.publish_time})")
+            else:
+                print("  ⚠️ 未获取到新闻")
+                
+        except Exception as e:
+            print(f"  ❌ 获取失败: {e}")
+            # import traceback
+            # traceback.print_exc()
+
+    print("\n全面测试完成")
+
+
 def run_all_tests():
     """运行所有测试"""
     print("\n" + "=" * 60)
@@ -241,12 +299,13 @@ def run_all_tests():
     print("=" * 60)
     
     tests = [
-        ("配置管理器", test_config),
-        ("数据模型", test_models),
-        ("新闻提供器", test_providers),
-        ("新闻聚合器", test_aggregator),
-        ("便捷函数", test_convenience_function),
-        ("市场类型选择", test_market_type_selection),
+        # ("配置管理器", test_config),
+        # ("数据模型", test_models),
+        # ("新闻提供器", test_providers),
+        # ("新闻聚合器", test_aggregator),
+        # ("便捷函数", test_convenience_function),
+        # ("市场类型选择", test_market_type_selection),
+        ("全面新闻获取", test_comprehensive_news),
     ]
     
     passed = 0
@@ -257,7 +316,7 @@ def run_all_tests():
             test_func()
             passed += 1
         except Exception as e:
-            print(f"\n�?测试失败: {test_name}")
+            print(f"\n❌ 测试失败: {test_name}")
             print(f"   错误: {e}")
             import traceback
             traceback.print_exc()

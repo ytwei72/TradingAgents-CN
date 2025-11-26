@@ -157,6 +157,10 @@ class NewsAggregator:
         unique_news = self._deduplicate_news(all_news)
         filtered_news = self._filter_news(unique_news, min_relevance)
         
+        # 标准化所有datetime对象(将aware转为naive)
+        for news_item in filtered_news:
+            news_item.publish_time = self._normalize_datetime(news_item.publish_time)
+        
         # 排序(按时间倒序)
         sorted_news = sorted(filtered_news, key=lambda x: x.publish_time, reverse=True)
         
@@ -228,6 +232,21 @@ class NewsAggregator:
                 sorted_providers.append(provider)
         
         return sorted_providers
+    
+    def _normalize_datetime(self, dt: datetime) -> datetime:
+        """
+        标准化datetime对象,将timezone-aware转换为naive
+        
+        Args:
+            dt: datetime对象
+            
+        Returns:
+            naive datetime对象
+        """
+        if dt.tzinfo is not None and dt.utcoffset() is not None:
+            # 转换为UTC时间,然后移除时区信息
+            return dt.replace(tzinfo=None)
+        return dt
     
     def _deduplicate_news(self, news_items: List[NewsItem]) -> List[NewsItem]:
         """

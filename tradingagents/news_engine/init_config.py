@@ -3,7 +3,7 @@
 News 模块配置初始化脚本
 
 从项目根目录 .env 文件读取 API 密钥,更新 news 模块 .env 文件
-保留 .env.example 的所有内容和注释,只替�?API 密钥的�?
+保留 .env.example 的所有内容和注释,只替换 API 密钥的值
 """
 
 import os
@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from datetime import datetime
 
-# 项目根目�?
+# 项目根目录
 project_root = Path(__file__).parent.parent.parent
 news_module_dir = Path(__file__).parent
 
@@ -75,10 +75,10 @@ def update_env_line(line: str, api_keys: dict) -> str:
                 # 如果有值，更新为实际值（注释掉的行会从全局继承）
                 return f"# {key}={value}\n"
             else:
-                # 如果没有�?保持示例格式
+                # 如果没有值，保持示例格式
                 return f"# {key}=your_{key.lower()}_here\n"
     
-    # 不需要更新的�?保持原样
+    # 不需要更新的值，保持原样
     return line
 
 
@@ -98,7 +98,7 @@ def create_news_env():
     # 检查全局 .env 文件
     if not global_env_file.exists():
         print(f"\n⚠️  警告: 全局 .env 文件不存在: {global_env_file}")
-        print(f"   将使�?.env.example 的默认配置生效")
+        print(f"   将使用 .env.example 的默认配置生效")
     else:
         print(f"\n找到全局 .env 文件: {global_env_file}")
     
@@ -172,7 +172,7 @@ def create_news_env():
             for key in configured_keys:
                 print(f"  ✅ {key}")
         else:
-            print(f"  ⚠️  未配置任�?API 密钥")
+            print(f"  ⚠️  未配置任何 API 密钥")
         
         print(f"\n💡 提示:")
         print(f"  1. API 密钥已从全局 .env 继承(注释形式)")
@@ -200,7 +200,7 @@ def main():
         response = input("是否覆盖? (y/N): ").strip().lower()
         
         if response not in ['y', 'yes']:
-            print("�?取消操作")
+            print("已取消操作")
             return
     
     # 创建配置文件

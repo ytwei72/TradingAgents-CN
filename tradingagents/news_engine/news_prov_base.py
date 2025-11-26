@@ -18,7 +18,7 @@ logger = get_logger('news_engine.providers')
 
 
 class NewsProvider(ABC):
-    """新闻提供者基器"""
+    """新闻提供者基类"""
     
     def __init__(self, source: NewsSource):
         """
@@ -70,7 +70,7 @@ class NewsProvider(ABC):
         """
         stock_code = stock_code.upper().strip()
         
-        # A股判�?
+        # A股判断
         if re.match(r'^(00|30|60|68)\d{4}$', stock_code):
             return MarketType.A_SHARE
         elif re.match(r'^(SZ|SH)\d{6}$', stock_code):
@@ -92,24 +92,24 @@ class NewsProvider(ABC):
     
     def assess_urgency(self, title: str, content: str) -> NewsUrgency:
         """
-        评估新闻紧急程�?
+        评估新闻紧急程度
         
         Args:
             title: 新闻标题
             content: 新闻内容
             
         Returns:
-            紧急程�?
+            紧急程度
         """
         text = (title + ' ' + content).lower()
         
-        # 高紧急度关键�?
+        # 高紧急度关键词
         high_keywords = [
             'breaking', 'urgent', 'alert', 'emergency', 'halt', 'suspend',
             '突发', '紧急', '暂停', '停牌', '重大', '警告'
         ]
         
-        # 中等紧急度关键�?
+        # 中等紧急度关键词
         medium_keywords = [
             'earnings', 'report', 'announce', 'launch', 'merger', 'acquisition',
             '财报', '发布', '宣布', '并购', '收购', '业绩'
@@ -127,14 +127,14 @@ class NewsProvider(ABC):
     
     def calculate_relevance(self, title: str, stock_code: str) -> float:
         """
-        计算新闻相关性分�?
+        计算新闻相关性分数
         
         Args:
             title: 新闻标题
             stock_code: 股票代码
             
         Returns:
-            相关性分�?(0.0-1.0)
+            相关性分数(0.0-1.0)
         """
         text = title.lower()
         ticker_lower = stock_code.lower()
@@ -143,7 +143,7 @@ class NewsProvider(ABC):
         if ticker_lower in text:
             return 1.0
         
-        # 提取纯数字部�?
+        # 提取纯数字部分
         pure_code = ''.join(filter(str.isdigit, stock_code))
         if pure_code and pure_code in text:
             return 0.9

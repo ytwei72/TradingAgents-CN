@@ -33,9 +33,9 @@ class AKShareNewsProvider(NewsProvider):
             import akshare as ak
             self.ak = ak
             self.connected = True
-            logger.debug("�?AKShare 连接成功")
+            logger.debug("✅ AKShare 连接成功")
         except Exception as e:
-            logger.error(f"�?AKShare 连接失败: {e}")
+            logger.error(f"❌ AKShare 连接失败: {e}")
             self.connected = False
     
     def is_available(self) -> bool:
@@ -92,7 +92,7 @@ class AKShareNewsProvider(NewsProvider):
                     )
                     news_items.append(news_item)
                 except Exception as e:
-                    logger.warning(f"解析新闻项失�? {e}")
+                    logger.warning(f"解析新闻项失败: {e}")
                     continue
             
             logger.info(f"📝 AKShare 获取 {len(news_items)} 条新闻")
