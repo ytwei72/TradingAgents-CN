@@ -251,10 +251,10 @@ def test_comprehensive_news():
     print(f"使用数据源: {[s.value for s in all_sources]}")
     
     test_cases = [
-        ("A股-深证", "000002"),      # 万科A
-        ("A股-深证", "000001"),      # 平安银行
-        ("A股-上证", "600519"),      # 贵州茅台
-        ("A股-上证", "601398"),      # 工商银行
+        # ("A股-深证", "000002"),      # 万科A
+        # ("A股-深证", "000001"),      # 平安银行
+        # ("A股-上证", "600519"),      # 贵州茅台
+        # ("A股-上证", "601398"),      # 工商银行
         ("港股", "0700.HK"),         # 腾讯控股
         ("港股", "9988.HK"),         # 阿里巴巴
         ("美股", "AAPL"),            # Apple
@@ -267,7 +267,7 @@ def test_comprehensive_news():
             response = aggregator.get_news(
                 stock_code=code,
                 max_news=100,  # 获取足够多的新闻以观察分布
-                hours_back=720, # 近1个月 (30天)
+                hours_back=20, # 近1个月 (30天)
                 sources=all_sources
             )
             

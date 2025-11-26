@@ -7,7 +7,7 @@ News Module Configuration
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass
 
 from tradingagents.utils.env_loader import ModularEnvLoader
@@ -56,7 +56,13 @@ class NewsConfig:
     request_timeout: int = 10
     max_retries: int = 3
     retry_delay: int = 1
+    retry_status_codes: List[int] = None  # 可重试的 HTTP 状态码
     rate_limit: int = 5
+    
+    def __post_init__(self):
+        """初始化后处理"""
+        if self.retry_status_codes is None:
+            self.retry_status_codes = [403, 429, 500, 502, 503, 504]
 
 
 class NewsConfigManager:
@@ -142,6 +148,15 @@ class NewsConfigManager:
         config.request_timeout = self.env_loader.get_env_int('NEWS_REQUEST_TIMEOUT', 10)
         config.max_retries = self.env_loader.get_env_int('NEWS_MAX_RETRIES', 3)
         config.retry_delay = self.env_loader.get_env_int('NEWS_RETRY_DELAY', 1)
+        
+        # 解析可重试的状态码
+        retry_codes_str = self.env_loader.get_env('NEWS_RETRY_STATUS_CODES', '403,429,500,502,503,504')
+        try:
+            config.retry_status_codes = [int(code.strip()) for code in retry_codes_str.split(',')]
+        except ValueError:
+            logger.warning(f"无效的 NEWS_RETRY_STATUS_CODES 配置: {retry_codes_str}, 使用默认值")
+            config.retry_status_codes = [403, 429, 500, 502, 503, 504]
+        
         config.rate_limit = self.env_loader.get_env_int('NEWS_RATE_LIMIT', 5)
         
         return config
@@ -198,6 +213,7 @@ class NewsConfigManager:
         logger.info(f"  请求超时: {self.config.request_timeout} 秒")
         logger.info(f"  最大重试次数: {self.config.max_retries}")
         logger.info(f"  重试延迟: {self.config.retry_delay} 秒")
+        logger.info(f"  可重试状态码: {self.config.retry_status_codes}")
         logger.info(f"  请求限流: {self.config.rate_limit} 请求/秒")
         
         logger.info("=" * 60)

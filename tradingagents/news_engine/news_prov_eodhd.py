@@ -99,6 +99,38 @@ class EODHDNewsProvider(NewsProvider):
             logger.info(f"📝 EODHD 获取 {len(news_items)} 条新闻")
             return news_items
             
+        except requests.exceptions.HTTPError as e:
+            # HTTP 错误需要重新抛出，以便 aggregator 的重试机制处理
+            status_code = None
+            if e.response is not None:
+                status_code = e.response.status_code
+            else:
+                # 尝试从异常消息中提取状态码
+                import re
+                match = re.search(r'(\d{3})\s+Client Error|(\d{3})\s+Server Error', str(e))
+                if match:
+                    status_code = int(match.group(1) or match.group(2))
+                else:
+                    status_code = 'Unknown'
+            
+            logger.error(f"❌ EODHD HTTP 错误 {status_code}: {str(e)}")
+            
+            # 记录响应内容（前500字符）
+            if e.response is not None:
+                try:
+                    response_text = e.response.text[:500]
+                    logger.debug(f"响应内容(前500字符): {response_text}")
+                except Exception:
+                    pass
+            
+            # 重新抛出 HTTPError，让 aggregator 的重试机制处理
+            raise
+            
+        except requests.exceptions.RequestException as e:
+            # 其他请求异常（超时、连接错误等）
+            logger.error(f"❌ EODHD 请求异常: {type(e).__name__}: {str(e)}")
+            return []
+            
         except Exception as e:
-            logger.error(f"EODHD 新闻获取失败: {e}")
+            logger.error(f"❌ EODHD 新闻获取失败: {type(e).__name__}: {str(e)}")
             return []

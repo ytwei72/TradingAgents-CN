@@ -51,6 +51,111 @@ class NewsAggregator:
         
         return available_providers
     
+    def _call_provider_with_retry(
+        self,
+        provider: 'NewsProvider',
+        stock_code: str,
+        start_date: str,
+        end_date: str,
+        max_news: int
+    ) -> List[NewsItem]:
+        """
+        使用重试机制调用 provider 的 get_news 方法
+        
+        Args:
+            provider: 新闻提供器
+            stock_code: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+            max_news: 最大新闻数
+            
+        Returns:
+            新闻列表
+        """
+        import time
+        import requests
+        
+        last_exception = None
+        
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                logger.debug(f"尝试从 {provider.source.value} 获取新闻 (第 {attempt + 1}/{self.config.max_retries + 1} 次)")
+                
+                news_items = provider.get_news(
+                    stock_code=stock_code,
+                    start_date=start_date,
+                    end_date=end_date,
+                    max_news=max_news
+                )
+                
+                # 成功获取,返回结果
+                if attempt > 0:
+                    logger.info(f"✅ {provider.source.value} 重试成功 (第 {attempt + 1} 次尝试)")
+                
+                return news_items
+                
+            except requests.exceptions.HTTPError as e:
+                last_exception = e
+                
+                # 获取状态码
+                status_code = None
+                if e.response is not None:
+                    status_code = e.response.status_code
+                else:
+                    # 尝试从异常消息中提取状态码
+                    import re
+                    match = re.search(r'(\d{3})\s+Client Error|(\d{3})\s+Server Error', str(e))
+                    if match:
+                        status_code = int(match.group(1) or match.group(2))
+                        logger.debug(f"从异常消息中提取状态码: {status_code}")
+                
+                # 记录详细错误信息
+                logger.warning(
+                    f"⚠️ {provider.source.value} HTTP 错误: {status_code} - {str(e)}"
+                )
+                
+                # 记录响应内容（前 500 字符）
+                if e.response is not None:
+                    try:
+                        response_text = e.response.text[:500]
+                        logger.debug(f"响应内容: {response_text}")
+                    except Exception:
+                        pass
+                
+                # 判断是否应该重试
+                if status_code not in self.config.retry_status_codes:
+                    logger.error(
+                        f"❌ {provider.source.value} 状态码 {status_code} 不可重试,放弃"
+                    )
+                    break
+                
+                # 如果还有重试机会
+                if attempt < self.config.max_retries:
+                    # 计算退避时间（指数退避）
+                    wait_time = self.config.retry_delay * (2 ** attempt)
+                    logger.info(
+                        f"🔄 {provider.source.value} 将在 {wait_time} 秒后重试 "
+                        f"({attempt + 1}/{self.config.max_retries})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error(
+                        f"❌ {provider.source.value} 已达到最大重试次数 ({self.config.max_retries})"
+                    )
+                    
+            except Exception as e:
+                last_exception = e
+                logger.error(f"❌ {provider.source.value} 发生异常: {type(e).__name__}: {str(e)}")
+                
+                # 对于非 HTTP 错误,不重试
+                break
+        
+        # 所有重试都失败,返回空列表
+        if last_exception:
+            logger.error(f"❌ {provider.source.value} 最终失败: {str(last_exception)}")
+        
+        return []
+    
     def get_news(
         self,
         stock_code: str,
@@ -132,10 +237,12 @@ class NewsAggregator:
         all_news = []
         sources_used = []
         
+        
         for provider in selected_providers:
             try:
-                logger.debug(f"尝试从 {provider.source.value} 获取新闻")
-                news_items = provider.get_news(
+                # 使用重试机制调用 provider
+                news_items = self._call_provider_with_retry(
+                    provider=provider,
                     stock_code=stock_code,
                     start_date=start_date,
                     end_date=end_date,

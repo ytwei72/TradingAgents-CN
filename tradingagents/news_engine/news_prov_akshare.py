@@ -52,17 +52,21 @@ class AKShareNewsProvider(NewsProvider):
         if not self.is_available():
             return []
         
+        # 清理股票代码
+        clean_code = stock_code.replace('.SH', '').replace('.SZ', '').replace('.SS', '')
+        
         try:
             logger.info(f"📝 AKShare 获取 {stock_code} 的新闻")
-            
-            # 清理股票代码
-            clean_code = stock_code.replace('.SH', '').replace('.SZ', '').replace('.SS', '')
+            logger.debug(f"AKShare API 调用参数: symbol={clean_code}")
             
             # 调用 AKShare API
             df = self.ak.stock_news_em(symbol=clean_code)
             
             if df is None or df.empty:
+                logger.warning(f"AKShare 返回空数据 (stock_code={stock_code}, clean_code={clean_code})")
                 return []
+            
+            logger.debug(f"AKShare 返回 {len(df)} 条原始新闻数据")
             
             news_items = []
             for _, row in df.head(max_news).iterrows():
@@ -95,9 +99,26 @@ class AKShareNewsProvider(NewsProvider):
                     logger.warning(f"解析新闻项失败: {e}")
                     continue
             
-            logger.info(f"📝 AKShare 获取 {len(news_items)} 条新闻")
+            logger.info(f"📝 AKShare 成功获取 {len(news_items)} 条新闻")
             return news_items
             
         except Exception as e:
-            logger.error(f"AKShare 新闻获取失败: {e}")
+            import traceback
+            
+            # 记录详细的错误信息
+            error_type = type(e).__name__
+            logger.error(f"❌ AKShare 新闻获取失败 ({error_type}): {str(e)}")
+            logger.debug(f"AKShare API 调用参数: stock_code={stock_code}, clean_code={clean_code}")
+            logger.debug(f"完整异常堆栈:\n{traceback.format_exc()}")
+            
+            # 尝试获取更多的错误信息
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    status_code = e.response.status_code
+                    response_text = e.response.text[:500] if hasattr(e.response, 'text') else 'N/A'
+                    logger.error(f"HTTP 响应状态码: {status_code}")
+                    logger.debug(f"HTTP 响应内容(前500字符): {response_text}")
+                except Exception:
+                    pass
+            
             return []
