@@ -70,34 +70,66 @@ def getNewsData(query, start_date, end_date):
 
         try:
             response = make_request(url, headers)
+            logger.debug(f"Google News Status: {response.status_code}, URL: {url}")
+            
             soup = BeautifulSoup(response.content, "html.parser")
-            results_on_page = soup.select("div.SoaBEf")
+            
+            # Try new selectors based on h3 tags
+            h3_tags = soup.find_all("h3")
+            logger.debug(f"Found {len(h3_tags)} h3 tags")
+            
+            if not h3_tags:
+                 logger.warning("No h3 tags found in Google News response")
+                 break
 
-            if not results_on_page:
-                break  # No more results found
-
-            for el in results_on_page:
+            for h3 in h3_tags:
                 try:
-                    link = el.find("a")["href"]
-                    title = el.select_one("div.MBeuO").get_text()
-                    snippet = el.select_one(".GI74Re").get_text()
-                    date = el.select_one(".LfVVr").get_text()
-                    source = el.select_one(".NUnG9d span").get_text()
-                    news_results.append(
-                        {
-                            "link": link,
-                            "title": title,
-                            "snippet": snippet,
-                            "date": date,
-                            "source": source,
-                        }
-                    )
+                    # Title
+                    title = h3.get_text()
+                    
+                    # Link
+                    a_tag = h3.find_parent("a")
+                    if not a_tag:
+                        continue
+                    link = a_tag.get("href")
+                    
+                    # Remove /url?q= prefix if present (Google redirection)
+                    if link and link.startswith("/url?"):
+                        import urllib.parse
+                        parsed = urllib.parse.parse_qs(urllib.parse.urlparse(link).query)
+                        if 'url' in parsed:
+                            link = parsed['url'][0]
+                        elif 'q' in parsed:
+                            link = parsed['q'][0]
+                            
+                    # Container for source and date
+                    container = a_tag
+                    
+                    # Source: .KogRLb or .BamJPe
+                    source_tag = container.select_one(".KogRLb, .BamJPe")
+                    source = source_tag.get_text() if source_tag else ""
+                    
+                    # Date: .UK5aid
+                    date_tag = container.select_one(".UK5aid")
+                    date = date_tag.get_text() if date_tag else ""
+                    
+                    # Snippet
+                    snippet = ""
+                    if date_tag:
+                        snippet_div = date_tag.find_parent("div")
+                        if snippet_div:
+                            snippet = snippet_div.get_text().replace(date, "").strip()
+                    
+                    news_results.append({
+                        "link": link,
+                        "title": title,
+                        "snippet": snippet,
+                        "date": date,
+                        "source": source
+                    })
                 except Exception as e:
                     logger.error(f"Error processing result: {e}")
-                    # If one of the fields is not found, skip this result
                     continue
-
-            # Update the progress bar with the current count of results scraped
 
             # Check for the "Next" link (pagination)
             next_link = soup.find("a", id="pnnext")

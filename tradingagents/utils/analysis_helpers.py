@@ -77,11 +77,11 @@ def validate_environment(
             update_progress(f"❌ {error_msg}")
         return False, error_msg
     
-    if not finnhub_key:
-        error_msg = "FINNHUB_API_KEY 环境变量未设置"
-        if update_progress:
-            update_progress(f"❌ {error_msg}")
-        return False, error_msg
+    # if not finnhub_key:
+    #     error_msg = "FINNHUB_API_KEY 环境变量未设置"
+    #     if update_progress:
+    #         update_progress(f"❌ {error_msg}")
+    #     return False, error_msg
     
     # 发布步骤4完成消息
     if message_producer and analysis_id and async_tracker:

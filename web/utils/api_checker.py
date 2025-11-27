@@ -9,7 +9,7 @@ def check_api_keys():
 
     # 检查各个API密钥
     dashscope_key = os.getenv("DASHSCOPE_API_KEY")
-    finnhub_key = os.getenv("FINNHUB_API_KEY")
+    # finnhub_key = os.getenv("FINNHUB_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     google_key = os.getenv("GOOGLE_API_KEY")
@@ -24,12 +24,12 @@ def check_api_keys():
             "required": True,
             "description": "阿里百炼API密钥"
         },
-        "FINNHUB_API_KEY": {
-            "configured": bool(finnhub_key),
-            "display": f"{finnhub_key[:12]}..." if finnhub_key else "未配置",
-            "required": True,
-            "description": "金融数据API密钥"
-        },
+        # "FINNHUB_API_KEY": {
+        #     "configured": bool(finnhub_key),
+        #     "display": f"{finnhub_key[:12]}..." if finnhub_key else "未配置",
+        #     "required": True,
+        #     "description": "金融数据API密钥"
+        # },
         "OPENAI_API_KEY": {
             "configured": bool(openai_key),
             "display": f"{openai_key[:12]}..." if openai_key else "未配置",

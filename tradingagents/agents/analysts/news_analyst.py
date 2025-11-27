@@ -1,3 +1,26 @@
+"""
+新闻分析师节点
+
+版本说明：
+- V1（旧版）: 使用 unified_news_tool.py，纯旧版数据源逻辑
+- V2（新版）: 使用 unified_news_tool_v2.py，混合模式（news_engine + 旧版备选）
+
+切换方式：
+1. 环境变量：export USE_NEWS_TOOL_V2=true  # 使用V2
+2. 环境变量：export USE_NEWS_TOOL_V2=false # 使用V1
+3. 默认：V2（推荐）
+
+V2优势：
+- ✅ 优先使用专业金融数据源（news_engine）
+- ✅ 自动降级到旧版备选源（Google、OpenAI等）
+- ✅ 针对不同市场优化策略（A股、港股、美股）
+- ✅ 完善的重试和错误处理机制
+- ✅ 保留所有旧版备选路径，风险最低
+
+快速回滚：
+如遇问题可立即回滚到V1：export USE_NEWS_TOOL_V2=false && 重启服务
+"""
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import time
 import json
@@ -7,14 +30,20 @@ from datetime import datetime
 from tradingagents.utils.logging_init import get_logger
 # 导入消息装饰器（优先使用消息模式）
 from tradingagents.messaging.decorators.message_decorators import message_analysis_module
-# 导入统一新闻工具
-from tradingagents.tools.unified_news_tool import create_unified_news_tool
+# 导入统一新闻工具 - V1（旧版，保留作为备选）
+from tradingagents.tools.unified_news_tool import create_unified_news_tool as create_unified_news_tool_v1
+# 导入统一新闻工具 - V2（新版，混合模式）
+from tradingagents.tools.unified_news_tool_v2 import create_unified_news_tool_v2
 # 导入股票工具类
 from tradingagents.utils.stock_utils import StockUtils
 # 导入Google工具调用处理器
 from tradingagents.agents.utils.google_tool_handler import GoogleToolCallHandler
+import os
 
 logger = get_logger("analysts.news")
+
+# 配置开关：是否使用V2版本（默认True，可通过环境变量控制）
+USE_NEWS_TOOL_V2 = os.getenv('USE_NEWS_TOOL_V2', 'true').lower() in ('true', '1', 'yes')
 
 
 def create_news_analyst(llm, toolkit):
@@ -91,13 +120,22 @@ def create_news_analyst(llm, toolkit):
         logger.debug(f"[新闻分析师] 公司名称: {company_name}")
         
         # 🔧 使用统一新闻工具，简化工具调用
-        logger.debug(f"[新闻分析师] 使用统一新闻工具，自动识别股票类型并获取相应新闻")
-   # 创建统一新闻工具
-        unified_news_tool = create_unified_news_tool(toolkit)
+        # V2版本：混合模式（news_engine优先，自动降级到旧版备选源）
+        # V1版本：纯旧版逻辑（保留作为备选）
+        if USE_NEWS_TOOL_V2:
+            logger.info(f"[新闻分析师] 🆕 使用V2统一新闻工具（混合模式：news_engine + 旧版备选）")
+            unified_news_tool = create_unified_news_tool_v2(
+                toolkit,
+                use_news_engine=True  # 启用news_engine
+            )
+        else:
+            logger.info(f"[新闻分析师] 📦 使用V1统一新闻工具（纯旧版逻辑）")
+            unified_news_tool = create_unified_news_tool_v1(toolkit)
+        
         unified_news_tool.name = "get_stock_news_unified"
         
         tools = [unified_news_tool]
-        logger.debug(f"[新闻分析师] 已加载统一新闻工具: get_stock_news_unified")
+        logger.debug(f"[新闻分析师] 已加载统一新闻工具: get_stock_news_unified (版本: {'V2混合模式' if USE_NEWS_TOOL_V2 else 'V1旧版'})")
 
         system_message = (
             """您是一位专业的财经新闻分析师，负责分析最新的市场新闻和事件对股票价格的潜在影响。

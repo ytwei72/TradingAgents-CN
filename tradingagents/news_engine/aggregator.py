@@ -13,6 +13,8 @@ from .news_prov_tushare import TushareNewsProvider
 from .news_prov_akshare import AKShareNewsProvider
 from .news_prov_finnhub import FinnhubNewsProvider
 from .news_prov_eodhd import EODHDNewsProvider
+from .news_prov_cls_rss import CLSRSSNewsProvider
+from .news_prov_googlenews import GoogleNewsProvider
 from .config import get_news_config
 from tradingagents.utils.logging_manager import get_logger
 
@@ -40,6 +42,8 @@ class NewsAggregator:
             AKShareNewsProvider(),
             FinnhubNewsProvider(),
             EODHDNewsProvider(),
+            CLSRSSNewsProvider(),
+            GoogleNewsProvider(),
         ]
         
         # 只保留可用的提供者
