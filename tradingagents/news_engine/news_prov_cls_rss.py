@@ -96,6 +96,7 @@ class CLSRSSNewsProvider(NewsProvider):
             import akshare as ak
             logger.debug("调用 akshare.stock_info_global_cls() 获取电报数据")
             df = ak.stock_info_global_cls()
+            logger.info(f"📊 财联社电报数据总行数: {len(df)}")
             
             if df is None or df.empty:
                 logger.warning("财联社电报返回空数据")
@@ -127,13 +128,17 @@ class CLSRSSNewsProvider(NewsProvider):
                         
                     title = str(row.get('标题', ''))
                     content = str(row.get('内容', ''))
-                    
-                    # 简单相关性: 标题/内容包含股票代码或纯数字部分
-                    if not self._is_related_to_stock(title, content, stock_code):
-                        continue
-                        
-                    urgency = self.assess_urgency(title, content)
-                    relevance = self.calculate_relevance(title, stock_code)
+
+                    if not stock_code:
+                        # 如果没有股票代码,则不进行相关性判断
+                        urgency = 0
+                        relevance = 0
+                    else:
+                        # 简单相关性: 标题/内容包含股票代码或纯数字部分
+                        if not self._is_related_to_stock(title, content, stock_code):
+                            continue
+                        urgency = self.assess_urgency(title, content)
+                        relevance = self.calculate_relevance(title, stock_code)
                     
                     news_item = NewsItem(
                         title=title,

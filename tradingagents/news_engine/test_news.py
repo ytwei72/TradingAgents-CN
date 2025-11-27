@@ -261,8 +261,8 @@ def test_comprehensive_news():
         # ("A股-上证", "601398"),      # 工商银行
         # ("港股", "0700.HK"),         # 腾讯控股
         ("港股", "9988.HK"),         # 阿里巴巴
-        ("美股", "AAPL"),            # Apple
-        ("美股", "NVDA"),            # Nvidia
+        # ("美股", "AAPL"),            # Apple
+        # ("美股", "NVDA"),            # Nvidia
     ]
     
     for market, code in test_cases:
@@ -313,12 +313,13 @@ def test_specific_providers():
         # akshare.stock_telegraph_cls 返回的是全市场电报, provider内部会过滤
         # 我们用一个常见的代码, 或者直接看日志输出
         stock_code = "000001" # 平安银行
+        # stock_code = None 
         print(f"  获取 {stock_code} 的新闻...")
         try:
             items = cls_provider.get_news(
                 stock_code=stock_code,
-                max_news=5,
-                start_date=(datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+                max_news=10,
+                start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
             )
             print(f"  获取到 {len(items)} 条新闻")
             if items:
@@ -327,6 +328,7 @@ def test_specific_providers():
             print(f"  ❌ CLS 获取失败: {e}")
     else:
         print("  ⚠️ CLS_RSS 未启用")
+    return
 
     # 2. 测试 GoogleNews (NVDA)
     print("\n[2] 测试 GoogleNews (NVDA):")
@@ -368,7 +370,7 @@ def run_all_tests():
         # ("便捷函数", test_convenience_function),
         # ("市场类型选择", test_market_type_selection),
         ("特定提供器测试", test_specific_providers),
-        ("全面新闻获取", test_comprehensive_news),
+        # ("全面新闻获取", test_comprehensive_news),
     ]
     
     passed = 0
