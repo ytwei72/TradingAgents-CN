@@ -1,0 +1,32 @@
+{
+    "message_engine": {
+        "type": "memory",
+        "mqtt": {
+            "host": "localhost",
+            "port": 1883,
+            "username": null,
+            "password": null,
+            "client_id": "tradingagents",
+            "clean_session": true,
+            "keepalive": 60
+        },
+        "redis": {
+            "host": "localhost",
+            "port": 6379,
+            "password": null,
+            "db": 0
+        },
+        "memory": {
+            "enabled": true
+        }
+    },
+    "topics": {
+        "task_progress": "task/progress",
+        "task_status": "task/status",
+        "module_start": "module/start",
+        "module_complete": "module/complete",
+        "module_error": "module/error"
+    },
+    "enabled": true
+}
+

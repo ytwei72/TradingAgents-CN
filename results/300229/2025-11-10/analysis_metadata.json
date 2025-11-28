@@ -1,0 +1,23 @@
+{
+  "stock_symbol": "300229",
+  "analysis_date": "2025-11-10",
+  "timestamp": "2025-11-10T17:16:16.490812",
+  "research_depth": 3,
+  "analysts": [
+    "market",
+    "news",
+    "fundamentals"
+  ],
+  "status": "completed",
+  "reports_count": 8,
+  "report_types": [
+    "market_report",
+    "news_report",
+    "fundamentals_report",
+    "investment_plan",
+    "trader_investment_plan",
+    "final_trade_decision",
+    "investment_debate_state",
+    "risk_debate_state"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "stock_symbol": "601127",
+  "analysis_date": "2025-10-31",
+  "timestamp": "2025-10-31T10:44:53.308507",
+  "research_depth": 3,
+  "analysts": [
+    "market",
+    "news",
+    "fundamentals"
+  ],
+  "status": "completed",
+  "reports_count": 8,
+  "report_types": [
+    "market_report",
+    "news_report",
+    "fundamentals_report",
+    "investment_plan",
+    "trader_investment_plan",
+    "final_trade_decision",
+    "investment_debate_state",
+    "risk_debate_state"
+  ]
+}

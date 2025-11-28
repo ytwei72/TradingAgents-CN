@@ -328,7 +328,6 @@ def test_specific_providers():
             print(f"  ❌ CLS 获取失败: {e}")
     else:
         print("  ⚠️ CLS_RSS 未启用")
-    return
 
     # 2. 测试 GoogleNews (NVDA)
     print("\n[2] 测试 GoogleNews (NVDA):")

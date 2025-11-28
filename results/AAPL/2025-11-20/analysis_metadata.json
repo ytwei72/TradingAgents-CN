@@ -1,0 +1,21 @@
+{
+  "stock_symbol": "AAPL",
+  "analysis_date": "2025-11-20",
+  "timestamp": "2025-11-20T14:27:49.929004",
+  "research_depth": 3,
+  "analysts": [
+    "market",
+    "fundamentals"
+  ],
+  "status": "completed",
+  "reports_count": 7,
+  "report_types": [
+    "market_report",
+    "fundamentals_report",
+    "investment_plan",
+    "trader_investment_plan",
+    "final_trade_decision",
+    "investment_debate_state",
+    "risk_debate_state"
+  ]
+}

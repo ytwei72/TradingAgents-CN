@@ -3,7 +3,6 @@ import time
 import os
 from .reddit_utils import fetch_top_from_category
 from .chinese_finance_utils import get_chinese_social_sentiment
-from .googlenews_utils import *
 from .finnhub_utils import get_data_in_range
 
 # 导入统一日志系统

@@ -32,12 +32,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# 数据文件
-*.csv
-*.json
-*.xlsx
-*.xls
-
 # 项目特定目录
 eval_results/
 eval_data/

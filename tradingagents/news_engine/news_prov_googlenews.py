@@ -2,7 +2,7 @@
 """
 Google News Provider
 
-基于现有的 tradingagents.dataflows.googlenews_utils 抓取逻辑,
+基于现有的 news_helper.googlenews_utils 抓取逻辑,
 将 Google News 结果适配到统一的 NewsItem 结构。
 """
 
@@ -34,7 +34,7 @@ class GoogleNewsProvider(NewsProvider):
 
         try:
             # 仅检查依赖是否存在,真正调用在 get_news 中完成
-            import tradingagents.dataflows.googlenews_utils as _gn  # noqa: F401
+            import news_helper.googlenews_utils as _gn  # noqa: F401
 
             self.connected = True
             logger.debug("✅ Google News 依赖检查通过,数据源可用")
@@ -56,7 +56,7 @@ class GoogleNewsProvider(NewsProvider):
         获取 Google News 新闻
 
         说明:
-            - 使用 tradingagents.dataflows.googlenews_utils.getNewsData
+            - 使用 news_helper.googlenews_utils.getNewsData
               抓取给定时间范围内的搜索结果
             - 因 Google News 没有直接按股票字段,这里只能通过搜索关键词近似筛选
         """
@@ -65,7 +65,7 @@ class GoogleNewsProvider(NewsProvider):
             return []
 
         try:
-            from tradingagents.dataflows.googlenews_utils import getNewsData
+            from news_helper.googlenews_utils import getNewsData
         except Exception as e:
             logger.error(f"❌ 无法导入 googlenews_utils.getNewsData: {e}")
             return []
@@ -122,6 +122,7 @@ class GoogleNewsProvider(NewsProvider):
                 publish_time = self._parse_publish_time(date_str, end_dt)
 
                 # 简单相关性判断,避免过多无关新闻
+                logger.info(f"📝 Google News title: {title}, snippet: {snippet}, link: {link}, date: {date_str}")
                 if not self._is_related_to_stock(title, snippet, stock_code):
                     continue
 

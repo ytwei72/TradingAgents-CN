@@ -1,0 +1,50 @@
+{
+  "000001": {
+    "stock_code": "000001",
+    "stock_name": "平安银行",
+    "company_name": "平安银行股份有限公司",
+    "industry": "银行业",
+    "aliases": ["平安", "PAB"],
+    "industry_keywords": ["存款", "贷款", "利率", "不良率", "拨备", "息差"]
+  },
+  "000002": {
+    "stock_code": "000002",
+    "stock_name": "万科A",
+    "company_name": "万科企业股份有限公司",
+    "industry": "房地产",
+    "aliases": ["万科"],
+    "industry_keywords": ["销售", "土地", "竣工", "预售", "去化", "房价"]
+  },
+  "600519": {
+    "stock_code": "600519",
+    "stock_name": "贵州茅台",
+    "company_name": "贵州茅台酒股份有限公司",
+    "industry": "白酒",
+    "aliases": ["茅台"],
+    "industry_keywords": ["白酒", "销量", "价格", "经销商", "直销"]
+  },
+  "601318": {
+    "stock_code": "601318",
+    "stock_name": "中国平安",
+    "company_name": "中国平安保险(集团)股份有限公司",
+    "industry": "保险",
+    "aliases": ["平安", "中国平安"],
+    "industry_keywords": ["保费", "理赔", "承保", "投资收益", "综合成本率"]
+  },
+  "AAPL": {
+    "stock_code": "AAPL",
+    "stock_name": "Apple",
+    "company_name": "Apple Inc.",
+    "industry": "科技",
+    "aliases": ["苹果", "Apple"],
+    "industry_keywords": ["iPhone", "Mac", "iPad", "服务", "revenue", "earnings"]
+  },
+  "NVDA": {
+    "stock_code": "NVDA",
+    "stock_name": "NVIDIA",
+    "company_name": "NVIDIA Corporation",
+    "industry": "科技",
+    "aliases": ["英伟达", "NVIDIA"],
+    "industry_keywords": ["GPU", "芯片", "AI", "数据中心", "gaming", "revenue"]
+  }
+}

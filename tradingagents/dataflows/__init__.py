@@ -1,6 +1,5 @@
 # 导入基础模块
 from .finnhub_utils import get_data_in_range
-from .googlenews_utils import getNewsData
 from .reddit_utils import fetch_top_from_category
 
 # 导入日志模块
