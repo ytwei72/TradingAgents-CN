@@ -9,6 +9,21 @@ import os
 from typing import Dict, List, Tuple, Optional, Union
 from enum import Enum
 
+try:
+    import jieba
+except ImportError:
+    jieba = None
+
+try:
+    from snownlp import SnowNLP
+except ImportError:
+    SnowNLP = None
+
+try:
+    from transformers import pipeline
+except ImportError:
+    pipeline = None
+
 class RelevanceLevel(Enum):
     """相关性判定层级"""
     QUICK_FILTER = 1  # 快速关键词过滤
@@ -66,6 +81,22 @@ class StockNewsRelevanceChecker:
         self.aliases = aliases or []
         self.industry_keywords = industry_keywords or self._get_default_industry_keywords()
 
+        # 负面信号模式
+        self.negative_patterns = {
+            '平安': ['平安夜', '平安福', '出入平安', '平安无事'],
+            '中国': ['中国队', '中国足球', '中国篮球'],  # 如果是"中国银行"
+        }
+
+        # Jieba支持（延迟加载）
+        self.jieba_available = False
+        if jieba is not None:
+            self.jieba_available = True
+            self._jieba = jieba
+            # 添加股票相关词汇到Jieba词典，提高识别准确性
+            custom_words = [self.stock_name, self.company_name] + self.aliases + self.industry_keywords
+            if custom_words:
+                self._jieba.add_words(custom_words)
+
         # 默认使用前两层
         self.strategy_levels = [
             RelevanceLevel.QUICK_FILTER,
@@ -81,7 +112,18 @@ class StockNewsRelevanceChecker:
             'rule_engine_threshold': 8,  # 规则引擎阈值
             'semantic_threshold': 0.3,  # 语义相似度阈值
             'min_name_length': 2,  # 最小名称长度（避免单字误判）
+            'use_ml_sentiment': True,  # 是否启用 ML 情感分析
+            'snownlp_neg_threshold': 0.3,  # SnowNLP 负面阈值
+            'snownlp_pos_threshold': 0.7,  # SnowNLP 正面阈值
         }
+
+        # ML 情感分析可用性
+        self.ml_available = {
+            'snownlp': SnowNLP is not None,
+            'transformers': pipeline is not None
+        }
+        self._snownlp_model = None
+        self._trans_pipeline = None
 
     def set_strategy_levels(self, levels: List[RelevanceLevel]):
         """设置判定策略层级"""
@@ -228,7 +270,7 @@ class StockNewsRelevanceChecker:
         # 规则3：别名提及（中权重：3分）
         for alias in self.aliases:
             if alias and len(alias) >= self.config['min_name_length']:
-                if alias.lower() in text_lower and self._is_independent_word(text, alias):
+                if self._is_independent_word(text, alias):
                     matched.append(f"[中权重]{alias}")
                     score += 3
                     break
@@ -288,38 +330,157 @@ class StockNewsRelevanceChecker:
     def _is_independent_word(self, text: str, word: str) -> bool:
         """
         检查词是否独立出现（避免"平安夜"匹配"平安"）
-        简单实现：检查前后是否有中文字符
+        使用Jieba分词优先，如果不可用则回退到正则匹配
         """
-        pattern = f"[^\\u4e00-\\u9fa5]{re.escape(word)}[^\\u4e00-\\u9fa5]"
-        # 也要匹配开头和结尾
-        return (
+        if not word or len(word.strip()) < self.config['min_name_length']:
+            return False
+
+        word = word.strip()
+
+        if self.jieba_available:
+            # 使用Jieba精确分词检查是否作为完整词出现
+            words = [w.strip() for w in self._jieba.cut(text, cut_all=False)]
+            return word in words
+        else:
+            # 回退到原正则实现
+            pattern = f"[^\\u4e00-\\u9fa5]{re.escape(word)}[^\\u4e00-\\u9fa5]"
+            return (
                 re.search(pattern, text) is not None or
                 text.startswith(word) or
                 text.endswith(word)
-        )
+            )
 
     def _has_negative_signals(self, text: str) -> bool:
-        """检查负面信号（排除不相关内容）"""
-        # 根据股票名称定制负面词
-        negative_patterns = {
-            '平安': ['平安夜', '平安福', '出入平安', '平安无事'],
-            '中国': ['中国队', '中国足球', '中国篮球'],  # 如果是"中国银行"
-        }
-
-        for key, patterns in negative_patterns.items():
-            if key in self.stock_name or key in self.company_name:
-                if any(pattern in text for pattern in patterns):
-                    return True
-
+        """检查负面信号（排除不相关内容），支持 A 股通用负面判定；集成规则 + ML (SnowNLP/Transformers)"""
+        # 规则基：通用 A 股负面关键词
+        general_negative_keywords = [
+            '亏损', '巨亏', '暴跌', '崩盘', '罚款', '处罚', '调查', '丑闻', '腐败',
+            '破产', '退市', '停牌', '预警', '限售', '减持', '抛售', '下调', '下修',
+            '重组失败', '诉讼', '欺诈', '违规', '黑天鹅', '风险事件'
+        ]
+        
+        text_lower = text.lower()
+        rule_negative = False
+        if self.jieba_available:
+            words = [w.strip() for w in self._jieba.cut(text, cut_all=False)]
+            rule_negative = any(keyword in words or keyword in text_lower for keyword in general_negative_keywords)
+        else:
+            rule_negative = any(keyword in text_lower for keyword in general_negative_keywords)
+        
+        if rule_negative:
+            return True
+        
+        # ML 情感分析（如果启用且可用）
+        if self.config.get('use_ml_sentiment', True) and text.strip():
+            ml_negative = False
+            
+            # SnowNLP
+            if self.ml_available['snownlp'] and self._snownlp_model is None:
+                try:
+                    self._snownlp_model = SnowNLP(text)
+                    if self._snownlp_model.sentiments < self.config['snownlp_neg_threshold']:
+                        ml_negative = True
+                except Exception as e:
+                    print(f"警告: SnowNLP 情感分析失败: {e}")
+            
+            # Transformers (uer/roberta-base-finetuned-chinanews-chinese, 输出 '正向'/'负向')
+            if self.ml_available['transformers'] and not ml_negative and self._trans_pipeline is None:
+                try:
+                    self._trans_pipeline = pipeline('sentiment-analysis', 
+                                                  model='uer/roberta-base-finetuned-chinanews-chinese',
+                                                  return_all_scores=False)
+                    result = self._trans_pipeline(text[:512])  # 限制长度
+                    if result and result[0]['label'] == '负向':
+                        ml_negative = True
+                except Exception as e:
+                    print(f"警告: Transformers 情感分析失败: {e}")
+            
+            if ml_negative:
+                return True
+        
         return False
 
+    def extend_rules(
+        self,
+        custom_aliases: List[str] = None,
+        custom_industry_keywords: List[str] = None
+    ):
+        """
+        扩展规则，支持添加自定义别名、行业关键词和负面模式
+        
+        Args:
+            custom_aliases: 自定义公司别名列表
+            custom_industry_keywords: 自定义行业关键词列表
+        """
+        if custom_aliases:
+            self.aliases.extend(custom_aliases)
+            if self.jieba_available:
+                self._jieba.add_words(custom_aliases)
+
+        if custom_industry_keywords:
+            self.industry_keywords.extend(custom_industry_keywords)
+            if self.jieba_available:
+                self._jieba.add_words(custom_industry_keywords)
+
     def _has_positive_signals(self, text: str) -> bool:
-        """检查正面信号（增强相关性）"""
+        """检查正面信号（增强相关性），限定适用范围：需与股票相关上下文协现；集成规则 + ML (SnowNLP/Transformers)"""
         positive_keywords = [
-            '财报', '公告', '业绩', '公布', '发布',
-            '董事会', '股东大会', '分红', '增持', '回购'
+            '财报', '公告', '业绩', '公布', '发布', '盈利', '上涨', '增长', '合作',
+            '董事会', '股东大会', '分红', '增持', '回购', '重组', '并购', '订单',
+            '上调', '上修', '获奖', '创新', '突破'
         ]
-        return any(keyword in text for keyword in positive_keywords)
+        
+        # 规则基：提取股票相关实体协现
+        entities = [self.stock_code, self.stock_name, self.company_name] + self.aliases
+        if self.industry:
+            entities.extend(self.industry_keywords[:3])  # 取前3个行业关键词作为代表
+        
+        text_lower = text.lower()
+        rule_positive = False
+        for keyword in positive_keywords:
+            if keyword in text:
+                pos = text.find(keyword)
+                if pos != -1:
+                    context_window = text[max(0, pos - 50):pos + 50].lower()
+                    for entity in entities:
+                        if entity.lower() in context_window:
+                            rule_positive = True
+                            break
+                if rule_positive:
+                    break
+        
+        if rule_positive:
+            return True
+        
+        # ML 情感分析（如果启用且可用）
+        if self.config.get('use_ml_sentiment', True) and text.strip():
+            ml_positive = False
+            
+            # SnowNLP
+            if self.ml_available['snownlp'] and self._snownlp_model is None:
+                try:
+                    self._snownlp_model = SnowNLP(text)
+                    if self._snownlp_model.sentiments > self.config['snownlp_pos_threshold']:
+                        ml_positive = True
+                except Exception as e:
+                    print(f"警告: SnowNLP 情感分析失败: {e}")
+            
+            # Transformers
+            if self.ml_available['transformers'] and not ml_positive and self._trans_pipeline is None:
+                try:
+                    self._trans_pipeline = pipeline('sentiment-analysis', 
+                                                  model='uer/roberta-base-finetuned-chinanews-chinese',
+                                                  return_all_scores=False)
+                    result = self._trans_pipeline(text[:512])  # 限制长度
+                    if result and result[0]['label'] == '正向':
+                        ml_positive = True
+                except Exception as e:
+                    print(f"警告: Transformers 情感分析失败: {e}")
+            
+            if ml_positive:
+                return True
+        
+        return False
 
     def _get_default_industry_keywords(self) -> List[str]:
         """获取默认行业关键词"""
@@ -571,6 +732,26 @@ def test_stock_news_relevance_checker():
         {
             'title': '000001号文件发布',
             'content': '关于加强企业管理的通知...'
+        },
+        # 新增测试用例：测试负面信号和独立词检测
+        {
+            'title': '平安银行独立提及',
+            'content': '平安银行在会议上发言，其他平安相关无关内容被排除'
+        },
+        # 测试 A 股负面信号
+        {
+            'title': '平安银行巨亏暴跌',
+            'content': '平安银行公布业绩，出现巨亏，股价暴跌10%，面临处罚调查。'
+        },
+        # 测试正面信号协现
+        {
+            'title': '平安银行盈利增长',
+            'content': '平安银行公告：本季度盈利大幅增长，合作项目顺利推进。'
+        },
+        # 测试正面信号不协现（应不触发）
+        {
+            'title': '其他银行分红',
+            'content': '某银行宣布分红方案，无相关股票提及。'
         }
     ]
 
@@ -592,6 +773,24 @@ def test_stock_news_relevance_checker():
         print(f"各层分数: {details['scores']}")
         if details['matched_keywords']:
             print(f"匹配关键词: {', '.join(details['matched_keywords'])}")
+        
+        # 测试独立词检测
+        independent_test = checker._is_independent_word('祝大家平安夜快乐', '平安')
+        print(f"独立词测试 ('平安' in '平安夜'): {independent_test} (应为True，负面将在规则中处理)")
+        
+        # 测试新负面/正面信号 (规则 + ML)
+        neg_test = checker._has_negative_signals('平安银行巨亏暴跌')
+        print(f"负面信号测试 ('巨亏暴跌' 规则+ML): {neg_test}")
+        
+        pos_test = checker._has_positive_signals('平安银行盈利增长')
+        print(f"正面信号测试 ('盈利增长' 协现+ML): {pos_test}")
+        
+        pos_no_context = checker._has_positive_signals('某银行分红')
+        print(f"正面信号测试 ('分红' 无协现+ML): {pos_no_context}")
+        
+        # ML 可用性
+        print(f"SnowNLP 可用: {checker.ml_available['snownlp']}")
+        print(f"Transformers 可用: {checker.ml_available['transformers']}")
 
     print("\n" + "=" * 60)
 
@@ -609,6 +808,12 @@ def test_check_article_relevance_helper():
     print("\n" + "=" * 60)
     print("测试 check_article_relevance 辅助函数")
     print("=" * 60)
+    
+    # 在辅助函数测试后调用完整测试
+    print("\n" + "=" * 60)
+    print("运行完整 StockNewsRelevanceChecker 测试（包含新负面/正面信号）")
+    print("=" * 60)
+    test_stock_news_relevance_checker()
     
     # 测试用例1: 使用字符串类型的文章
     print("\n测试用例 1: 字符串类型文章")
@@ -679,9 +884,16 @@ def test_check_article_relevance_helper():
     print(f"各层分数: {details['scores']}")
 
 
-# 使用示例
-if __name__ == '__main__':
-    # 运行测试
-    # test_stock_news_relevance_checker()
-    test_check_article_relevance_helper()
-
+    # 使用示例
+    if __name__ == '__main__':
+        # 运行测试
+        # test_stock_news_relevance_checker()
+        test_check_article_relevance_helper()
+        
+        # 安装提示
+        print("\n" + "=" * 60)
+        print("ML 情感分析依赖安装提示:")
+        print("pip install snownlp  # SnowNLP")
+        print("pip install transformers torch sentencepiece  # Hugging Face (需 torch)")
+        print("启用: checker.set_config(use_ml_sentiment=True)")
+        print("=" * 60)

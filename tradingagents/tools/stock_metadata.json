@@ -5,7 +5,8 @@
     "company_name": "平安银行股份有限公司",
     "industry": "银行业",
     "aliases": ["平安", "PAB"],
-    "industry_keywords": ["存款", "贷款", "利率", "不良率", "拨备", "息差"]
+    "industry_keywords": ["存款", "贷款", "利率", "不良率", "拨备", "息差"],
+    "market": "SZSE Main Board"
   },
   "000002": {
     "stock_code": "000002",
@@ -13,7 +14,8 @@
     "company_name": "万科企业股份有限公司",
     "industry": "房地产",
     "aliases": ["万科"],
-    "industry_keywords": ["销售", "土地", "竣工", "预售", "去化", "房价"]
+    "industry_keywords": ["销售", "土地", "完成的", "预售", "去化", "房价"],
+    "market": "SZSE Main Board"
   },
   "600519": {
     "stock_code": "600519",
@@ -21,7 +23,8 @@
     "company_name": "贵州茅台酒股份有限公司",
     "industry": "白酒",
     "aliases": ["茅台"],
-    "industry_keywords": ["白酒", "销量", "价格", "经销商", "直销"]
+    "industry_keywords": ["白酒", "销量", "价格", "经销商", "直销"],
+    "market": "SSE Main Board"
   },
   "601318": {
     "stock_code": "601318",
@@ -29,7 +32,8 @@
     "company_name": "中国平安保险(集团)股份有限公司",
     "industry": "保险",
     "aliases": ["平安", "中国平安"],
-    "industry_keywords": ["保费", "理赔", "承保", "投资收益", "综合成本率"]
+    "industry_keywords": ["保费", "理赔", "承保", "投资收益", "综合成本率"],
+    "market": "SSE Main Board"
   },
   "AAPL": {
     "stock_code": "AAPL",
@@ -37,7 +41,8 @@
     "company_name": "Apple Inc.",
     "industry": "科技",
     "aliases": ["苹果", "Apple"],
-    "industry_keywords": ["iPhone", "Mac", "iPad", "服务", "revenue", "earnings"]
+    "industry_keywords": ["iPhone", "Mac", "iPad", "服务", "revenue", "earnings"],
+    "market": "NASDAQ"
   },
   "NVDA": {
     "stock_code": "NVDA",
@@ -45,6 +50,70 @@
     "company_name": "NVIDIA Corporation",
     "industry": "科技",
     "aliases": ["英伟达", "NVIDIA"],
-    "industry_keywords": ["GPU", "芯片", "AI", "数据中心", "gaming", "revenue"]
+    "industry_keywords": ["GPU", "芯片", "AI", "数据中心", "gaming", "revenue"],
+    "market": "NASDAQ"
+  },
+  "002195": {
+    "stock_code": "002195",
+    "stock_name": "海天味业",
+    "company_name": "佛山市海天调味食品股份有限公司",
+    "industry": "调味品",
+    "aliases": ["海天"],
+    "industry_keywords": ["酱油", "蚝油", "调味品", "销量", "市场份额", "产能"],
+    "market": "SZSE Main Board"
+  },
+  "300229": {
+    "stock_code": "300229",
+    "stock_name": "深南电路",
+    "company_name": "深圳深南电路股份有限公司",
+    "industry": "电子元器件",
+    "aliases": ["深南电路"],
+    "industry_keywords": ["PCB", "印制电路", "订单", "产能", "5G", "汽车电子"],
+    "market": "SZSE GEM"
+  },
+  "300458": {
+    "stock_code": "300458",
+    "stock_name": "四维图新",
+    "company_name": "四维图新股份有限公司",
+    "industry": "导航地图",
+    "aliases": ["四维图新"],
+    "industry_keywords": ["高精地图", "车联网", "导航", "数据服务", "自动驾驶"],
+    "market": "SZSE GEM"
+  },
+  "601127": {
+    "stock_code": "601127",
+    "stock_name": "中国建设银行",
+    "company_name": "中国建设银行股份有限公司",
+    "industry": "银行业",
+    "aliases": ["建设银行", "CCB"],
+    "industry_keywords": ["贷款", "存款", "资产", "净利润", "不良率", "拨备"],
+    "market": "SSE Main Board"
+  },
+  "688213": {
+    "stock_code": "688213",
+    "stock_name": "中微半导体",
+    "company_name": "中微半导体股份有限公司",
+    "industry": "半导体设备",
+    "aliases": ["中微"],
+    "industry_keywords": ["等离子刻蚀", "半导体工艺", "晶圆", "芯片制造", "设备"],
+    "market": "SSE STAR Market"
+  },
+  "688256": {
+    "stock_code": "688256",
+    "stock_name": "华大半导体",
+    "company_name": "华大半导体有限公司",
+    "industry": "集成电路",
+    "aliases": ["华大", "华大半导体"],
+    "industry_keywords": ["安全芯片", "汽车芯片", "射频芯片", "设计", "IP"],
+    "market": "SSE STAR Market"
+  },
+  "688347": {
+    "stock_code": "688347",
+    "stock_name": "兴发铝业",
+    "company_name": "广西兴发铝业股份有限公司",
+    "industry": "有色金属",
+    "aliases": ["兴发"],
+    "industry_keywords": ["氧化铝", "电解铝", "铝合金", "产能", "价格"],
+    "market": "SSE STAR Market"
   }
 }
