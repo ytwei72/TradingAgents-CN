@@ -77,9 +77,18 @@ class TushareNewsProvider(NewsProvider):
                     logger.info("💡 提示: Tushare 新闻接口可能需要更高的积分权限")
                     return []
                 
-                # 转换日期格式 (YYYY-MM-DD -> YYYYMMDD)
-                ts_start_date = start_date.replace('-', '') if start_date else None
-                ts_end_date = end_date.replace('-', '') if end_date else None
+                # 转换日期格式为 YYYYMMDD，支持秒级输入
+                if start_date:
+                    start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                    ts_start_date = start_dt.strftime('%Y%m%d')
+                else:
+                    ts_start_date = None
+                
+                if end_date:
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+                    ts_end_date = end_dt.strftime('%Y%m%d')
+                else:
+                    ts_end_date = None
                 
                 logger.debug(f"调用 Tushare API: pro.news(src='sina', start_date={ts_start_date}, end_date={ts_end_date})")
                 

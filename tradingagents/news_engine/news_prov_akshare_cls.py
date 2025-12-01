@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""
+CaiLianShe News Provider using AkShare
+
+通过 AkShare 获取财联社新闻
+"""
+
+from typing import Dict
+import pandas as pd
+
+from .news_prov_akshare_base import AkShareNewsProviderBase
+from .models import NewsSource
+
+from tradingagents.utils.logging_manager import get_logger
+
+logger = get_logger("news_engine.akshare_cls")
+
+class AkShareClsNewsProvider(AkShareNewsProviderBase):
+    """财联社新闻提供器"""
+
+    def __init__(self):
+        super().__init__(
+            source=NewsSource.AKSHARE_CLS,
+            config_key="akshare_cls_enabled"
+        )
+
+    def _fetch_dataframe(self) -> pd.DataFrame:
+        """
+        获取财联社新闻数据 DataFrame
+
+        Returns:
+            包含新闻数据的 DataFrame
+        """
+        try:
+            import akshare as ak
+            df = ak.stock_info_global_cls()
+            logger.info(f"📊 财联社获取到 {len(df)} 条数据")
+            return df
+        except Exception as e:
+            logger.error(f"获取财联社数据失败: {e}")
+            return pd.DataFrame()
+
+    def _get_column_mapping(self) -> Dict[str, str]:
+        """
+        获取列名映射
+
+        Returns:
+            列名映射字典
+        """
+        return {
+            "title": "标题",
+            "content": "内容",
+            "date": "发布时间",
+            "url": "链接",
+        }

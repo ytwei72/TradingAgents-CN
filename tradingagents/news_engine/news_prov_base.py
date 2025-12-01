@@ -44,8 +44,8 @@ class NewsProvider(ABC):
         
         Args:
             stock_code: 股票代码
-            start_date: 开始日期(YYYY-MM-DD)
-            end_date: 结束日期 (YYYY-MM-DD)
+            start_date: 开始日期(YYYY-MM-DD HH:MM:SS)
+            end_date: 结束日期 (YYYY-MM-DD HH:MM:SS)
             max_news: 最大新闻数量
             
         Returns:

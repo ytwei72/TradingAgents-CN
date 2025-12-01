@@ -34,8 +34,13 @@ class NewsConfig:
     tushare_enabled: bool = True
     akshare_enabled: bool = True
     eodhd_enabled: bool = False
-    cls_rss_enabled: bool = True
+    cls_rss_enabled: bool = True  # 旧的配置,保留兼容性
     google_news_enabled: bool = False
+    
+    # AkShare 数据源细分配置
+    akshare_cls_enabled: bool = True       # 财联社
+    akshare_sina_enabled: bool = True      # 新浪财经
+    akshare_em_enabled: bool = False       # 东方财富
     
     # 获取配置
     default_hours_back: int = 6
@@ -62,7 +67,7 @@ class NewsConfig:
     def __post_init__(self):
         """初始化后处理"""
         if self.retry_status_codes is None:
-            self.retry_status_codes = [403, 429, 500, 502, 503, 504]
+            self.retry_status_codes = [429, 500, 502, 503, 504]
 
 
 class NewsConfigManager:
@@ -129,6 +134,11 @@ class NewsConfigManager:
         config.cls_rss_enabled = self.env_loader.get_env_bool('NEWS_CLS_RSS_ENABLED', True)
         config.google_news_enabled = self.env_loader.get_env_bool('NEWS_GOOGLE_NEWS_ENABLED', False)
         
+        # AkShare 数据源细分配置
+        config.akshare_cls_enabled = self.env_loader.get_env_bool('NEWS_AKSHARE_CLS_ENABLED', True)
+        config.akshare_sina_enabled = self.env_loader.get_env_bool('NEWS_AKSHARE_SINA_ENABLED', True)
+        config.akshare_em_enabled = self.env_loader.get_env_bool('NEWS_AKSHARE_EM_ENABLED', False)
+        
         # 获取配置
         config.default_hours_back = self.env_loader.get_env_int('NEWS_DEFAULT_HOURS_BACK', 6)
         config.default_max_news = self.env_loader.get_env_int('NEWS_DEFAULT_MAX_NEWS', 10)
@@ -150,12 +160,12 @@ class NewsConfigManager:
         config.retry_delay = self.env_loader.get_env_int('NEWS_RETRY_DELAY', 1)
         
         # 解析可重试的状态码
-        retry_codes_str = self.env_loader.get_env('NEWS_RETRY_STATUS_CODES', '403,429,500,502,503,504')
+        retry_codes_str = self.env_loader.get_env('NEWS_RETRY_STATUS_CODES', '429,500,502,503,504')
         try:
             config.retry_status_codes = [int(code.strip()) for code in retry_codes_str.split(',')]
         except ValueError:
             logger.warning(f"无效的 NEWS_RETRY_STATUS_CODES 配置: {retry_codes_str}, 使用默认值")
-            config.retry_status_codes = [403, 429, 500, 502, 503, 504]
+            config.retry_status_codes = [429, 500, 502, 503, 504]
         
         config.rate_limit = self.env_loader.get_env_int('NEWS_RATE_LIMIT', 5)
         
@@ -190,8 +200,10 @@ class NewsConfigManager:
         logger.info(f"  NewsAPI: {'✅ 启用' if self.config.newsapi_enabled else '❌ 禁用'}")
         logger.info(f"  Tushare: {'✅ 启用' if self.config.tushare_enabled else '❌ 禁用'}")
         logger.info(f"  AKShare: {'✅ 启用' if self.config.akshare_enabled else '❌ 禁用'}")
+        logger.info(f"    - 财联社: {'✅ 启用' if self.config.akshare_cls_enabled else '❌ 禁用'}")
+        logger.info(f"    - 新浪财经: {'✅ 启用' if self.config.akshare_sina_enabled else '❌ 禁用'}")
+        logger.info(f"    - 东方财富: {'✅ 启用' if self.config.akshare_em_enabled else '❌ 禁用'}")
         logger.info(f"  EODHD: {'✅ 启用' if self.config.eodhd_enabled else '❌ 禁用'}")
-        logger.info(f"  财联社RSS: {'✅ 启用' if self.config.cls_rss_enabled else '❌ 禁用'}")
         logger.info(f"  Google News: {'✅ 启用' if self.config.google_news_enabled else '❌ 禁用'}")
         
         logger.info("\n⚙️ 获取配置:")

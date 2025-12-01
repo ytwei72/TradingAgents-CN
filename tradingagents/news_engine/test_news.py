@@ -255,12 +255,12 @@ def test_comprehensive_news():
     print(f"使用数据源: {[s.value for s in all_sources]}")
     
     test_cases = [
-        # ("A股-深证", "000002"),      # 万科A
+        ("A股-深证", "000002"),      # 万科A
         # ("A股-深证", "000001"),      # 平安银行
         # ("A股-上证", "600519"),      # 贵州茅台
         # ("A股-上证", "601398"),      # 工商银行
         # ("港股", "0700.HK"),         # 腾讯控股
-        ("港股", "9988.HK"),         # 阿里巴巴
+        # ("港股", "9988.HK"),         # 阿里巴巴
         # ("美股", "AAPL"),            # Apple
         # ("美股", "NVDA"),            # Nvidia
     ]
@@ -368,8 +368,8 @@ def run_all_tests():
         # ("新闻聚合器", test_aggregator),
         # ("便捷函数", test_convenience_function),
         # ("市场类型选择", test_market_type_selection),
-        ("特定提供器测试", test_specific_providers),
-        # ("全面新闻获取", test_comprehensive_news),
+        # ("特定提供器测试", test_specific_providers),
+        ("全面新闻获取", test_comprehensive_news),
     ]
     
     passed = 0

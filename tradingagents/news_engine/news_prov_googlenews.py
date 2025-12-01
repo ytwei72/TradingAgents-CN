@@ -73,12 +73,18 @@ class GoogleNewsProvider(NewsProvider):
         # 计算时间范围
         try:
             if end_date:
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                try:
+                    end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
             else:
                 end_dt = datetime.now()
 
             if start_date:
-                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                try:
+                    start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             else:
                 # Google News 搜索默认回溯若干天
                 start_dt = end_dt - timedelta(days=3)

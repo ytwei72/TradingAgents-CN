@@ -31,6 +31,9 @@ class NewsSource(Enum):
     DONGFANG_FORTUNE = "东方财富"
     SINA_FINANCE = "新浪财经"
     CLS_RSS = "财联社"
+    AKSHARE_CLS = "AKShare-CLS"
+    AKSHARE_SINA = "AKShare-SINA"
+    AKSHARE_EM = "AKShare-EM"
     UNKNOWN = "未知"
 
 

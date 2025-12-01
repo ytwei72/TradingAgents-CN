@@ -54,15 +54,22 @@ class FinnhubNewsProvider(NewsProvider):
         import requests
         
         # 计算时间范围
+        # 计算时间范围
         if not end_date:
             end_time = datetime.now()
         else:
-            end_time = datetime.strptime(end_date, '%Y-%m-%d')
+            try:
+                end_time = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                end_time = datetime.strptime(end_date, '%Y-%m-%d')
         
         if not start_date:
             start_time = end_time - timedelta(days=7)
         else:
-            start_time = datetime.strptime(start_date, '%Y-%m-%d')
+            try:
+                start_time = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                start_time = datetime.strptime(start_date, '%Y-%m-%d')
         
         # 调用 FinnHub API
         url = "https://finnhub.io/api/v1/company-news"

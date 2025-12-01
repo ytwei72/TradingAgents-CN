@@ -10,10 +10,11 @@ from typing import List, Optional
 
 from .models import NewsItem, NewsQuery, NewsResponse, NewsSource, MarketType
 from .news_prov_tushare import TushareNewsProvider
-from .news_prov_akshare import AKShareNewsProvider
 from .news_prov_finnhub import FinnhubNewsProvider
 from .news_prov_eodhd import EODHDNewsProvider
-from .news_prov_cls_rss import CLSRSSNewsProvider
+from .news_prov_akshare_cls import AkShareClsNewsProvider
+from .news_prov_akshare_sina import AkShareSinaNewsProvider
+from .news_prov_akshare_em import AkShareEmNewsProvider
 from .news_prov_googlenews import GoogleNewsProvider
 from .config import get_news_config
 from tradingagents.utils.logging_manager import get_logger
@@ -39,10 +40,11 @@ class NewsAggregator:
         """
         all_providers = [
             TushareNewsProvider(),
-            AKShareNewsProvider(),
             FinnhubNewsProvider(),
             EODHDNewsProvider(),
-            CLSRSSNewsProvider(),
+            AkShareClsNewsProvider(),
+            AkShareSinaNewsProvider(),
+            AkShareEmNewsProvider(),
             GoogleNewsProvider(),
         ]
         
@@ -196,13 +198,17 @@ class NewsAggregator:
         # 计算日期范围
         if not end_date:
             end_time = datetime.now()
-            end_date = end_time.strftime('%Y-%m-%d')
+            end_date = end_time.strftime('%Y-%m-%d %H:%M:%S')
         else:
-            end_time = datetime.strptime(end_date, '%Y-%m-%d')
+            # 尝试解析带时间的格式,如果失败则使用仅日期格式
+            try:
+                end_time = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                end_time = datetime.strptime(end_date, '%Y-%m-%d')
         
         if not start_date:
             start_time = end_time - timedelta(hours=hours_back)
-            start_date = start_time.strftime('%Y-%m-%d')
+            start_date = start_time.strftime('%Y-%m-%d %H:%M:%S')
         
         # 创建查询对象
         query = NewsQuery(
