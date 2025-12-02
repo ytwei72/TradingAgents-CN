@@ -11,6 +11,7 @@ from typing import List, Optional
 from .news_prov_base import NewsProvider
 from .models import NewsItem, NewsSource
 from tradingagents.utils.logging_manager import get_logger
+from tradingagents.utils.time_utils import TaTimes, TimeGranularity
 
 logger = get_logger('news_engine.eodhd')
 
@@ -64,10 +65,9 @@ class EODHDNewsProvider(NewsProvider):
                 'limit': max_news
             }
             
-            if start_date:
-                params['from'] = start_date
-            if end_date:
-                params['to'] = end_date
+            # 转换日期格式：从 '%Y-%m-%d %H:%M:%S' 到 '%Y-%m-%d'
+            params['from'] = TaTimes.to_day_format(start_date)
+            params['to'] = TaTimes.to_day_format(end_date)
             
             response = requests.get(url, params=params, timeout=self.config.request_timeout)
             response.raise_for_status()

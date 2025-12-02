@@ -54,7 +54,6 @@ class FinnhubNewsProvider(NewsProvider):
         import requests
         
         # 计算时间范围
-        # 计算时间范围
         if not end_date:
             end_time = datetime.now()
         else:

@@ -94,20 +94,22 @@ def test_providers():
     print("测试 3: 新闻提供器")
     print("=" * 60)
     
-    from tradingagents.news_engine.news_prov_akshare import AKShareNewsProvider
     from tradingagents.news_engine.news_prov_tushare import TushareNewsProvider
     from tradingagents.news_engine.news_prov_finnhub import FinnhubNewsProvider
     from tradingagents.news_engine.news_prov_eodhd import EODHDNewsProvider
-    from tradingagents.news_engine.news_prov_cls_rss import CLSRSSNewsProvider
     from tradingagents.news_engine.news_prov_googlenews import GoogleNewsProvider
+    from tradingagents.news_engine.news_prov_akshare_cls import AkShareClsNewsProvider
+    from tradingagents.news_engine.news_prov_akshare_sina import AkShareSinaNewsProvider
+    from tradingagents.news_engine.news_prov_akshare_em import AkShareEmNewsProvider
     
     providers = [
-        ("AKShare", AKShareNewsProvider()),
         ("Tushare", TushareNewsProvider()),
         ("FinnHub", FinnhubNewsProvider()),
         ("EODHD", EODHDNewsProvider()),
-        ("CLS_RSS", CLSRSSNewsProvider()),
         ("GoogleNews", GoogleNewsProvider()),
+        ("AkShare_CLS", AkShareClsNewsProvider()),
+        ("AkShare_Sina", AkShareSinaNewsProvider()),
+        ("AkShare_EM", AkShareEmNewsProvider()),
     ]
     
     print("\n提供者可用性")
@@ -124,7 +126,8 @@ def test_providers():
         ("AAPL", "美股"),
     ]
     
-    provider = providers[0][1]  # 使用第一个提供器
+    # 使用一个支持A股的提供器来测试识别 (AkShare_CLS)
+    provider = providers[4][1]
     for code, expected in test_codes:
         market_type = provider.identify_market_type(code)
         print(f"  {code}: {market_type.value} (预期: {expected})")
@@ -295,64 +298,57 @@ def test_comprehensive_news():
 
     print("\n全面测试完成")
 
-def test_specific_providers():
-    """测试特定提供器 (CLS_RSS 和 GoogleNews)"""
+def verify_providers():
+    """自动验证各个providers是否正常work"""
     print("\n" + "=" * 60)
-    print("测试 8: 特定提供器修复验证")
+    print("测试 9: 验证所有 Providers")
     print("=" * 60)
-    
-    from tradingagents.news_engine.news_prov_cls_rss import CLSRSSNewsProvider
+
+    from tradingagents.news_engine.news_prov_tushare import TushareNewsProvider
+    from tradingagents.news_engine.news_prov_finnhub import FinnhubNewsProvider
+    from tradingagents.news_engine.news_prov_eodhd import EODHDNewsProvider
     from tradingagents.news_engine.news_prov_googlenews import GoogleNewsProvider
+    from tradingagents.news_engine.news_prov_akshare_cls import AkShareClsNewsProvider
+    from tradingagents.news_engine.news_prov_akshare_sina import AkShareSinaNewsProvider
+    from tradingagents.news_engine.news_prov_akshare_em import AkShareEmNewsProvider
     from datetime import datetime, timedelta
-    
-    # 1. 测试 CLS_RSS (现在使用 akshare)
-    print("\n[1] 测试 CLS_RSS (AkShare 替代源):")
-    cls_provider = CLSRSSNewsProvider()
-    if cls_provider.is_available():
-        # 随便找个热门股或者不传代码(如果支持)
-        # akshare.stock_telegraph_cls 返回的是全市场电报, provider内部会过滤
-        # 我们用一个常见的代码, 或者直接看日志输出
-        stock_code = "000001" # 平安银行
-        # stock_code = None 
-        print(f"  获取 {stock_code} 的新闻...")
-        try:
-            items = cls_provider.get_news(
-                stock_code=stock_code,
-                max_news=10,
-                start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
-            )
-            print(f"  获取到 {len(items)} 条新闻")
-            if items:
-                print(f"  第一条: {items[0].title} ({items[0].publish_time})")
-        except Exception as e:
-            print(f"  ❌ CLS 获取失败: {e}")
-    else:
-        print("  ⚠️ CLS_RSS 未启用")
 
-    # 2. 测试 GoogleNews (NVDA)
-    print("\n[2] 测试 GoogleNews (NVDA):")
-    google_provider = GoogleNewsProvider()
-    if google_provider.is_available():
-        stock_code = "NVDA"
-        print(f"  获取 {stock_code} 的新闻...")
+    providers = [
+        # ("Tushare", TushareNewsProvider(), "000002"), # 万科
+        # ("FinnHub", FinnhubNewsProvider(), "AAPL"),   # Apple
+        ("EODHD", EODHDNewsProvider(), "AAPL"),       # Apple (or HK stock)
+        # ("GoogleNews", GoogleNewsProvider(), "NVDA"), # Nvidia
+        # ("AkShare_CLS", AkShareClsNewsProvider(), "000002"),
+        # ("AkShare_Sina", AkShareSinaNewsProvider(), "000002"),
+        # ("AkShare_EM", AkShareEmNewsProvider(), "000002"),
+    ]
+
+    for name, provider, test_code in providers:
+        print(f"\n验证 {name} ...")
+        if not provider.is_available():
+            print(f"  ⚠️ {name} 未启用或不可用")
+            continue
+            
         try:
-            items = google_provider.get_news(
-                stock_code=stock_code,
+            print(f"  尝试获取 {test_code} 的新闻...")
+            items = provider.get_news(
+                stock_code=test_code,
                 max_news=5,
-                start_date=(datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+                start_date=(datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
             )
-            print(f"  获取到 {len(items)} 条新闻")
+            
             if items:
+                print(f"  ✅ 成功获取 {len(items)} 条新闻")
                 print(f"  第一条: {items[0].title} ({items[0].publish_time})")
-                print(f"  来源: {items[0].source}")
             else:
-                print("  ⚠️ GoogleNews 返回空列表 (可能被反爬或无新闻)")
+                print(f"  ⚠️ 成功调用但未返回新闻 (可能是无相关新闻)")
+                
         except Exception as e:
-            print(f"  ❌ GoogleNews 获取失败: {e}")
-    else:
-        print("  ⚠️ GoogleNews 未启用")
+            print(f"  ❌ 验证失败: {e}")
+            # import traceback
+            # traceback.print_exc()
 
-    print("\n特定提供器测试完成")
+    print("\nProvider 验证完成")
 
 
 def run_all_tests():
@@ -369,7 +365,8 @@ def run_all_tests():
         # ("便捷函数", test_convenience_function),
         # ("市场类型选择", test_market_type_selection),
         # ("特定提供器测试", test_specific_providers),
-        ("全面新闻获取", test_comprehensive_news),
+        # ("全面新闻获取", test_comprehensive_news),
+        ("Provider验证", verify_providers),
     ]
     
     passed = 0

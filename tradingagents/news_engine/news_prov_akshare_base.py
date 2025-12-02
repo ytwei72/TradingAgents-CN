@@ -13,6 +13,7 @@ import pandas as pd
 from .news_prov_base import NewsProvider
 from .models import NewsItem, NewsSource
 from tradingagents.utils.logging_manager import get_logger
+from tradingagents.utils.time_utils import TaTimes
 
 logger = get_logger("news_engine.akshare_base")
 

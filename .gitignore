@@ -33,6 +33,7 @@ node_modules/
 Thumbs.db
 
 # 项目特定目录
+results/
 eval_results/
 eval_data/
 logs/
@@ -51,6 +52,7 @@ web/finnhub_data/
 web/results/
 web/eval_results/
 docs/v1.0.0-preview/
+config/usage.json
 
 # 股票数据缓存文件 (不纳入版本控制)
 *_stock_data_*.txt
