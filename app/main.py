@@ -20,7 +20,7 @@ import asyncio
 
 from app.core.config import settings
 from app.core.startup_validator import validate_startup_config
-from app.routers import health, analysis
+from app.routers import health, analysis, reports, notifications
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -59,6 +59,8 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
+app.include_router(reports.router, prefix="/reports", tags=["reports"])
+app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 
 @app.get("/")
 async def root():
