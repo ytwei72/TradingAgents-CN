@@ -1191,7 +1191,7 @@ def save_analysis_result(analysis_id: str, stock_symbol: str, analysts: List[str
     """
 
     try:
-        from web.utils.async_progress_tracker import safe_serialize
+        from tradingagents.utils.async_progress_tracker import safe_serialize
 
         # 创建结果条目，使用安全序列化
         result_entry = {

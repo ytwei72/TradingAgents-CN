@@ -176,7 +176,7 @@ def check_analysis_status(analysis_id: str) -> str:
     
     # 线程不存在，检查进度数据确定最终状态
     try:
-        from .async_progress_tracker import get_progress_by_id
+        from tradingagents.utils.async_progress_tracker import get_progress_by_id
         progress_data = get_progress_by_id(analysis_id)
         
         if progress_data:

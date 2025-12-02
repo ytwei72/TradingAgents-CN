@@ -5,7 +5,7 @@
 from typing import Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from web.utils.async_progress_tracker import AsyncProgressTracker
+    from tradingagents.utils.async_progress_tracker import AsyncProgressTracker
 
 from tradingagents.utils.logging_manager import get_logger
 from ..handler.message_handler import MessageHandler, MessageType

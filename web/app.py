@@ -42,7 +42,7 @@ from components.task_status_display import render_task_status_card, render_progr
 from utils.api_checker import check_api_keys
 from tradingagents.utils.analysis_runner import run_stock_analysis, validate_analysis_params, format_analysis_results
 from utils.progress_tracker import SmartStreamlitProgressDisplay, create_smart_progress_callback
-from utils.async_progress_tracker import AsyncProgressTracker
+from tradingagents.utils.async_progress_tracker import AsyncProgressTracker, get_progress_by_id
 from components.async_progress_display import display_unified_progress
 from utils.smart_session_manager import get_persistent_analysis_id, set_persistent_analysis_id
 from utils.auth_manager import auth_manager
@@ -617,7 +617,6 @@ def main():
                 logger.info(f"🔄 [状态同步] 更新分析状态: {is_running} (基于线程检测: {actual_status})")
 
             # 获取进度数据用于显示
-            from utils.async_progress_tracker import get_progress_by_id
             progress_data = get_progress_by_id(current_analysis_id)
 
             # 显示任务状态信息（使用组件函数）

@@ -97,7 +97,7 @@ def _find_step_by_module_name(module_name: str, analysis_steps: list) -> Optiona
 def _get_progress_info(analysis_id: str) -> Optional[Dict[str, Any]]:
     """获取进度信息"""
     try:
-        from web.utils.async_progress_tracker import get_progress_by_id
+        from tradingagents.utils.async_progress_tracker import get_progress_by_id
         return get_progress_by_id(analysis_id)
     except Exception as e:
         logger.debug(f"获取进度信息失败: {e}")

@@ -154,7 +154,7 @@ def get_persistent_analysis_id() -> Optional[str]:
         
         # 3. 最后从分析数据恢复最新分析
         try:
-            from .async_progress_tracker import get_latest_analysis_id
+            from tradingagents.utils.async_progress_tracker import get_latest_analysis_id
             latest_id = get_latest_analysis_id()
             if latest_id:
                 st.session_state.current_analysis_id = latest_id

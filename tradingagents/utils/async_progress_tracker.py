@@ -127,38 +127,6 @@ class AsyncProgressTracker:
         # 初始化消息机制（如果启用）
         self.message_producer = None
         self._init_message_system()
-
-        # ========== 日志系统注册已禁用（已迁移到消息模式） ==========
-        # 注意：任务阶段识别、状态和进度获取已迁移到消息模式
-        # 如果消息模式未启用，系统会回退到消息装饰器的日志模式
-        # 不再使用 ProgressLogHandler 进行日志识别
-        
-        # 注册到日志系统进行自动进度更新（已禁用，迁移到消息模式）
-        # if not self.message_producer:
-        #     try:
-        #         from .progress_log_handler import register_analysis_tracker
-        #         import threading
-        #
-        #         # 使用超时机制避免死锁
-        #         def register_with_timeout():
-        #             try:
-        #                 register_analysis_tracker(self.analysis_id, self)
-        #                 print(f"✅ [进度集成] 跟踪器注册成功: {self.analysis_id}")
-        #             except Exception as e:
-        #                 print(f"❌ [进度集成] 跟踪器注册失败: {e}")
-        #
-        #         # 在单独线程中注册，避免阻塞主线程
-        #         register_thread = threading.Thread(target=register_with_timeout, daemon=True)
-        #         register_thread.start()
-        #         register_thread.join(timeout=2.0)  # 2秒超时
-        #
-        #         if register_thread.is_alive():
-        #             print(f"⚠️ [进度集成] 跟踪器注册超时，继续执行: {self.analysis_id}")
-        #
-        #     except ImportError:
-        #         logger.debug("📊 [异步进度] 日志集成不可用")
-        #     except Exception as e:
-        #         print(f"❌ [进度集成] 跟踪器注册异常: {e}")
     
     def _init_message_system(self):
         """初始化消息系统"""

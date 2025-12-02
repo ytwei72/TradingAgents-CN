@@ -52,7 +52,7 @@ def _restore_latest_analysis_results():
         return  # 已经有结果，无需恢复
     
     try:
-        from utils.async_progress_tracker import get_latest_analysis_id, get_progress_by_id
+        from tradingagents.utils.async_progress_tracker import get_latest_analysis_id, get_progress_by_id
         from tradingagents.utils.analysis_runner import format_analysis_results
 
         latest_id = get_latest_analysis_id()
