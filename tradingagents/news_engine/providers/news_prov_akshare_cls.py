@@ -9,7 +9,7 @@ from typing import Dict
 import pandas as pd
 
 from .news_prov_akshare_base import AkShareNewsProviderBase
-from .models import NewsSource
+from tradingagents.news_engine.models import NewsSource
 
 from tradingagents.utils.logging_manager import get_logger
 

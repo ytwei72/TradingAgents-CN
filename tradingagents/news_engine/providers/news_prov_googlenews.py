@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from .news_prov_base import NewsProvider
-from .models import NewsItem, NewsSource
+from tradingagents.news_engine.models import NewsItem, NewsSource
 from tradingagents.utils.logging_manager import get_logger
-from .config import get_news_config
+from tradingagents.news_engine.config import get_news_config
 
 logger = get_logger("news_engine.googlenews")
 
@@ -34,7 +34,7 @@ class GoogleNewsProvider(NewsProvider):
 
         try:
             # 仅检查依赖是否存在,真正调用在 get_news 中完成
-            import news_helper.googlenews_utils as _gn  # noqa: F401
+            from ..news_helper.googlenews_utils import getNewsData as _gn
 
             self.connected = True
             logger.debug("✅ Google News 依赖检查通过,数据源可用")
@@ -56,7 +56,7 @@ class GoogleNewsProvider(NewsProvider):
         获取 Google News 新闻
 
         说明:
-            - 使用 news_helper.googlenews_utils.getNewsData
+            - 使用 ..news_helper.googlenews_utils.getNewsData
               抓取给定时间范围内的搜索结果
             - 因 Google News 没有直接按股票字段,这里只能通过搜索关键词近似筛选
         """
@@ -65,7 +65,7 @@ class GoogleNewsProvider(NewsProvider):
             return []
 
         try:
-            from news_helper.googlenews_utils import getNewsData
+            from ..news_helper.googlenews_utils import getNewsData
         except Exception as e:
             logger.error(f"❌ 无法导入 googlenews_utils.getNewsData: {e}")
             return []

@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from .news_prov_base import NewsProvider
-from .models import NewsItem, NewsSource
+from tradingagents.news_engine.models import NewsItem, NewsSource
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.utils.time_utils import TaTimes, TimeGranularity
 

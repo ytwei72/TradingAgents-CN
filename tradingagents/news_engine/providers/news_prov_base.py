@@ -10,8 +10,8 @@ from datetime import datetime
 from typing import List, Optional
 import re
 
-from .models import NewsItem, NewsSource, NewsUrgency, MarketType
-from .config import get_news_config
+from tradingagents.news_engine.models import NewsItem, NewsSource, NewsUrgency, MarketType
+from tradingagents.news_engine.config import get_news_config
 from tradingagents.utils.logging_manager import get_logger
 
 logger = get_logger('news_engine.providers')

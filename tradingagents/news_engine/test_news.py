@@ -94,13 +94,13 @@ def test_providers():
     print("测试 3: 新闻提供器")
     print("=" * 60)
     
-    from tradingagents.news_engine.news_prov_tushare import TushareNewsProvider
-    from tradingagents.news_engine.news_prov_finnhub import FinnhubNewsProvider
-    from tradingagents.news_engine.news_prov_eodhd import EODHDNewsProvider
-    from tradingagents.news_engine.news_prov_googlenews import GoogleNewsProvider
-    from tradingagents.news_engine.news_prov_akshare_cls import AkShareClsNewsProvider
-    from tradingagents.news_engine.news_prov_akshare_sina import AkShareSinaNewsProvider
-    from tradingagents.news_engine.news_prov_akshare_em import AkShareEmNewsProvider
+    from providers.news_prov_tushare import TushareNewsProvider
+    from providers.news_prov_finnhub import FinnhubNewsProvider
+    from providers.news_prov_eodhd import EODHDNewsProvider
+    from providers.news_prov_googlenews import GoogleNewsProvider
+    from providers.news_prov_akshare_cls import AkShareClsNewsProvider
+    from providers.news_prov_akshare_sina import AkShareSinaNewsProvider
+    from providers.news_prov_akshare_em import AkShareEmNewsProvider
     
     providers = [
         ("Tushare", TushareNewsProvider()),
@@ -248,7 +248,6 @@ def test_comprehensive_news():
     print("=" * 60)
     
     from tradingagents.news_engine.aggregator import NewsAggregator
-    from tradingagents.news_engine.models import NewsSource
     from collections import Counter
     
     aggregator = NewsAggregator()
@@ -304,13 +303,7 @@ def verify_providers():
     print("测试 9: 验证所有 Providers")
     print("=" * 60)
 
-    from tradingagents.news_engine.news_prov_tushare import TushareNewsProvider
-    from tradingagents.news_engine.news_prov_finnhub import FinnhubNewsProvider
-    from tradingagents.news_engine.news_prov_eodhd import EODHDNewsProvider
-    from tradingagents.news_engine.news_prov_googlenews import GoogleNewsProvider
-    from tradingagents.news_engine.news_prov_akshare_cls import AkShareClsNewsProvider
-    from tradingagents.news_engine.news_prov_akshare_sina import AkShareSinaNewsProvider
-    from tradingagents.news_engine.news_prov_akshare_em import AkShareEmNewsProvider
+    from providers.news_prov_eodhd import EODHDNewsProvider
     from datetime import datetime, timedelta
 
     providers = [
