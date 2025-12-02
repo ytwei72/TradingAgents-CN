@@ -28,16 +28,18 @@ class ModularEnvLoader:
     _loaded_files: Dict[str, bool] = {}
     _env_cache: Dict[str, str] = {}
     
-    def __init__(self, module_name: Optional[str] = None, module_path: Optional[Path] = None):
+    def __init__(self, module_name: Optional[str] = None, module_path: Optional[Path] = None, load_global: bool = True):
         """
         初始化环境变量加载器
         
         Args:
             module_name: 模块名称,用于查找模块级 .env 文件
             module_path: 模块路径,如果提供则直接使用该路径查找 .env
+            load_global: 是否加载全局 .env 文件
         """
         self.module_name = module_name
         self.module_path = module_path
+        self.load_global = load_global
         self.project_root = self._get_project_root()
         
     @staticmethod
@@ -67,20 +69,21 @@ class ModularEnvLoader:
         loaded_vars = {}
         
         # 1. 加载全局 .env
-        global_env_file = self.project_root / ".env"
-        if global_env_file.exists():
-            if verbose:
-                logger.info(f"📂 加载全局环境变量: {global_env_file}")
-            
-            # 只在未加载过时才加载
-            if str(global_env_file) not in self._loaded_files:
-                load_dotenv(global_env_file, override=override)
-                self._loaded_files[str(global_env_file)] = True
+        if self.load_global:
+            global_env_file = self.project_root / ".env"
+            if global_env_file.exists():
                 if verbose:
-                    logger.info(f"✅ 全局环境变量加载完成")
-        else:
-            if verbose:
-                logger.warning(f"⚠️ 全局 .env 文件不存在: {global_env_file}")
+                    logger.info(f"📂 加载全局环境变量: {global_env_file}")
+                
+                # 只在未加载过时才加载
+                if str(global_env_file) not in self._loaded_files:
+                    load_dotenv(global_env_file, override=override)
+                    self._loaded_files[str(global_env_file)] = True
+                    if verbose:
+                        logger.info(f"✅ 全局环境变量加载完成")
+            else:
+                if verbose:
+                    logger.warning(f"⚠️ 全局 .env 文件不存在: {global_env_file}")
         
         # 2. 加载模块级 .env
         module_env_file = self._get_module_env_file()

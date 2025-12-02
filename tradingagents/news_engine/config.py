@@ -90,7 +90,7 @@ class NewsConfigManager:
         self.module_path = module_path
         
         # 创建环境变量加载器
-        self.env_loader = ModularEnvLoader(module_path=module_path)
+        self.env_loader = ModularEnvLoader(module_path=module_path, load_global=False)
         
         # 加载环境变量
         self._load_env()
