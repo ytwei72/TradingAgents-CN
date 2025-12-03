@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import HomeView from './views/HomeView.vue'
+import StockAnalyzeView from './views/StockAnalyzeView.vue'
 </script>
 
 <template>
-  <HomeView />
+  <StockAnalyzeView />
 </template>

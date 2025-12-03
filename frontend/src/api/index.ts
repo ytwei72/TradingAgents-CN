@@ -48,4 +48,19 @@ export const getAnalysisResult = async (analysisId: string) => {
     return response.data;
 };
 
+export const pauseAnalysis = async (analysisId: string) => {
+    const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/pause`);
+    return response.data;
+};
+
+export const resumeAnalysis = async (analysisId: string) => {
+    const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/resume`);
+    return response.data;
+};
+
+export const stopAnalysis = async (analysisId: string) => {
+    const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/stop`);
+    return response.data;
+};
+
 export default api;
