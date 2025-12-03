@@ -569,10 +569,10 @@ def main():
                     finally:
                         # 分析结束后注销线程和任务控制
                         from utils.thread_tracker import unregister_analysis_thread
-                        from tradingagents.utils.task_control_manager import unregister_task
+                        from tradingagents.tasks import get_task_manager
                         
                         unregister_analysis_thread(analysis_id)
-                        unregister_task(analysis_id)
+                        get_task_manager().unregister_task(analysis_id)
                         logger.info(f"🧵 [线程清理] 分析线程和任务控制已注销: {analysis_id}")
 
                 # 启动后台分析线程
@@ -582,9 +582,9 @@ def main():
 
                 # 注册任务控制和线程跟踪
                 from utils.thread_tracker import register_analysis_thread
-                from tradingagents.utils.task_control_manager import register_task
+                from tradingagents.tasks import get_task_manager
                 
-                register_task(analysis_id)
+                get_task_manager().register_task(analysis_id)
                 register_analysis_thread(analysis_id, analysis_thread)
 
                 logger.info(f"🧵 [后台分析] 分析线程已启动: {analysis_id}")

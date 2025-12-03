@@ -347,7 +347,6 @@ def prepare_stock_data_for_analysis(
                 message_producer.publish_progress(progress_msg)
             except Exception as e:
                 logger.debug(f"发布步骤3完成消息失败: {e}")
-        
         return True, None, preparation_result
         
     except Exception as e:
@@ -376,26 +375,27 @@ def check_task_control(
         return True  # 没有analysis_id，继续执行
     
     try:
-        from tradingagents.utils.task_control_manager import should_stop, should_pause, wait_if_paused
+        from tradingagents.tasks import get_task_manager
+        task_manager = get_task_manager()
         
         # 检查停止信号
-        if should_stop(analysis_id):
+        if task_manager.should_stop(analysis_id):
             logger.info(f"⏹️ [任务控制] 收到停止信号: {analysis_id}")
             if async_tracker:
                 async_tracker.mark_stopped("用户停止了分析任务")
             return False
         
         # 检查暂停信号
-        if should_pause(analysis_id):
+        if task_manager.should_pause(analysis_id):
             logger.info(f"⏸️ [任务控制] 收到暂停信号: {analysis_id}")
             if async_tracker:
                 async_tracker.mark_paused()
             
             # 等待直到恢复或停止
-            wait_if_paused(analysis_id)
+            task_manager.wait_if_paused(analysis_id)
             
             # 检查是否在暂停期间被停止
-            if should_stop(analysis_id):
+            if task_manager.should_stop(analysis_id):
                 logger.info(f"⏹️ [任务控制] 暂停期间收到停止信号: {analysis_id}")
                 if async_tracker:
                     async_tracker.mark_stopped("用户停止了分析任务")
@@ -424,8 +424,6 @@ def track_token_usage(
 ) -> Optional[float]:
     """
     记录Token使用情况
-    
-    Args:
         llm_provider: LLM提供商
         llm_model: 模型名称
         session_id: 会话ID

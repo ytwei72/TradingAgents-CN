@@ -17,7 +17,7 @@ logger = get_logger('tools')  # 使用tools日志器，与正常节点执行保�
 
 # 导入消息机制
 from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
-from tradingagents.messaging.decorators.message_decorators import _publish_progress_message
+from tradingagents.messaging.decorators.message_decorators import _publish_step_message
 from tradingagents.messaging.business.messages import NodeStatus
 
 # 全局变量存储graph实例（用于访问模拟模式功能）
@@ -64,7 +64,7 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
     if is_message_mode_enabled():
         producer = get_message_producer()
         if producer and analysis_id:
-            _publish_progress_message(
+            _publish_step_message(
                 producer=producer,
                 analysis_id=str(analysis_id),
                 module_name=node_name,
@@ -121,7 +121,7 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
         if is_message_mode_enabled():
             producer = get_message_producer()
             if producer and analysis_id:
-                _publish_progress_message(
+                _publish_step_message(
                     producer=producer,
                     analysis_id=str(analysis_id),
                     module_name=node_name,
@@ -142,7 +142,7 @@ def check_and_handle_mock_mode(node_name: str, state: Dict[str, Any]) -> Optiona
         if is_message_mode_enabled():
             producer = get_message_producer()
             if producer and analysis_id:
-                _publish_progress_message(
+                _publish_step_message(
                     producer=producer,
                     analysis_id=str(analysis_id),
                     module_name=node_name,

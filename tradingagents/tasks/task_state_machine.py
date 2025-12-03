@@ -94,14 +94,14 @@ class TaskStateMachine:
             logger.warning(f"📊 [任务状态机] Redis 连接失败，使用文件存储: {e}")
             return False
     
-    def create_task(self, task_params: Dict[str, Any]) -> Dict[str, Any]:
-        """创建新任务
+    def initialize(self, task_params: Dict[str, Any]) -> Dict[str, Any]:
+        """状态机初始化
         
         Args:
             task_params: 任务参数，必须包含 'task_id' 键
             
         Returns:
-            创建的任务状态
+            创建的初始任务状态
             
         Raises:
             ValueError: 如果缺少 task_id 或任务已存在
@@ -142,7 +142,7 @@ class TaskStateMachine:
         logger.info(f"📊 [任务创建] 任务已创建: {task_id}")
         return current_state
     
-    def update_task(self, task_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    def update_state(self, task_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """更新任务状态
         
         Args:
@@ -230,27 +230,7 @@ class TaskStateMachine:
         # 返回完整历史的副本
         return [state.copy() for state in history]
     
-    def delete_task(self, task_id: str) -> bool:
-        """删除任务
-        
-        Args:
-            task_id: 任务 ID
-            
-        Returns:
-            是否删除成功
-        """
-        # 从内存删除
-        if task_id in self.current_states:
-            del self.current_states[task_id]
-        if task_id in self.history_states:
-            del self.history_states[task_id]
-        
-        # 从存储删除
-        self._delete_current_state(task_id)
-        self._delete_history_states(task_id)
-        
-        logger.info(f"📊 [任务删除] 任务已删除: {task_id}")
-        return True
+
     
     def _save_current_state(self, task_id: str, state: Dict[str, Any]):
         """保存当前状态到存储"""
@@ -335,37 +315,7 @@ class TaskStateMachine:
                 logger.error(f"📊 [存储错误] 加载历史状态失败: {e}")
                 return []
     
-    def _delete_current_state(self, task_id: str):
-        """从存储删除当前状态"""
-        if self.use_redis:
-            try:
-                key = f"task:current:{task_id}"
-                self.redis_client.delete(key)
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 删除当前状态失败: {e}")
-        else:
-            try:
-                file_path = self.storage_dir / f"{task_id}_current.json"
-                if file_path.exists():
-                    file_path.unlink()
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 删除当前状态失败: {e}")
-    
-    def _delete_history_states(self, task_id: str):
-        """从存储删除历史状态"""
-        if self.use_redis:
-            try:
-                key = f"task:history:{task_id}"
-                self.redis_client.delete(key)
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 删除历史状态失败: {e}")
-        else:
-            try:
-                file_path = self.storage_dir / f"{task_id}_history.json"
-                if file_path.exists():
-                    file_path.unlink()
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 删除历史状态失败: {e}")
+
 
 
 # 全局单例

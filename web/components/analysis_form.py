@@ -10,7 +10,7 @@ from tradingagents.utils.logging_manager import get_logger
 
 from web.utils.thread_tracker import check_analysis_status
 from web.utils.smart_session_manager import smart_session_manager
-from tradingagents.utils.task_control_manager import pause_task, resume_task, stop_task
+from tradingagents.tasks import get_task_manager
 import time
 
 # 导入用户活动记录器
@@ -485,7 +485,7 @@ def render_analysis_form():
                 with btn_col1:
                     if actual_status == 'running':
                         if st.button("⏸️ 暂停分析", key="pause_btn_form", use_container_width=True):
-                            if pause_task(form_current_analysis_id):
+                            if get_task_manager().pause_task(form_current_analysis_id):
                                 st.success("✅ 任务已暂停")
                                 logger.info(f"⏸️ [用户操作] 暂停任务: {form_current_analysis_id}")
                                 time.sleep(1)
@@ -495,7 +495,7 @@ def render_analysis_form():
                     
                     elif actual_status == 'paused':
                         if st.button("▶️ 继续分析", key="resume_btn_form", use_container_width=True):
-                            if resume_task(form_current_analysis_id):
+                            if get_task_manager().resume_task(form_current_analysis_id):
                                 st.success("✅ 任务已恢复")
                                 logger.info(f"▶️ [用户操作] 恢复任务: {form_current_analysis_id}")
                                 time.sleep(1)
@@ -505,7 +505,7 @@ def render_analysis_form():
                 
                 with btn_col2:
                     if st.button("⏹️ 停止分析", key="stop_btn_form", use_container_width=True):
-                        if stop_task(form_current_analysis_id):
+                        if get_task_manager().stop_task(form_current_analysis_id):
                             st.success("✅ 任务已停止")
                             logger.info(f"⏹️ [用户操作] 停止任务: {form_current_analysis_id}")
                             # 清理分析状态

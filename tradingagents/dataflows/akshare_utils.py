@@ -683,3 +683,25 @@ def get_stock_news_em(symbol: str, max_news: int = 10) -> pd.DataFrame:
     """
     provider = get_akshare_provider()
     return provider.get_stock_news(symbol, max_news)
+
+
+if __name__ == "__main__":
+    # 创建 AKShare 提供器实例
+    provider = get_akshare_provider()
+    
+    # 测试 get_stock_data 函数
+    symbol = "000001"  # 示例：平安银行
+    print(f"测试获取股票数据: {symbol}")
+    
+    try:
+        data = provider.get_stock_data(symbol)
+        if data is not None and not data.empty:
+            print(f"✅ 成功获取 {symbol} 数据，共 {len(data)} 行")
+            print(data.head(5))  # 显示前5行
+        else:
+            print(f"❌ 未能获取 {symbol} 数据（返回空）")
+    except Exception as e:
+        print(f"❌ 测试异常: {e}")
+    
+    # 可以在这里添加更多测试
+    print("测试完成")

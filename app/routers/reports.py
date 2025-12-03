@@ -9,11 +9,11 @@ from pathlib import Path
 
 from app.schemas.report import ReportGenerateRequest, ReportGenerateResponse
 from app.services.report_service import report_service
-from app.routers.analysis import analysis_tasks
 from tradingagents.utils.logging_manager import get_logger
+from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
 
 router = APIRouter()
-logger = get_logger('reports_router')
+logger = get_logger("reports_router")
 
 
 @router.post("/generate", response_model=ReportGenerateResponse)
@@ -26,25 +26,42 @@ async def generate_report(request: ReportGenerateRequest):
     - **include_charts**: 是否包含图表（当前版本暂不支持）
     """
     try:
-        # 检查分析任务是否存在
-        if request.analysis_id not in analysis_tasks:
+        # 从数据库(MongoDB)读取分析报告/结果
+        if not mongodb_report_manager or not mongodb_report_manager.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="报告数据库未连接，无法生成报告"
+            )
+
+        db_report = mongodb_report_manager.get_report_by_id(request.analysis_id)
+        if not db_report:
             raise HTTPException(
                 status_code=404,
-                detail=f"分析任务不存在: {request.analysis_id}"
+                detail=f"未在数据库中找到分析报告: {request.analysis_id}"
             )
-        
-        # 获取分析任务
-        task = analysis_tasks[request.analysis_id]
-        
+
         # 检查分析是否完成
-        if task['status'] != 'completed':
+        status = db_report.get("status", "completed")
+        if status != "completed":
             raise HTTPException(
                 status_code=400,
-                detail=f"分析任务未完成，当前状态: {task['status']}"
+                detail=f"分析任务未完成，当前状态: {status}"
             )
-        
-        # 获取分析结果
-        analysis_results = task.get('result')
+
+        # 从MongoDB文档中构造 analysis_results 供报告服务使用
+        # 优先使用 summary / analysts / research_depth / formatted_decision 等字段
+        analysis_results = {
+            "analysis_id": db_report.get("analysis_id"),
+            "stock_symbol": db_report.get("stock_symbol"),
+            "analysis_date": db_report.get("analysis_date"),
+            "summary": db_report.get("summary"),
+            "analysts": db_report.get("analysts", []),
+            "research_depth": db_report.get("research_depth", 1),
+            "decision": db_report.get("formatted_decision", {}),
+            # 报告生成器期望的模块化报告字段，从 reports 中拆分/映射
+            **db_report.get("reports", {}),
+        }
+
         if not analysis_results:
             raise HTTPException(
                 status_code=400,

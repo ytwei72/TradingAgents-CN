@@ -4,20 +4,13 @@ from typing import List, Optional, Dict, Any
 import uuid
 import datetime
 import asyncio
-from tradingagents.utils.analysis_runner import run_stock_analysis
-from tradingagents.utils.task_control_manager import (
-    register_task, unregister_task, pause_task, resume_task, 
-    stop_task, get_task_state
-)
+
+from tradingagents.tasks import get_task_manager, TaskStatus
 from tradingagents.utils.logging_manager import get_logger
-from tradingagents.tasks import get_task_state_machine
+
 
 router = APIRouter()
-logger = get_logger('api_analysis')
-
-
-# In-memory store for analysis tasks (replace with database in production)
-analysis_tasks = {}
+logger = get_logger("api_analysis")
 
 class AnalysisRequest(BaseModel):
     stock_symbol: str = Field(..., description="Stock symbol (e.g., AAPL, 000001)")
@@ -35,115 +28,13 @@ class AnalysisResponse(BaseModel):
     status: str
     message: str
 
-def run_analysis_task(analysis_id: str, request: AnalysisRequest):
-    """Background task wrapper for running analysis"""
-    try:
-        # Get state machine instance
-        state_machine = get_task_state_machine()
-        
-        # Update task status to running
-        analysis_tasks[analysis_id]['status'] = 'running'
-        state_machine.update_task(analysis_id, {
-            'status': 'running',
-            'progress': {
-                'message': '分析任务开始执行'
-            }
-        })
-        
-        # Mock progress callback for now
-        def progress_callback(message, step=None, total_steps=None):
-            analysis_tasks[analysis_id]['progress'].append({
-                'message': message,
-                'step': step,
-                'total_steps': total_steps,
-                'timestamp': datetime.datetime.now().isoformat()
-            })
-            analysis_tasks[analysis_id]['current_message'] = message
-            
-            # Update state machine with progress
-            state_machine.update_task(analysis_id, {
-                'progress': {
-                    'current_step': step if step is not None else 0,
-                    'total_steps': total_steps if total_steps is not None else 0,
-                    'percentage': (step / total_steps * 100) if (step and total_steps) else 0,
-                    'message': message
-                }
-            })
 
-        # Prepare configuration
-        # Note: You might need to adapt how config is passed depending on run_stock_analysis signature
-        # For now, we map the request fields to the function arguments
-        
-        # Default LLM provider/model (should be configurable via env or request)
-        llm_provider = "dashscope" # Default or from env
-        llm_model = "qwen-max" # Default or from env
-        
-        if request.extra_config:
-             llm_provider = request.extra_config.get('llm_provider', llm_provider)
-             llm_model = request.extra_config.get('llm_model', llm_model)
-
-        results = run_stock_analysis(
-            stock_symbol=request.stock_symbol,
-            analysis_date=request.analysis_date or datetime.date.today().strftime('%Y-%m-%d'),
-            analysts=request.analysts,
-            research_depth=request.research_depth,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
-            market_type=request.market_type,
-            progress_callback=progress_callback,
-            analysis_id=analysis_id
-            # async_tracker is omitted for simplicity in this first pass, 
-            # but should be integrated if full feature parity is needed
-        )
-
-        analysis_tasks[analysis_id]['status'] = 'completed'
-        analysis_tasks[analysis_id]['result'] = results
-        
-        # Update state machine with completion
-        state_machine.update_task(analysis_id, {
-            'status': 'completed',
-            'progress': {
-                'percentage': 100.0,
-                'message': '分析任务已完成'
-            }
-        })
-        
-    except asyncio.CancelledError:
-        # Gracefully handle task cancellation during shutdown
-        logger.info(f"Analysis task {analysis_id} was cancelled (server shutdown)")
-        if analysis_id in analysis_tasks:
-            analysis_tasks[analysis_id]['status'] = 'cancelled'
-            analysis_tasks[analysis_id]['error'] = 'Task cancelled due to server shutdown'
-            
-            # Update state machine
-            state_machine.update_task(analysis_id, {
-                'status': 'cancelled',
-                'error': 'Task cancelled due to server shutdown'
-            })
-        raise  # Re-raise to allow proper cleanup
-    except Exception as e:
-        logger.error(f"Analysis failed for {analysis_id}: {e}")
-        if analysis_id in analysis_tasks:
-            analysis_tasks[analysis_id]['status'] = 'failed'
-            analysis_tasks[analysis_id]['error'] = str(e)
-            
-            # Update state machine with error
-            state_machine.update_task(analysis_id, {
-                'status': 'failed',
-                'error': str(e)
-            })
 
 @router.post("/start", response_model=AnalysisResponse)
-async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks):
-    analysis_id = str(uuid.uuid4())
+async def start_analysis(request: AnalysisRequest):
+    task_manager = get_task_manager()
     
-    # Register task with control manager
-    register_task(analysis_id)
-    
-    # Create task in state machine
-    state_machine = get_task_state_machine()
     task_params = {
-        'task_id': analysis_id,
         'stock_symbol': request.stock_symbol,
         'market_type': request.market_type,
         'analysis_date': request.analysis_date,
@@ -154,18 +45,8 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
         'custom_prompt': request.custom_prompt,
         'extra_config': request.extra_config
     }
-    state_machine.create_task(task_params)
     
-    analysis_tasks[analysis_id] = {
-        'id': analysis_id,
-        'status': 'pending',
-        'request': request.dict(),
-        'progress': [],
-        'current_message': 'Initializing...',
-        'created_at': datetime.datetime.now().isoformat()
-    }
-    
-    background_tasks.add_task(run_analysis_task, analysis_id, request)
+    analysis_id = task_manager.start_task(task_params)
     
     return {
         "analysis_id": analysis_id,
@@ -176,41 +57,53 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
 
 @router.get("/{analysis_id}/status")
 async def get_analysis_status(analysis_id: str):
-    if analysis_id not in analysis_tasks:
+    """获取分析任务状态（统一使用任务状态机）"""
+    task_manager = get_task_manager()
+    current_state = task_manager.get_task_status(analysis_id)
+    if not current_state:
         raise HTTPException(status_code=404, detail="Analysis ID not found")
-    
-    task = analysis_tasks[analysis_id]
+
+    # 取最近的若干历史进度记录
+    history = task_manager.get_task_history(analysis_id)
+    progress_log = []
+    for item in history[-5:]:
+        progress = item.get('progress') or {}
+        if progress:
+            progress_log.append(progress)
+
     return {
         "analysis_id": analysis_id,
-        "status": task['status'],
-        "current_message": task.get('current_message'),
-        "progress_log": task.get('progress')[-5:] if task.get('progress') else [], # Return last 5 logs
-        "error": task.get('error')
+        "status": current_state.get('status'),
+        "current_message": (current_state.get('progress') or {}).get('message'),
+        "progress_log": progress_log,
+        "error": current_state.get('error'),
     }
 
 @router.get("/{analysis_id}/result")
 async def get_analysis_result(analysis_id: str):
-    if analysis_id not in analysis_tasks:
+    """获取分析结果（从任务状态机读取）"""
+    task_manager = get_task_manager()
+    current_state = task_manager.get_task_status(analysis_id)
+    if not current_state:
         raise HTTPException(status_code=404, detail="Analysis ID not found")
-    
-    task = analysis_tasks[analysis_id]
-    if task['status'] != 'completed':
-        raise HTTPException(status_code=400, detail=f"Analysis not completed. Current status: {task['status']}")
-        
-    return task.get('result')
+
+    status = current_state.get('status')
+    if status != TaskStatus.COMPLETED.value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Analysis not completed. Current status: {status}",
+        )
+
+    return current_state.get('result')
 
 @router.post("/{analysis_id}/pause", response_model=AnalysisResponse)
 async def pause_analysis(analysis_id: str):
     """暂停分析任务"""
-    if analysis_id not in analysis_tasks:
-        raise HTTPException(status_code=404, detail="Analysis ID not found")
+    task_manager = get_task_manager()
     
-    success = pause_task(analysis_id)
+    success = task_manager.pause_task(analysis_id)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to pause task")
-    
-    # Update task status in memory
-    analysis_tasks[analysis_id]['status'] = 'paused'
     
     return {
         "analysis_id": analysis_id,
@@ -221,15 +114,11 @@ async def pause_analysis(analysis_id: str):
 @router.post("/{analysis_id}/resume", response_model=AnalysisResponse)
 async def resume_analysis(analysis_id: str):
     """恢复分析任务"""
-    if analysis_id not in analysis_tasks:
-        raise HTTPException(status_code=404, detail="Analysis ID not found")
+    task_manager = get_task_manager()
     
-    success = resume_task(analysis_id)
+    success = task_manager.resume_task(analysis_id)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to resume task")
-    
-    # Update task status in memory
-    analysis_tasks[analysis_id]['status'] = 'running'
     
     return {
         "analysis_id": analysis_id,
@@ -240,15 +129,13 @@ async def resume_analysis(analysis_id: str):
 @router.post("/{analysis_id}/stop", response_model=AnalysisResponse)
 async def stop_analysis(analysis_id: str):
     """停止分析任务"""
-    if analysis_id not in analysis_tasks:
-        raise HTTPException(status_code=404, detail="Analysis ID not found")
+    task_manager = get_task_manager()
     
-    success = stop_task(analysis_id)
+    success = task_manager.stop_task(analysis_id)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to stop task")
-    
-    # Update task status in memory
-    analysis_tasks[analysis_id]['status'] = 'stopped'
+
+    # 这里不立即调用 unregister_task，等待后台任务自然退出时注销
     
     return {
         "analysis_id": analysis_id,
@@ -260,8 +147,8 @@ async def stop_analysis(analysis_id: str):
 @router.get("/{analysis_id}/state")
 async def get_task_current_state(analysis_id: str):
     """获取任务当前状态（来自状态机）"""
-    state_machine = get_task_state_machine()
-    state = state_machine.get_current_state(analysis_id)
+    task_manager = get_task_manager()
+    state = task_manager.get_task_status(analysis_id)
     
     if not state:
         raise HTTPException(status_code=404, detail="Task state not found")
@@ -279,8 +166,8 @@ async def get_task_history_states(analysis_id: str):
     Returns:
         完整的历史状态列表（JSON数组）
     """
-    state_machine = get_task_state_machine()
-    history = state_machine.get_history_states(analysis_id)
+    task_manager = get_task_manager()
+    history = task_manager.get_task_history(analysis_id)
     
     if not history:
         raise HTTPException(status_code=404, detail="Task history not found")
