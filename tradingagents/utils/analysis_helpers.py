@@ -10,7 +10,7 @@ from pathlib import Path
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.messaging.business.messages import NodeStatus
-logger = get_logger('web')
+logger = get_logger('analysis')
 
 
 def validate_environment(

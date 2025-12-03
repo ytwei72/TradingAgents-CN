@@ -2,6 +2,15 @@
 TradingAgents API 主应用
 """
 
+import sys
+from pathlib import Path
+
+# 将项目根目录添加到 Python 路径
+# 这样可以直接运行 python app/main.py
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -27,6 +36,12 @@ from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.messaging.config import get_message_handler, is_message_mode_enabled
 from tradingagents.messaging.engine.websocket_engine import WebSocketEngine
+
+# 在模块级别配置日志，确保在 uvicorn 启动时就生效
+# 降低 watchfiles 的日志级别，减少开发模式下的噪音
+logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
+logging.getLogger("watchfiles").setLevel(logging.WARNING)
+
 
 async def lifespan(app: FastAPI):
     # Startup

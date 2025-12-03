@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { startAnalysis, getAnalysisStatus, getAnalysisResult, pauseAnalysis, resumeAnalysis, stopAnalysis, type AnalysisRequest } from '../api';
 import MarkdownIt from 'markdown-it';
 
@@ -35,6 +35,91 @@ const result = ref<any>(null);
 const error = ref<string | null>(null);
 const showAdvanced = ref(false);
 
+// Task Control State
+const autoRefresh = ref(true);
+const pollingTimer = ref<any>(null);
+const ws = ref<WebSocket | null>(null);
+
+// --- WebSocket Logic ---
+
+const connectWebSocket = () => {
+    if (ws.value) return; // Already connected
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = 'localhost:8000'; // Assuming backend is on 8000, adjust if needed
+    const wsUrl = `${protocol}//${host}/ws/notifications`;
+
+    ws.value = new WebSocket(wsUrl);
+
+    ws.value.onopen = () => {
+        console.log('WebSocket Connected');
+        // Send heartbeat
+        setInterval(() => {
+            if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+                ws.value.send('ping');
+            }
+        }, 30000);
+    };
+
+    ws.value.onmessage = (event) => {
+        if (event.data === 'pong') return;
+
+        // If Auto Refresh is ON, ignore WS messages for state update
+        if (autoRefresh.value) return;
+
+        try {
+            const data = JSON.parse(event.data);
+            if (data.topic === 'task/progress' && data.payload) {
+                const payload = data.payload;
+                
+                // Only update if it matches current analysisId
+                if (payload.analysis_id !== analysisId.value) return;
+
+                // Update status if provided (infer from message or payload if available)
+                if (status.value !== 'running' && status.value !== 'paused') {
+                     status.value = 'running';
+                }
+
+                // Add to progress log
+                const newLog = {
+                    message: payload.message,
+                    step: payload.current_step,
+                    timestamp: data.timestamp || new Date().toISOString()
+                };
+                
+                progressLog.value.push(newLog);
+
+                if (payload.status) {
+                    status.value = payload.status;
+                    if (payload.status === 'completed') {
+                         handleCompletion();
+                    } else if (payload.status === 'failed') {
+                         handleFailure(payload.error || 'Unknown error');
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Error parsing WS message:', e);
+        }
+    };
+
+    ws.value.onclose = () => {
+        console.log('WebSocket Disconnected');
+        ws.value = null;
+    };
+
+    ws.value.onerror = (err) => {
+        console.error('WebSocket Error:', err);
+    };
+};
+
+const disconnectWebSocket = () => {
+    if (ws.value) {
+        ws.value.close();
+        ws.value = null;
+    }
+};
+
 // --- API Interactions ---
 
 const start = async () => {
@@ -60,21 +145,32 @@ const start = async () => {
     const res = await startAnalysis(apiRequest);
     analysisId.value = res.analysis_id;
     status.value = res.status;
-    pollStatus();
+    
+    // Connect WS immediately
+    connectWebSocket();
+
+    // Initial check: if autoRefresh is true, start polling.
+    // If false, we rely on WS (which is connected).
+    if (autoRefresh.value) {
+        startPolling();
+    }
   } catch (e: any) {
     error.value = e.message || '启动分析失败';
     loading.value = false;
   }
 };
 
-const pollStatus = async () => {
-  if (!analysisId.value) return;
+const startPolling = () => {
+  if (pollingTimer.value) clearInterval(pollingTimer.value);
   
-  const interval = setInterval(async () => {
+  pollingTimer.value = setInterval(async () => {
     if (!analysisId.value) {
-        clearInterval(interval);
+        stopPolling();
         return;
     }
+    
+    // Double check autoRefresh, though watcher handles it too
+    if (!autoRefresh.value) return; 
 
     try {
       const res = await getAnalysisStatus(analysisId.value!);
@@ -82,22 +178,57 @@ const pollStatus = async () => {
       progressLog.value = res.progress_log || [];
       
       if (res.status === 'completed') {
-        clearInterval(interval);
-        const resData = await getAnalysisResult(analysisId.value!);
-        result.value = resData;
-        loading.value = false;
+        handleCompletion();
       } else if (res.status === 'failed' || res.status === 'stopped' || res.status === 'cancelled') {
-        clearInterval(interval);
-        if (res.status === 'failed') {
-            error.value = res.error || '分析失败';
-        }
-        loading.value = false;
+        handleFailure(res.error);
       }
     } catch (e) {
       console.error(e);
     }
-  }, 2000);
+  }, 3000); // Changed to 3s as per requirement
 };
+
+const stopPolling = () => {
+    if (pollingTimer.value) {
+        clearInterval(pollingTimer.value);
+        pollingTimer.value = null;
+    }
+};
+
+const handleCompletion = async () => {
+    stopPolling();
+    // disconnectWebSocket(); // Optional: keep open for other notifications?
+    status.value = 'completed';
+    try {
+        const resData = await getAnalysisResult(analysisId.value!);
+        result.value = resData;
+    } catch(e) {
+        console.error(e);
+    }
+    loading.value = false;
+};
+
+const handleFailure = (errMsg?: string) => {
+    stopPolling();
+    status.value = 'failed'; // or stopped/cancelled
+    if (errMsg) error.value = errMsg;
+    loading.value = false;
+};
+
+// Watcher for Auto Refresh
+watch(autoRefresh, (newVal) => {
+    if (newVal) {
+        // Turned ON: Start polling
+        startPolling();
+    } else {
+        // Turned OFF: Stop polling
+        stopPolling();
+        // Ensure WS is connected (should be, but check)
+        if (!ws.value && analysisId.value) {
+            connectWebSocket();
+        }
+    }
+});
 
 const pause = async () => {
     if (!analysisId.value) return;
@@ -121,14 +252,23 @@ const resume = async () => {
 
 const stop = async () => {
     if (!analysisId.value) return;
+    if (!confirm('确定要停止当前分析任务吗？此操作不可恢复。')) return;
+    
     try {
         await stopAnalysis(analysisId.value);
         status.value = 'stopped';
         loading.value = false;
+        stopPolling();
+        disconnectWebSocket();
     } catch (e: any) {
         error.value = e.message || '停止失败';
     }
 };
+
+onUnmounted(() => {
+    stopPolling();
+    disconnectWebSocket();
+});
 
 // --- Computed ---
 
@@ -328,15 +468,13 @@ const formattedLogs = computed(() => {
 
         <!-- Analysis Process / Results -->
         <section v-if="analysisId || result" class="bg-[#1e293b] rounded-xl p-6 shadow-lg border border-gray-700">
-           <div class="flex items-center justify-between mb-6 border-b border-gray-700 pb-4">
-              <h2 class="text-xl font-semibold text-white flex items-center">
-                 <span class="mr-2">📄</span>
-                 {{ form.stock_symbol }} - 详细分析步骤日志
-              </h2>
-              <div class="flex items-center space-x-4">
-                 <div class="text-sm text-gray-400">分析ID: <span class="font-mono text-gray-300">{{ analysisId }}</span></div>
+           <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 border-b border-gray-700 pb-4 gap-4">
+              <div class="flex items-center">
+                 <h2 class="text-xl font-semibold text-white flex items-center mr-4">
+                    <span class="mr-2">📄</span>
+                    {{ form.stock_symbol }} - 详细分析步骤日志
+                 </h2>
                  <div class="flex items-center space-x-2">
-                    <span class="text-sm text-gray-400">状态:</span>
                     <span class="px-2 py-0.5 rounded text-xs font-bold uppercase" 
                         :class="{
                             'bg-green-900 text-green-300': status === 'completed',
@@ -346,6 +484,33 @@ const formattedLogs = computed(() => {
                         }">
                         {{ status }}
                     </span>
+                 </div>
+              </div>
+              
+              <div class="flex items-center space-x-4 flex-wrap gap-y-2">
+                 <!-- Auto Refresh Toggle -->
+                 <label class="flex items-center space-x-2 cursor-pointer select-none">
+                    <div class="relative">
+                       <input type="checkbox" v-model="autoRefresh" class="sr-only peer">
+                       <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </div>
+                    <span class="text-sm text-gray-300">定时刷新</span>
+                 </label>
+
+                 <!-- Control Buttons -->
+                 <div class="flex items-center space-x-2">
+                    <button v-if="status === 'running'" @click="pause" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded transition flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        暂停
+                    </button>
+                    <button v-if="status === 'paused'" @click="resume" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        继续
+                    </button>
+                    <button v-if="status === 'running' || status === 'paused'" @click="stop" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path></svg>
+                        停止
+                    </button>
                  </div>
               </div>
            </div>
