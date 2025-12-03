@@ -20,15 +20,37 @@ import asyncio
 
 from app.core.config import settings
 from app.core.startup_validator import validate_startup_config
-from app.routers import health, analysis, reports, notifications
+from app.routers import health, analysis, reports, notifications, websocket
+from app.services.websocket_manager import manager as ws_manager
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
+from tradingagents.messaging.config import get_message_handler, is_message_mode_enabled
+from tradingagents.messaging.engine.websocket_engine import WebSocketEngine
 
 async def lifespan(app: FastAPI):
     # Startup
     validate_startup_config()
     logging.basicConfig(level=settings.LOG_LEVEL)
+    
+    # 注册WebSocket广播回调
+    if is_message_mode_enabled():
+        handler = get_message_handler()
+        if handler and isinstance(handler.engine, WebSocketEngine):
+            # 获取当前运行的事件循环（主线程循环）
+            main_loop = asyncio.get_running_loop()
+            
+            # 定义同步包装器，使用捕获的主线程循环
+            def broadcast_wrapper(message):
+                try:
+                    # 使用 run_coroutine_threadsafe 将协程提交到主线程循环
+                    asyncio.run_coroutine_threadsafe(ws_manager.broadcast(message), main_loop)
+                except Exception as e:
+                    logging.error(f"WebSocket广播回调异常: {e}")
+            
+            handler.engine.set_broadcast_callback(broadcast_wrapper)
+            logging.info("已注册WebSocket广播回调到消息引擎")
+            
     yield
     # Shutdown
 
@@ -61,6 +83,7 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(reports.router, prefix="/reports", tags=["reports"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
+app.include_router(websocket.router, tags=["websocket"])
 
 @app.get("/")
 async def root():

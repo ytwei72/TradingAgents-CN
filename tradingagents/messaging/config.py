@@ -14,6 +14,7 @@ from .engine.redis_engine import RedisPubSubEngine
 from .engine.memory_engine import MemoryEngine
 from .handler.message_handler import MessageHandler
 from .business.handler import ProgressMessageHandler
+from .engine.websocket_engine import WebSocketEngine
 
 logger = get_logger('messaging.config')
 
@@ -69,6 +70,9 @@ class MessageConfig:
                     "port": 6379,
                     "password": None,
                     "db": 0
+                },
+                "websocket": {
+                    "enabled": True
                 }
             },
             "topics": {
@@ -106,6 +110,9 @@ class MessageConfig:
         elif engine_type == 'memory':
             logger.info("创建内存消息引擎")
             return MemoryEngine(engine_config)
+        elif engine_type == 'websocket':
+            logger.info("创建WebSocket消息引擎")
+            return WebSocketEngine(engine_config)
         else:
             raise ValueError(f"不支持的消息引擎类型: {engine_type}")
     
