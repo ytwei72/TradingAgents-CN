@@ -200,38 +200,44 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
         # 如果任务不在管理器中（例如非任务管理器启动的任务），创建临时状态机
         state_machine = TaskStateMachine(analysis_id)
     
-    # 从状态机获取当前任务信息
-    current_state = state_machine.get_current_state()
-    if current_state is None:
+    # 从状态机获取当前任务对象
+    task_obj = state_machine.get_task_object()
+    if task_obj is None:
         # 创建初始任务
         task_params = {'task_id': analysis_id}
-        initial_state = state_machine.initialize(task_params)
-        current_state = initial_state
+        task_obj = state_machine.initialize(task_params)
         logger.warning(f"任务 {analysis_id} 不存在，已创建初始状态")
     
-    progress = current_state.get('progress', {})
-    current_step = progress.get('current_step', 0)
-    total_steps = progress.get('total_steps', 10)  # 默认总步骤数，如果状态机无则假设
-    step_index = current_step  # 使用当前步骤作为索引，无需查找
+    # 获取当前步骤信息
+    current_state = state_machine.get_current_state() or {}
+    current_step_index = current_state.get('step_index', 0)
     
-    # 计算进度步骤
-    if node_status == 'complete':
-        progress_step = step_index
-        next_step = min(step_index + 1, total_steps)
-        progress_percentage = (next_step + 1) / total_steps * 100 if total_steps > 0 else 0
-    elif node_status == 'start':
-        progress_step = step_index
-        progress_percentage = (step_index + 1) / total_steps * 100 if total_steps > 0 else 0
+    progress = task_obj.get('progress', {})
+    total_steps = progress.get('total_steps', 10)  # 默认总步骤数
+    
+    # 根据节点状态决定步骤索引和状态
+    if node_status == 'start':
+        # 开始新步骤：递增索引
+        step_index = current_step_index + 1
+        step_status = None  # 新步骤开始时不设置 step_status，由 step_name 触发新步骤
+    elif node_status == 'complete':
+        # 完成当前步骤：保持当前索引
+        step_index = current_step_index
+        step_status = 'completed'  # 明确标记步骤完成
     else:  # error
-        progress_step = step_index
-        progress_percentage = (step_index + 1) / total_steps * 100 if total_steps > 0 else 0
+        # 错误：保持当前索引
+        step_index = current_step_index
+        step_status = 'failed'  # 明确标记步骤失败
+    
+    # 计算进度百分比
+    progress_percentage = (step_index + 1) / total_steps * 100 if total_steps > 0 else 0
     
     # 步骤信息从模块名派生
     step_name = module_name
-    step_description = ''
     
-    # 计算elapsed_time从created_at
-    created_time = datetime.fromisoformat(current_state.get('created_at', datetime.now().isoformat()))
+    # 计算elapsed_time
+    created_at = task_obj.get('created_at', datetime.now().isoformat())
+    created_time = datetime.fromisoformat(created_at)
     elapsed_time = (datetime.now() - created_time).total_seconds()
     
     # 构建消息文本
@@ -244,42 +250,40 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     else:  # start
         last_message = f"模块开始: {module_name}"
     
-    # 估算剩余时间，简化
+    # 估算剩余时间
     remaining_time = max(0.0, total_steps * 5.0 - elapsed_time)  # 假设每步5秒
     
-    # 构建更新（设置当前步骤状态并添加到历史）
+    # 更新状态机（关键：传递 step_name 和 step_status）
     updates = {
-        'module_name': module_name,
-        'node_status': node_status,
-        'progress_step': progress_step,
-        'progress_percentage': progress_percentage,
-        'step_name': step_name,
-        'step_description': step_description,
+        'progress': {
+            'current_step': step_index,
+            'total_steps': total_steps,
+            'percentage': progress_percentage,
+            'message': last_message
+        },
         'elapsed_time': elapsed_time,
-        'remaining_time': remaining_time,
-        'last_message': last_message,
-        'duration': duration,
-        'error_message': error_message,
-        'timestamp': time.time(),
+        'remaining_time': remaining_time
     }
-    # 更新progress
-    progress_update = {
-        'current_step': progress_step,
-        'total_steps': total_steps,
-        'percentage': progress_percentage,
-        'message': last_message
-    }
-    updates['progress'] = progress_update
+    
+    # 只在开始新步骤时传递 step_name，触发新步骤创建
+    if node_status == 'start':
+        updates['step_name'] = step_name
+        updates['step_index'] = step_index
+    
+    # 在完成或错误时传递 step_status，触发步骤完成
+    if step_status:
+        updates['step_status'] = step_status
+    
     state_machine.update_state(updates)
     
     # 创建进度消息（直接发布）
     progress_msg = TaskProgressMessage(
         analysis_id=analysis_id,
-        current_step=progress_step,
+        current_step=step_index,
         total_steps=total_steps,
         progress_percentage=progress_percentage,
         current_step_name=step_name,
-        current_step_description=step_description,
+        current_step_description='',
         elapsed_time=elapsed_time,
         remaining_time=remaining_time,
         last_message=last_message,
@@ -290,6 +294,7 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     # 发布进度消息
     producer.publish_progress(progress_msg)
     
+
 
 
 def message_analysis_module(module_name: str, session_id: str = None):

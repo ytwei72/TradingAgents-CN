@@ -151,6 +151,30 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             progress_callback(message, step, total_steps)
         logger.info(f"[进度] {message}")
     
+    # 规范化分析师名称
+    # 将前端可能传入的长名称转换为系统内部使用的短名称
+    normalized_analysts = []
+    analyst_mapping = {
+        'market_analyst': 'market',
+        'social_media_analyst': 'social',
+        'news_analyst': 'news',
+        'fundamentals_analyst': 'fundamentals',
+        'fundamental_analyst': 'fundamentals',
+        # 保持原有短名称支持
+        'market': 'market',
+        'social': 'social',
+        'news': 'news',
+        'fundamentals': 'fundamentals'
+    }
+    
+    for a in analysts:
+        if a in analyst_mapping:
+            normalized_analysts.append(analyst_mapping[a])
+        else:
+            normalized_analysts.append(a)
+    
+    analysts = normalized_analysts
+
     # ========== 步骤1: 记录分析开始日志 ==========
     logger_manager, analysis_start_time = log_analysis_start(
         stock_symbol=stock_symbol,
@@ -519,7 +543,10 @@ def validate_analysis_params(stock_symbol, analysis_date, analysts, research_dep
     if not analysts or len(analysts) == 0:
         errors.append("必须至少选择一个分析师")
     
-    valid_analysts = ['market', 'social', 'news', 'fundamentals']
+    valid_analysts = [
+        'market', 'social', 'news', 'fundamentals',
+        'market_analyst', 'social_media_analyst', 'news_analyst', 'fundamentals_analyst', 'fundamental_analyst'
+    ]
     invalid_analysts = [a for a in analysts if a not in valid_analysts]
     if invalid_analysts:
         errors.append(f"无效的分析师类型: {', '.join(invalid_analysts)}")

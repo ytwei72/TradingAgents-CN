@@ -10,6 +10,7 @@ from pathlib import Path
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.messaging.business.messages import NodeStatus
+from tradingagents.utils.prep_step_state import update_preparation_step
 logger = get_logger('analysis')
 
 

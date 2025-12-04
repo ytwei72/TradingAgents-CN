@@ -38,6 +38,11 @@ class TaskStateMachine:
     """任务状态机
     
     管理单个任务的当前状态和历史状态，支持 Redis 和文件两种存储方式。
+    
+    数据结构说明：
+    1. task_props (任务对象): 包含任务的基本信息、参数、整体进度、时间统计等
+    2. current_step (当前状态): 仅包含当前步骤的信息（名称、序号、描述、状态）
+    3. history (历史状态): 步骤状态的列表集合
     """
     
     def __init__(self, task_id: str):
@@ -47,8 +52,14 @@ class TaskStateMachine:
             task_id: 任务 ID
         """
         self.task_id = task_id
-        self.current_state: Optional[Dict[str, Any]] = None  # 当前任务状态
-        self.history_state: List[Dict[str, Any]] = []  # 历史任务状态
+        
+        # 数据存储结构
+        self.task_props: Dict[str, Any] = {}      # 任务对象属性
+        self.current_step: Dict[str, Any] = {}    # 当前步骤状态
+        self.history: List[Dict[str, Any]] = []   # 历史步骤列表
+        
+        # 步骤时间跟踪
+        self._step_start_time: Optional[float] = None  # 当前步骤开始时间戳
         
         # 初始化存储后端
         self.redis_client = None
@@ -69,7 +80,6 @@ class TaskStateMachine:
         try:
             redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower() == 'true'
             if not redis_enabled:
-                # logger.info("📊 [任务状态机] Redis 已禁用，使用文件存储")
                 return False
             
             import redis
@@ -104,8 +114,9 @@ class TaskStateMachine:
             
     def _load_state(self):
         """加载状态"""
-        self.current_state = self._load_current_state()
-        self.history_state = self._load_history_states()
+        self.task_props = self._load_data("props") or {}
+        self.current_step = self._load_data("current_step") or {}
+        self.history = self._load_data("history") or []
     
     def initialize(self, task_params: Dict[str, Any]) -> Dict[str, Any]:
         """状态机初始化
@@ -114,194 +125,306 @@ class TaskStateMachine:
             task_params: 任务参数
             
         Returns:
-            创建的初始任务状态
-            
-        Raises:
-            ValueError: 如果任务已存在
+            初始化的任务对象
         """
-        # 检查任务是否已存在
-        if self.current_state is not None:
+        if self.task_props:
             raise ValueError(f"任务已存在: {self.task_id}")
         
-        # 创建初始状态
-        current_state = {
+        now = datetime.now().isoformat()
+        self._step_start_time = time.time()  # 记录步骤开始时间
+        
+        # 1. 初始化任务对象
+        self.task_props = {
             'task_id': self.task_id,
             'status': TaskStatus.PENDING.value,
-            'created_at': datetime.now().isoformat(),
-            'updated_at': datetime.now().isoformat(),
+            'created_at': now,
+            'updated_at': now,
             'params': task_params,
             'progress': {
-                'current_step': 0,
-                'total_steps': 0,
                 'percentage': 0.0,
-                'message': '任务已创建，等待执行'
+                'message': '任务已创建,等待执行',
+                'total_steps': 0,
+                'current_step': 0
             },
-            'error': None
+            'elapsed_time': 0.0,
+            'remaining_time': 0.0,
+            'error': None,
+            'result': None
         }
         
-        # 保存当前状态
-        self.current_state = current_state
-        self._save_current_state(current_state)
+        # 2. 初始化当前步骤
+        self.current_step = {
+            'step_name': 'Initialization',
+            'step_index': 0,
+            'description': 'Task initialized',
+            'status': 'pending',
+            'start_time': now,
+            'end_time': None,
+            'elapsed_time': 0.0,
+            'timestamp': now
+        }
         
-        # 初始化历史状态
-        self.history_state = [current_state.copy()]
-        self._save_history_state(current_state)
+        # 3. 初始化历史
+        self.history = [self.current_step.copy()]
+        
+        # 保存所有数据
+        self._save_all()
         
         logger.info(f"📊 [任务创建] 任务已创建: {self.task_id}")
-        return current_state
+        return self.get_task_object()
     
     def update_state(self, updates: Dict[str, Any]) -> Dict[str, Any]:
         """更新任务状态
         
         Args:
-            updates: 更新内容
+            updates: 更新内容，可以包含任务属性更新和步骤更新
             
         Returns:
-            更新后的任务状态
-            
-        Raises:
-            ValueError: 如果任务不存在
+            更新后的任务对象
         """
-        if self.current_state is None:
-            # 尝试重新加载
+        if not self.task_props:
             self._load_state()
-            if self.current_state is None:
+            if not self.task_props:
                 raise ValueError(f"任务不存在: {self.task_id}")
         
-        # 获取当前状态
-        current_state = self.current_state.copy()
+        now = datetime.now().isoformat()
+        now_timestamp = time.time()
+        self.task_props['updated_at'] = now
         
-        # 保存到历史
-        self.history_state.append(current_state.copy())
-        self._save_history_state(current_state)
+        # 1. 处理任务属性更新 (params, progress, status, result, error)
+        old_status = self.task_props.get('status')
+        new_status = updates.get('status', old_status)
         
-        # 更新当前状态
-        current_state['updated_at'] = datetime.now().isoformat()
+        if 'status' in updates:
+            self.task_props['status'] = new_status
         
-        # 更新字段
-        for key, value in updates.items():
-            if key == 'progress' and isinstance(value, dict):
-                # 合并进度信息
-                current_state.setdefault('progress', {}).update(value)
-            elif key == 'status':
-                # 验证状态转换
-                current_state['status'] = value
+        if 'progress' in updates and isinstance(updates['progress'], dict):
+            self.task_props.setdefault('progress', {}).update(updates['progress'])
+            
+        if 'result' in updates:
+            self.task_props['result'] = updates['result']
+            
+        if 'error' in updates:
+            self.task_props['error'] = updates['error']
+            
+        if 'elapsed_time' in updates:
+            self.task_props['elapsed_time'] = updates['elapsed_time']
+            
+        if 'remaining_time' in updates:
+            self.task_props['remaining_time'] = updates['remaining_time']
+            
+        # 2. 处理步骤更新
+        step_update_needed = False
+        new_step_info = {}
+        
+        # 显式步骤信息
+        if 'step_name' in updates:
+            new_step_info['step_name'] = updates['step_name']
+            step_update_needed = True
+            
+        if 'step_index' in updates:
+            new_step_info['step_index'] = updates['step_index']
+            step_update_needed = True
+            
+        # 从 progress 中提取步骤信息
+        if 'progress' in updates:
+            prog = updates['progress']
+            if 'message' in prog:
+                new_step_info['description'] = prog['message']
+                step_update_needed = True
+            if 'current_step' in prog:
+                new_step_info['step_index'] = prog['current_step']
+                step_update_needed = True
+        
+        # 从 updates 中提取 step_status（用于明确指定步骤状态）
+        step_status = updates.get('step_status')
+        
+        # 3. 检测步骤是否结束（状态变为完成、失败、停止、取消）
+        task_ended = new_status in [
+            TaskStatus.COMPLETED.value,
+            TaskStatus.FAILED.value,
+            TaskStatus.STOPPED.value,
+            TaskStatus.CANCELLED.value
+        ] and old_status not in [
+            TaskStatus.COMPLETED.value,
+            TaskStatus.FAILED.value,
+            TaskStatus.STOPPED.value,
+            TaskStatus.CANCELLED.value
+        ]
+        
+        # 步骤完成的判断：明确指定 step_status 为 completed/failed，或者有新步骤开始
+        step_completed = step_status in ['completed', 'failed', 'error']
+        new_step_starting = 'step_name' in new_step_info and new_step_info['step_name'] != self.current_step.get('step_name')
+        
+        if step_update_needed or task_ended:
+            # 计算当前步骤的耗时
+            if self._step_start_time is not None:
+                elapsed = now_timestamp - self._step_start_time
             else:
-                current_state[key] = value
+                elapsed = 0.0
+            
+            # 如果任务结束，完成当前步骤并添加到历史
+            if task_ended:
+                self.current_step['end_time'] = now
+                self.current_step['elapsed_time'] = elapsed
+                self.current_step['status'] = new_status
+                self.current_step['timestamp'] = now
+                
+                # 将完成的步骤添加到历史
+                self.history.append(self.current_step.copy())
+                
+                # 保存步骤和历史
+                self._save_data("current_step", self.current_step)
+                self._save_data("history", self.history)
+                
+                logger.debug(f"📊 [任务结束] {self.current_step.get('step_name', 'Unknown')} - "
+                           f"耗时: {elapsed:.2f}秒, 状态: {new_status}")
+            
+            # 如果当前步骤完成（但任务未结束），完成当前步骤并准备新步骤
+            elif step_completed:
+                # 完成当前步骤
+                self.current_step['end_time'] = now
+                self.current_step['elapsed_time'] = elapsed
+                self.current_step['status'] = 'completed' if step_status == 'completed' else 'failed'
+                self.current_step['timestamp'] = now
+                
+                # 更新描述（如果提供了新描述）
+                if 'description' in new_step_info:
+                    self.current_step['description'] = new_step_info['description']
+                
+                # 将完成的步骤添加到历史
+                self.history.append(self.current_step.copy())
+                
+                # 保存步骤和历史
+                self._save_data("current_step", self.current_step)
+                self._save_data("history", self.history)
+                
+                logger.debug(f"📊 [步骤完成] {self.current_step.get('step_name', 'Unknown')} - "
+                           f"耗时: {elapsed:.2f}秒, 状态: {self.current_step['status']}")
+            
+            # 如果是新步骤开始
+            elif new_step_starting:
+                # 先完成当前步骤（如果存在且还没完成）
+                if self.current_step.get('step_name') and self.current_step.get('step_name') != 'Initialization':
+                    # 只有当前步骤还在运行中时才需要完成并添加到历史
+                    # 如果已经是 completed/failed 状态，说明已经被 COMPLETE 消息处理过了
+                    if self.current_step.get('status') == 'running':
+                        self.current_step['end_time'] = now
+                        self.current_step['elapsed_time'] = elapsed
+                        self.current_step['status'] = 'completed'
+                        
+                        # 添加到历史
+                        self.history.append(self.current_step.copy())
+                
+                # 创建新步骤
+                self.current_step = {
+                    'step_name': new_step_info['step_name'],
+                    'step_index': new_step_info.get('step_index', self.current_step.get('step_index', 0) + 1),
+                    'description': new_step_info.get('description', ''),
+                    'status': 'running',
+                    'start_time': now,
+                    'end_time': None,
+                    'elapsed_time': 0.0,
+                    'timestamp': now
+                }
+                
+                # 重置步骤开始时间
+                self._step_start_time = now_timestamp
+                
+                # 保存步骤和历史
+                self._save_data("current_step", self.current_step)
+                self._save_data("history", self.history)
+                
+                logger.debug(f"📊 [新步骤] {self.current_step['step_name']} (索引: {self.current_step['step_index']})")
+
+            
+            else:
+                # 只是更新当前步骤的信息，不创建新步骤，不添加历史
+                if 'description' in new_step_info:
+                    self.current_step['description'] = new_step_info['description']
+                if 'step_index' in new_step_info:
+                    self.current_step['step_index'] = new_step_info['step_index']
+                
+                self.current_step['timestamp'] = now
+                # 保持当前状态，除非明确指定
+                if step_status:
+                    self.current_step['status'] = step_status
+                
+                # 保存当前步骤（不添加到历史）
+                self._save_data("current_step", self.current_step)
         
-        # 保存更新后的状态
-        self.current_state = current_state
-        self._save_current_state(current_state)
+        # 保存任务属性
+        self._save_data("props", self.task_props)
         
-        logger.debug(f"📊 [任务更新] 任务已更新: {self.task_id}, 状态: {current_state.get('status')}")
-        return current_state
+        return self.get_task_object()
+    
+    def get_task_object(self) -> Optional[Dict[str, Any]]:
+        """获取完整的任务对象 (包含 params, progress 等)"""
+        if not self.task_props:
+            self._load_state()
+            if not self.task_props:
+                return None
+        return self.task_props.copy()
     
     def get_current_state(self) -> Optional[Dict[str, Any]]:
-        """查询任务当前状态
-        
-        Returns:
-            当前状态，如果任务不存在则返回 None
-        """
-        # 总是尝试从内存返回，如果内存为空则尝试加载
-        if self.current_state is None:
-            self.current_state = self._load_current_state()
-            
-        return self.current_state.copy() if self.current_state else None
+        """获取当前步骤状态 (仅包含步骤信息)"""
+        if not self.current_step:
+            self._load_state()
+        return self.current_step.copy() if self.current_step else None
     
     def get_history_states(self) -> List[Dict[str, Any]]:
-        """查询任务历史状态（返回完整历史）
+        """获取历史步骤列表（包含当前正在运行的步骤）"""
+        if not self.history:
+            self._load_state()
         
-        Returns:
-            完整的历史状态列表（JSON数组格式）
-        """
-        if not self.history_state:
-            self.history_state = self._load_history_states()
-            
-        if not self.history_state:
-            return []
+        # 复制历史记录
+        history_with_current = [state.copy() for state in self.history]
         
-        # 返回完整历史的副本
-        return [state.copy() for state in self.history_state]
+        # 如果当前步骤存在且状态为 running，将其添加到历史末尾
+        if self.current_step and self.current_step.get('status') == 'running':
+            history_with_current.append(self.current_step.copy())
+        
+        return history_with_current
     
-    def _save_current_state(self, state: Dict[str, Any]):
-        """保存当前状态到存储"""
+    def _save_all(self):
+        """保存所有数据"""
+        self._save_data("props", self.task_props)
+        self._save_data("current_step", self.current_step)
+        self._save_data("history", self.history)
+        
+    def _save_data(self, key_suffix: str, data: Any):
+        """保存数据通用方法"""
         if self.use_redis:
             try:
-                key = f"task:current:{self.task_id}"
-                self.redis_client.set(key, json.dumps(state))
+                key = f"task:{self.task_id}:{key_suffix}"
+                self.redis_client.set(key, json.dumps(data))
             except Exception as e:
-                logger.error(f"📊 [存储错误] 保存当前状态失败: {e}")
+                logger.error(f"📊 [存储错误] Redis保存失败 ({key_suffix}): {e}")
         else:
             try:
-                file_path = self.storage_dir / f"{self.task_id}_current.json"
+                file_path = self.storage_dir / f"{self.task_id}_{key_suffix}.json"
                 with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(state, f, ensure_ascii=False, indent=2)
+                    json.dump(data, f, ensure_ascii=False, indent=2)
             except Exception as e:
-                logger.error(f"📊 [存储错误] 保存当前状态失败: {e}")
-    
-    def _save_history_state(self, state: Dict[str, Any]):
-        """保存历史状态到存储"""
+                logger.error(f"📊 [存储错误] 文件保存失败 ({key_suffix}): {e}")
+
+    def _load_data(self, key_suffix: str) -> Any:
+        """加载数据通用方法"""
         if self.use_redis:
             try:
-                key = f"task:history:{self.task_id}"
-                # 使用 RPUSH 追加到列表
-                self.redis_client.rpush(key, json.dumps(state))
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 保存历史状态失败: {e}")
-        else:
-            try:
-                file_path = self.storage_dir / f"{self.task_id}_history.json"
-                # 读取现有历史
-                history = []
-                if file_path.exists():
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        history = json.load(f)
-                # 追加新状态
-                history.append(state)
-                # 写回文件
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(history, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 保存历史状态失败: {e}")
-    
-    def _load_current_state(self) -> Optional[Dict[str, Any]]:
-        """从存储加载当前状态"""
-        if self.use_redis:
-            try:
-                key = f"task:current:{self.task_id}"
+                key = f"task:{self.task_id}:{key_suffix}"
                 data = self.redis_client.get(key)
                 return json.loads(data) if data else None
             except Exception as e:
-                logger.error(f"📊 [存储错误] 加载当前状态失败: {e}")
+                logger.error(f"📊 [存储错误] Redis加载失败 ({key_suffix}): {e}")
                 return None
         else:
             try:
-                file_path = self.storage_dir / f"{self.task_id}_current.json"
+                file_path = self.storage_dir / f"{self.task_id}_{key_suffix}.json"
                 if file_path.exists():
                     with open(file_path, 'r', encoding='utf-8') as f:
                         return json.load(f)
                 return None
             except Exception as e:
-                logger.error(f"📊 [存储错误] 加载当前状态失败: {e}")
+                logger.error(f"📊 [存储错误] 文件加载失败 ({key_suffix}): {e}")
                 return None
-    
-    def _load_history_states(self) -> List[Dict[str, Any]]:
-        """从存储加载历史状态"""
-        if self.use_redis:
-            try:
-                key = f"task:history:{self.task_id}"
-                data_list = self.redis_client.lrange(key, 0, -1)
-                return [json.loads(data) for data in data_list]
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 加载历史状态失败: {e}")
-                return []
-        else:
-            try:
-                file_path = self.storage_dir / f"{self.task_id}_history.json"
-                if file_path.exists():
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        return json.load(f)
-                return []
-            except Exception as e:
-                logger.error(f"📊 [存储错误] 加载历史状态失败: {e}")
-                return []

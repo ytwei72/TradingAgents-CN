@@ -135,7 +135,7 @@ async def stop_analysis(analysis_id: str):
 async def get_task_current_state(analysis_id: str):
     """获取任务当前状态（来自状态机）"""
     task_manager = get_task_manager()
-    state = task_manager.get_task_status(analysis_id)
+    state = task_manager.get_task_current_step(analysis_id)
     
     if not state:
         raise HTTPException(status_code=404, detail="Task state not found")

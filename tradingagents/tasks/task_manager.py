@@ -255,11 +255,15 @@ class TaskManager:
         
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务状态"""
-        return self._get_task_state_machine(task_id).get_current_state()
+        return self._get_task_state_machine(task_id).get_task_object()
 
     def get_task_history(self, task_id: str) -> List[Dict[str, Any]]:
         """获取任务历史"""
         return self._get_task_state_machine(task_id).get_history_states()
+
+    def get_task_current_step(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """获取任务当前步骤状态"""
+        return self._get_task_state_machine(task_id).get_current_state()
     
     def get_task_result(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务结果"""
