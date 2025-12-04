@@ -60,24 +60,11 @@ async def get_analysis_status(analysis_id: str):
     """获取分析任务状态（统一使用任务状态机）"""
     task_manager = get_task_manager()
     current_state = task_manager.get_task_status(analysis_id)
+    
     if not current_state:
         raise HTTPException(status_code=404, detail="Analysis ID not found")
-
-    # 取最近的若干历史进度记录
-    history = task_manager.get_task_history(analysis_id)
-    progress_log = []
-    for item in history[-5:]:
-        progress = item.get('progress') or {}
-        if progress:
-            progress_log.append(progress)
-
-    return {
-        "analysis_id": analysis_id,
-        "status": current_state.get('status'),
-        "current_message": (current_state.get('progress') or {}).get('message'),
-        "progress_log": progress_log,
-        "error": current_state.get('error'),
-    }
+    
+    return current_state
 
 @router.get("/{analysis_id}/result")
 async def get_analysis_result(analysis_id: str):

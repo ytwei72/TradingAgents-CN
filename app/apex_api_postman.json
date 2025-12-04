@@ -1,36 +1,86 @@
 {
     "info": {
         "_postman_id": "b6a8c8e1-1234-5678-9abc-def012345678",
-        "name": "TradingAgents API Verification",
-        "description": "Collection to verify the TradingAgents-CN Backend API",
+        "name": "TradingAgents API",
+        "description": "TradingAgents-CN 后端服务接口测试集合",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
         {
-            "name": "Health Check",
-            "request": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                    "raw": "http://localhost:8000/api/health",
-                    "protocol": "http",
-                    "host": [
-                        "localhost"
-                    ],
-                    "port": "8000",
-                    "path": [
-                        "api",
-                        "health"
-                    ]
+            "name": "健康检查",
+            "item": [
+                {
+                    "name": "根路径信息",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "健康检查",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/health",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "health"
+                            ]
+                        }
+                    },
+                    "response": []
                 }
-            },
-            "response": []
+            ]
         },
         {
             "name": "分析任务",
             "item": [
                 {
-                    "name": "Start Analysis",
+                    "name": "设置分析任务ID",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "pm.environment.set(\"analysis_id\", \"56805c4f-4884-4558-bb08-422def2bc02a\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/health",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "health"
+                            ]
+                        },
+                        "description": "此请求用于设置环境变量 analysis_id，方便后续测试使用"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "启动分析任务",
                     "event": [
                         {
                             "listen": "test",
@@ -54,15 +104,13 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"stock_symbol\": \"AAPL\",\n    \"market_type\": \"美股\",\n    \"research_depth\": 3,\n    \"analysts\": [\"market\", \"fundamentals\"],\n    \"include_sentiment\": true,\n    \"include_risk_assessment\": true\n}"
+                            "raw": "{\n    \"stock_symbol\": \"AAPL\",\n    \"market_type\": \"美股\",\n    \"research_depth\": 3,\n    \"analysts\": [\"market_analyst\", \"fundamental_analyst\"],\n    \"include_sentiment\": true,\n    \"include_risk_assessment\": true\n}"
                         },
                         "url": {
-                            "raw": "http://localhost:8000/api/analysis/start",
-                            "protocol": "http",
+                            "raw": "{{base_url}}/api/analysis/start",
                             "host": [
-                                "localhost"
+                                "{{base_url}}"
                             ],
-                            "port": "8000",
                             "path": [
                                 "api",
                                 "analysis",
@@ -73,17 +121,15 @@
                     "response": []
                 },
                 {
-                    "name": "Get Analysis Status",
+                    "name": "查询任务状态",
                     "request": {
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "http://localhost:8000/api/analysis/{{analysis_id}}/status",
-                            "protocol": "http",
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/status",
                             "host": [
-                                "localhost"
+                                "{{base_url}}"
                             ],
-                            "port": "8000",
                             "path": [
                                 "api",
                                 "analysis",
@@ -95,17 +141,15 @@
                     "response": []
                 },
                 {
-                    "name": "Get Analysis Result",
+                    "name": "获取分析结果",
                     "request": {
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "http://localhost:8000/api/analysis/{{analysis_id}}/result",
-                            "protocol": "http",
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/result",
                             "host": [
-                                "localhost"
+                                "{{base_url}}"
                             ],
-                            "port": "8000",
                             "path": [
                                 "api",
                                 "analysis",
@@ -117,17 +161,55 @@
                     "response": []
                 },
                 {
-                    "name": "Pause Analysis",
+                    "name": "查询任务当前状态",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/state",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "analysis",
+                                "{{analysis_id}}",
+                                "state"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "查询任务历史状态",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/history",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "analysis",
+                                "{{analysis_id}}",
+                                "history"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "暂停分析任务",
                     "request": {
                         "method": "POST",
                         "header": [],
                         "url": {
-                            "raw": "http://localhost:8000/api/analysis/{{analysis_id}}/pause",
-                            "protocol": "http",
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/pause",
                             "host": [
-                                "localhost"
+                                "{{base_url}}"
                             ],
-                            "port": "8000",
                             "path": [
                                 "api",
                                 "analysis",
@@ -139,17 +221,15 @@
                     "response": []
                 },
                 {
-                    "name": "Resume Analysis",
+                    "name": "恢复分析任务",
                     "request": {
                         "method": "POST",
                         "header": [],
                         "url": {
-                            "raw": "http://localhost:8000/api/analysis/{{analysis_id}}/resume",
-                            "protocol": "http",
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/resume",
                             "host": [
-                                "localhost"
+                                "{{base_url}}"
                             ],
-                            "port": "8000",
                             "path": [
                                 "api",
                                 "analysis",
@@ -161,17 +241,15 @@
                     "response": []
                 },
                 {
-                    "name": "Stop Analysis",
+                    "name": "停止分析任务",
                     "request": {
                         "method": "POST",
                         "header": [],
                         "url": {
-                            "raw": "http://localhost:8000/api/analysis/{{analysis_id}}/stop",
-                            "protocol": "http",
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/stop",
                             "host": [
-                                "localhost"
+                                "{{base_url}}"
                             ],
-                            "port": "8000",
                             "path": [
                                 "api",
                                 "analysis",
@@ -183,6 +261,93 @@
                     "response": []
                 }
             ]
+        },
+        {
+            "name": "报告管理",
+            "item": [
+                {
+                    "name": "生成报告",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"analysis_id\": \"{{analysis_id}}\",\n    \"format\": \"markdown\",\n    \"include_charts\": true,\n    \"language\": \"zh-CN\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/reports/generate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "generate"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "下载报告",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/{{report_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "{{report_id}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "WebSocket",
+            "item": [
+                {
+                    "name": "实时通知连接",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{ws_url}}/ws/notifications",
+                            "host": [
+                                "{{ws_url}}"
+                            ],
+                            "path": [
+                                "ws",
+                                "notifications"
+                            ]
+                        },
+                        "description": "WebSocket 连接，用于接收实时通知（如分析进度、系统消息）"
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000",
+            "type": "string"
+        },
+        {
+            "key": "ws_url",
+            "value": "ws://localhost:8000",
+            "type": "string"
         }
     ]
 }
