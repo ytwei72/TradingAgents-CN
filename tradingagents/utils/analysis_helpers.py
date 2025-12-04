@@ -15,7 +15,6 @@ logger = get_logger('analysis')
 
 
 def validate_environment(
-    update_progress: Optional[Callable] = None,
     analysis_id: Optional[str] = None,
     async_tracker: Optional[Any] = None
 ) -> tuple[bool, Optional[str]]:
@@ -23,13 +22,10 @@ def validate_environment(
     验证环境变量配置
     
     Args:
-        update_progress: 进度回调函数
         
     Returns:
         (是否通过验证, 错误信息)
     """
-    if update_progress:
-        update_progress("检查环境变量配置...")
     
     dashscope_key = os.getenv("DASHSCOPE_API_KEY")
     finnhub_key = os.getenv("FINNHUB_API_KEY")
@@ -40,18 +36,11 @@ def validate_environment(
     
     if not dashscope_key:
         error_msg = "DASHSCOPE_API_KEY 环境变量未设置"
-        if update_progress:
-            update_progress(f"❌ {error_msg}")
         return False, error_msg
     
     # if not finnhub_key:
     #     error_msg = "FINNHUB_API_KEY 环境变量未设置"
-    #     if update_progress:
-    #         update_progress(f"❌ {error_msg}")
     #     return False, error_msg
-    
-    if update_progress:
-        update_progress("✅ 环境变量验证通过")
     
     return True, None
 
@@ -187,7 +176,6 @@ def prepare_stock_data_for_analysis(
     stock_symbol: str,
     market_type: str,
     analysis_date: str,
-    update_progress: Optional[Callable] = None,
     analysis_id: Optional[str] = None,
     async_tracker: Optional[Any] = None
 ) -> tuple[bool, Optional[str], Optional[Any]]:
@@ -198,13 +186,10 @@ def prepare_stock_data_for_analysis(
         stock_symbol: 股票代码
         market_type: 市场类型
         analysis_date: 分析日期
-        update_progress: 进度回调函数
         
     Returns:
         (是否成功, 错误信息, 准备结果)
     """
-    if update_progress:
-        update_progress("🔍 验证股票代码并预获取数据...")
     
     try:
         from tradingagents.utils.stock_validator import prepare_stock_data
@@ -219,23 +204,17 @@ def prepare_stock_data_for_analysis(
         
         if not preparation_result.is_valid:
             error_msg = f"❌ 股票数据验证失败: {preparation_result.error_message}"
-            if update_progress:
-                update_progress(error_msg)
             logger.error(error_msg)
             return False, preparation_result.error_message, preparation_result
         
         # 数据预获取成功
         success_msg = f"✅ 数据准备完成: {preparation_result.stock_name} ({preparation_result.market_type})"
-        if update_progress:
-            update_progress(success_msg)
         logger.info(success_msg)
         logger.info(f"缓存状态: {preparation_result.cache_status}")
         return True, None, preparation_result
         
     except Exception as e:
         error_msg = f"❌ 数据预获取过程中发生错误: {str(e)}"
-        if update_progress:
-            update_progress(error_msg)
         logger.error(error_msg)
         return False, error_msg, None
 
@@ -361,8 +340,7 @@ def prepare_analysis_steps(
     llm_provider: str,
     llm_model: str,
     analysis_id: Optional[str],
-    async_tracker: Optional[Any],
-    update_progress: Optional[Callable] = None
+    async_tracker: Optional[Any]
 ) -> tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     """
     准备分析步骤：执行所有前期准备工作
@@ -385,7 +363,6 @@ def prepare_analysis_steps(
         llm_model: 模型名称
         analysis_id: 分析任务ID
         async_tracker: 异步进度跟踪器
-        update_progress: 进度回调函数
         
     Returns:
         (是否成功, 准备结果字典, 错误信息)
@@ -407,66 +384,36 @@ def prepare_analysis_steps(
     graph = None
     
     # Step 1: 任务控制检查
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step1_task_control", 1, "开始任务控制检查", 'start')
-    if update_progress:
-        update_progress("开始任务控制检查")
+    task_manager.update_task_progress(analysis_id, "任务控制检查", 1, "开始任务控制检查", 'start')
     if not check_task_control(analysis_id, async_tracker):
         error_msg = '任务已被停止'
-        if task_manager:
-            task_manager.update_task_progress(analysis_id, "step1_task_control", 1, error_msg, 'error')
-        if update_progress:
-            update_progress(error_msg)
+        task_manager.update_task_progress(analysis_id, "任务控制检查", 1, error_msg, 'error')
         return False, None, error_msg
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step1_task_control", 1, "任务控制检查完成", 'success')
-    if update_progress:
-        update_progress("任务控制检查完成")
+    task_manager.update_task_progress(analysis_id, "任务控制检查", 1, "任务控制检查完成", 'success')
     
     # Step 2: 数据预获取和验证
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step2_data_preparation", 2, "开始数据预获取和验证", 'start')
-    if update_progress:
-        update_progress("开始数据预获取和验证")
+    task_manager.update_task_progress(analysis_id, "数据预获取和验证", 2, "🔍 验证股票代码并预获取数据...", 'start')
     success, error_msg, preparation_result = prepare_stock_data_for_analysis(
-        stock_symbol, market_type, analysis_date, update_progress, analysis_id, async_tracker
+        stock_symbol, market_type, analysis_date, analysis_id, async_tracker
     )
     
     if not success:
         suggestion = getattr(preparation_result, 'suggestion', "请检查网络连接或稍后重试") if preparation_result else "请检查网络连接或稍后重试"
         full_error = f"{error_msg} ({suggestion})"
-        if task_manager:
-            task_manager.update_task_progress(analysis_id, "step2_data_preparation", 2, full_error, 'error')
-        if update_progress:
-            update_progress(full_error)
+        task_manager.update_task_progress(analysis_id, "数据预获取和验证", 2, full_error, 'error')
         return False, None, full_error
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step2_data_preparation", 2, "数据预获取和验证完成", 'success')
-    if update_progress:
-        update_progress("数据预获取和验证完成")
+    task_manager.update_task_progress(analysis_id, "数据预获取和验证", 2, "数据预获取和验证完成", 'success')
     
     # Step 3: 环境验证
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step3_environment_validation", 3, "开始环境验证", 'start')
-    if update_progress:
-        update_progress("开始环境验证")
-    env_valid, env_error = validate_environment(update_progress, analysis_id, async_tracker)
+    task_manager.update_task_progress(analysis_id, "环境验证", 3, "开始环境验证", 'start')
+    env_valid, env_error = validate_environment(analysis_id, async_tracker)
     if not env_valid:
-        if task_manager:
-            task_manager.update_task_progress(analysis_id, "step3_environment_validation", 3, f"环境验证失败：{env_error}", 'error')
-        if update_progress:
-            update_progress(f"环境验证失败：{env_error}")
+        task_manager.update_task_progress(analysis_id, "环境验证", 3, f"环境验证失败：{env_error}", 'error')
         return False, None, env_error
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step3_environment_validation", 3, "环境验证完成", 'success')
-    if update_progress:
-        update_progress("环境验证完成")
+    task_manager.update_task_progress(analysis_id, "环境验证", 3, "环境验证完成", 'success')
     
     # Step 4: 构建配置
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step4_config_building", 4, "开始构建配置", 'start')
-    if update_progress:
-        update_progress("开始构建配置...")
+    task_manager.update_task_progress(analysis_id, "构建配置", 4, "开始构建配置", 'start')
     try:
         config_builder = AnalysisConfigBuilder()
         config = config_builder.build_config(
@@ -475,16 +422,10 @@ def prepare_analysis_steps(
             research_depth=research_depth,
             market_type=market_type
         )
-        if task_manager:
-            task_manager.update_task_progress(analysis_id, "step4_config_building", 4, "配置构建完成", 'success')
-        if update_progress:
-            update_progress("配置构建完成")
+        task_manager.update_task_progress(analysis_id, "构建配置", 4, "配置构建完成", 'success')
     except Exception as e:
         error_msg = f"配置构建失败：{str(e)}"
-        if task_manager and analysis_id:
-            task_manager.update_task_progress(analysis_id, "step4_config_building", 4, error_msg, 'error')
-        if update_progress:
-            update_progress(error_msg)
+        task_manager.update_task_progress(analysis_id, "构建配置", 4, error_msg, 'error')
         raise
     
     logger.info(f"使用配置: {config}")
@@ -493,47 +434,29 @@ def prepare_analysis_steps(
     logger.info(f"分析日期: {analysis_date}")
     
     # Step 5: 格式化股票代码
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step5_symbol_formatting", 5, "开始格式化股票代码", 'start')
-    if update_progress:
-        update_progress("开始格式化股票代码...")
+    task_manager.update_task_progress(analysis_id, "格式化股票代码", 5, "开始格式化股票代码", 'start')
     formatted_symbol = format_stock_symbol(stock_symbol, market_type)
     
     market_icons = {"A股": "🇨🇳", "港股": "🇭🇰", "美股": "🇺🇸"}
     market_icon = market_icons.get(market_type, "📊")
     success_msg = f"✅ {market_icon} 股票代码格式化完成: {formatted_symbol}"
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step5_symbol_formatting", 5, success_msg, 'success')
-    if update_progress:
-        update_progress(success_msg)
+    task_manager.update_task_progress(analysis_id, "格式化股票代码", 5, success_msg, 'success')
     
     # Step 6: 初始化分析引擎
-    if task_manager:
-        task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, "开始初始化分析引擎", 'start')
-    if update_progress:
-        update_progress("开始初始化分析引擎...")
+    task_manager.update_task_progress(analysis_id, "初始化分析引擎", 6, "开始初始化分析引擎", 'start')
     
     if not check_task_control(analysis_id, async_tracker):
         error_msg = '任务已被停止'
-        if task_manager:
-            task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, error_msg, 'error')
-        if update_progress:
-            update_progress(error_msg)
+        task_manager.update_task_progress(analysis_id, "初始化分析引擎", 6, error_msg, 'error')
         return False, None, error_msg
     
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
         graph = TradingAgentsGraph(analysts, config=config, debug=False)
-        if task_manager:
-            task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, "分析引擎初始化完成", 'success')
-        if update_progress:
-            update_progress("分析引擎初始化完成")
+        task_manager.update_task_progress(analysis_id, "初始化分析引擎", 6, "分析引擎初始化完成", 'success')
     except Exception as e:
         error_msg = f"分析引擎初始化失败：{str(e)}"
-        if task_manager:
-            task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, error_msg, 'error')
-        if update_progress:
-            update_progress(error_msg)
+        task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, error_msg, 'error')
         raise
     
     # 返回准备结果

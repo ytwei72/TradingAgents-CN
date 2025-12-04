@@ -205,8 +205,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         llm_provider=llm_provider,
         llm_model=llm_model,
         analysis_id=analysis_id,
-        async_tracker=async_tracker,
-        update_progress=update_progress
+        async_tracker=async_tracker
     )
     
     if not prep_success:

@@ -1,0 +1,62 @@
+[
+    {
+        "step_name": "Initialization",
+        "step_index": 0,
+        "description": "Task initialized",
+        "status": "pending",
+        "start_time": "2025-12-04T20:05:38.140493",
+        "end_time": null,
+        "elapsed_time": 0.0,
+        "timestamp": "2025-12-04T20:05:38.140493"
+    },
+    {
+        "step_name": "market_analyst",
+        "step_index": 1,
+        "description": "模块完成: market_analyst (耗时: 40.75s)",
+        "status": "completed",
+        "start_time": "2025-12-04T20:05:40.716521",
+        "end_time": "2025-12-04T20:06:21.467396",
+        "elapsed_time": 40.75087523460388,
+        "timestamp": "2025-12-04T20:06:21.467396"
+    },
+    {
+        "step_name": "fundamentals_analyst",
+        "step_index": 2,
+        "description": "模块完成: fundamentals_analyst (耗时: 1.58s)",
+        "status": "completed",
+        "start_time": "2025-12-04T20:06:21.489849",
+        "end_time": "2025-12-04T20:06:23.071677",
+        "elapsed_time": 1.5818278789520264,
+        "timestamp": "2025-12-04T20:06:23.071677"
+    },
+    {
+        "step_name": "fundamentals_analyst",
+        "step_index": 3,
+        "description": "模块完成: fundamentals_analyst (耗时: 1.39s)",
+        "status": "completed",
+        "start_time": "2025-12-04T20:06:21.489849",
+        "end_time": "2025-12-04T20:06:24.508071",
+        "elapsed_time": 3.0182220935821533,
+        "timestamp": "2025-12-04T20:06:24.508071"
+    },
+    {
+        "step_name": "bull_researcher",
+        "step_index": 4,
+        "description": "模块完成: bull_researcher (耗时: 54.90s)",
+        "status": "completed",
+        "start_time": "2025-12-04T20:06:24.522823",
+        "end_time": "2025-12-04T20:07:19.428407",
+        "elapsed_time": 54.90558481216431,
+        "timestamp": "2025-12-04T20:07:19.428407"
+    },
+    {
+        "step_name": "bear_researcher",
+        "step_index": 5,
+        "description": "模块开始: bear_researcher",
+        "status": "running",
+        "start_time": "2025-12-04T20:07:19.449589",
+        "end_time": null,
+        "elapsed_time": 0.0,
+        "timestamp": "2025-12-04T20:07:19.449589"
+    }
+]
