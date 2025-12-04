@@ -401,6 +401,62 @@ class TaskManager:
         except Exception as e:
             logger.error(f"❌ [清理] 清理检查点文件失败: {e}")
 
+    def update_task_progress(self, task_id: str, step_name: str, step_index: int, description: str, status: str):
+        """更新任务进度状态并发布状态更新消息
+        
+        Args:
+            task_id: 任务ID
+            step_name: 步骤名称
+            step_index: 步骤索引
+            description: 步骤描述
+            status: 状态 ('start', 'success', 'error')
+        """
+        if not task_id:
+            return
+        
+        state_machine = self._get_task_state_machine(task_id)
+        
+        # 计算进度百分比
+        total_steps = 6  # 准备步骤总数
+        if status == 'start':
+            percentage = ((step_index - 1) / total_steps) * 100
+        else:
+            percentage = (step_index / total_steps) * 100
+        
+        updates = {
+            'progress': {
+                'current_step': step_index,
+                'total_steps': total_steps,
+                'percentage': percentage,
+                'message': description,
+            },
+            'step_name': step_name,
+            'step_status': status,
+        }
+        state_machine.update_state(updates)
+        
+        # 发布消息
+        try:
+            from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
+            if is_message_mode_enabled():
+                producer = get_message_producer()
+                if producer:
+                    current_state = state_machine.get_current_state()
+                    historical_states = state_machine.get_history_states()
+                    message_body = {
+                        "task_id": task_id,
+                        "current_state": current_state,
+                        "historical_states": historical_states,
+                        'step_name': step_name,
+                        'step_index': step_index,
+                        'description': description,
+                        'status': status,
+                    }
+                    producer.publish("task_status_update", message_body)
+                    logger.info(f"📤 发布任务状态更新: {task_id} - {step_name} - {status}")
+        except Exception as e:
+            logger.debug(f"发布任务状态更新失败: {e}")
+
 
 # 全局单例
 _task_manager = None

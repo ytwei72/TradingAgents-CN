@@ -10,7 +10,7 @@ from pathlib import Path
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.messaging.business.messages import NodeStatus
-from tradingagents.utils.prep_step_state import update_preparation_step
+from tradingagents.tasks import get_task_manager
 logger = get_logger('analysis')
 
 
@@ -28,40 +28,6 @@ def validate_environment(
     Returns:
         (是否通过验证, 错误信息)
     """
-    # 获取消息生产者（如果消息模式启用）
-    message_producer = None
-    if analysis_id:
-        try:
-            from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
-            message_producer = get_message_producer() if is_message_mode_enabled() else None
-        except Exception:
-            pass
-    
-    # 发布步骤4开始消息
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 3  # 步骤4（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="🔧 环境验证",
-                current_step_description="正在检查环境变量配置",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="检查环境变量配置...",
-                module_name="environment_validation",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.START.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤4消息失败: {e}")
-    
     if update_progress:
         update_progress("检查环境变量配置...")
     
@@ -83,31 +49,6 @@ def validate_environment(
     #     if update_progress:
     #         update_progress(f"❌ {error_msg}")
     #     return False, error_msg
-    
-    # 发布步骤4完成消息
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 3  # 步骤4（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="🔧 环境验证",
-                current_step_description="环境变量验证通过",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="✅ 环境变量验证通过",
-                module_name="environment_validation",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.COMPLETE.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤4完成消息失败: {e}")
     
     if update_progress:
         update_progress("✅ 环境变量验证通过")
@@ -262,40 +203,6 @@ def prepare_stock_data_for_analysis(
     Returns:
         (是否成功, 错误信息, 准备结果)
     """
-    # 获取消息生产者（如果消息模式启用）
-    message_producer = None
-    if analysis_id:
-        try:
-            from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
-            message_producer = get_message_producer() if is_message_mode_enabled() else None
-        except Exception:
-            pass
-    
-    # 发布步骤3开始消息
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 2  # 步骤3（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="🔍 数据预获取和验证",
-                current_step_description="正在验证股票代码并预获取数据",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="🔍 验证股票代码并预获取数据...",
-                module_name="data_preparation",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.START.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤3开始消息失败: {e}")
-    
     if update_progress:
         update_progress("🔍 验证股票代码并预获取数据...")
     
@@ -323,31 +230,6 @@ def prepare_stock_data_for_analysis(
             update_progress(success_msg)
         logger.info(success_msg)
         logger.info(f"缓存状态: {preparation_result.cache_status}")
-        
-        # 发布步骤3完成消息
-        if message_producer and analysis_id and async_tracker:
-            try:
-                import time
-                from tradingagents.messaging.business.messages import TaskProgressMessage
-                current_step = 2  # 步骤3（索引从0开始）
-                total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-                progress_msg = TaskProgressMessage(
-                    analysis_id=analysis_id,
-                    current_step=current_step,
-                    total_steps=total_steps,
-                    progress_percentage=progress_percentage,
-                    current_step_name="🔍 数据预获取和验证",
-                    current_step_description=success_msg,
-                    elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                    remaining_time=0,
-                    last_message=success_msg,
-                module_name="data_preparation",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.COMPLETE.value  # 任务节点状态
-                )
-                message_producer.publish_progress(progress_msg)
-            except Exception as e:
-                logger.debug(f"发布步骤3完成消息失败: {e}")
         return True, None, preparation_result
         
     except Exception as e:
@@ -509,6 +391,9 @@ def prepare_analysis_steps(
         (是否成功, 准备结果字典, 错误信息)
         准备结果字典包含: config, formatted_symbol, graph, session_id
     """
+    task_manager = get_task_manager()
+    if not task_manager or not analysis_id:
+        raise ValueError("Task manager or analysis_id: {analysis_id} is not available")
     from .analysis_config import AnalysisConfigBuilder
     
     # 生成会话ID
@@ -516,226 +401,140 @@ def prepare_analysis_steps(
     from datetime import datetime
     session_id = f"analysis_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
-    # ========== 准备步骤1: 任务控制检查 ==========
+    preparation_result = None
+    formatted_symbol = None
+    config = None
+    graph = None
+    
+    # Step 1: 任务控制检查
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step1_task_control", 1, "开始任务控制检查", 'start')
+    if update_progress:
+        update_progress("开始任务控制检查")
     if not check_task_control(analysis_id, async_tracker):
         error_msg = '任务已被停止'
+        if task_manager:
+            task_manager.update_task_progress(analysis_id, "step1_task_control", 1, error_msg, 'error')
+        if update_progress:
+            update_progress(error_msg)
         return False, None, error_msg
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step1_task_control", 1, "任务控制检查完成", 'success')
+    if update_progress:
+        update_progress("任务控制检查完成")
     
-    # ========== 准备步骤2: 数据预获取和验证 ==========
+    # Step 2: 数据预获取和验证
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step2_data_preparation", 2, "开始数据预获取和验证", 'start')
+    if update_progress:
+        update_progress("开始数据预获取和验证")
     success, error_msg, preparation_result = prepare_stock_data_for_analysis(
         stock_symbol, market_type, analysis_date, update_progress, analysis_id, async_tracker
     )
     
     if not success:
         suggestion = getattr(preparation_result, 'suggestion', "请检查网络连接或稍后重试") if preparation_result else "请检查网络连接或稍后重试"
-        return False, None, f"{error_msg} ({suggestion})"
+        full_error = f"{error_msg} ({suggestion})"
+        if task_manager:
+            task_manager.update_task_progress(analysis_id, "step2_data_preparation", 2, full_error, 'error')
+        if update_progress:
+            update_progress(full_error)
+        return False, None, full_error
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step2_data_preparation", 2, "数据预获取和验证完成", 'success')
+    if update_progress:
+        update_progress("数据预获取和验证完成")
     
-    # ========== 准备步骤3: 环境验证 ==========
+    # Step 3: 环境验证
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step3_environment_validation", 3, "开始环境验证", 'start')
+    if update_progress:
+        update_progress("开始环境验证")
     env_valid, env_error = validate_environment(update_progress, analysis_id, async_tracker)
     if not env_valid:
+        if task_manager:
+            task_manager.update_task_progress(analysis_id, "step3_environment_validation", 3, f"环境验证失败：{env_error}", 'error')
+        if update_progress:
+            update_progress(f"环境验证失败：{env_error}")
         return False, None, env_error
-    
-    # 获取消息生产者（如果消息模式启用）
-    message_producer = None
-    if analysis_id:
-        try:
-            from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
-            message_producer = get_message_producer() if is_message_mode_enabled() else None
-        except Exception:
-            pass
-    
-    # ========== 准备步骤4: 构建配置 ==========
-    # 发布步骤5开始消息（构建配置）
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 4  # 步骤5（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="⚙️ 构建配置",
-                current_step_description="正在构建配置",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="⚙️ 构建配置...",
-                module_name="config_builder",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.START.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤5消息失败: {e}")
-    
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step3_environment_validation", 3, "环境验证完成", 'success')
     if update_progress:
-        update_progress("⚙️ 构建配置...")
-    config_builder = AnalysisConfigBuilder()
-    config = config_builder.build_config(
-        llm_provider=llm_provider,
-        llm_model=llm_model,
-        research_depth=research_depth,
-        market_type=market_type
-    )
+        update_progress("环境验证完成")
+    
+    # Step 4: 构建配置
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step4_config_building", 4, "开始构建配置", 'start')
+    if update_progress:
+        update_progress("开始构建配置...")
+    try:
+        config_builder = AnalysisConfigBuilder()
+        config = config_builder.build_config(
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            research_depth=research_depth,
+            market_type=market_type
+        )
+        if task_manager:
+            task_manager.update_task_progress(analysis_id, "step4_config_building", 4, "配置构建完成", 'success')
+        if update_progress:
+            update_progress("配置构建完成")
+    except Exception as e:
+        error_msg = f"配置构建失败：{str(e)}"
+        if task_manager and analysis_id:
+            task_manager.update_task_progress(analysis_id, "step4_config_building", 4, error_msg, 'error')
+        if update_progress:
+            update_progress(error_msg)
+        raise
     
     logger.info(f"使用配置: {config}")
     logger.info(f"分析师列表: {analysts}")
     logger.info(f"股票代码: {stock_symbol}")
     logger.info(f"分析日期: {analysis_date}")
     
-    # 发布步骤5完成消息
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 4  # 步骤5（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="⚙️ 构建配置",
-                current_step_description="配置构建完成",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="✅ 配置构建完成",
-                module_name="config_builder",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.COMPLETE.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤5完成消息失败: {e}")
-    
+    # Step 5: 格式化股票代码
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step5_symbol_formatting", 5, "开始格式化股票代码", 'start')
     if update_progress:
-        update_progress("✅ 配置构建完成")
-    
-    # ========== 准备步骤5: 格式化股票代码 ==========
-    # 发布步骤6开始消息（格式化股票代码）
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 5  # 步骤6（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="📝 格式化股票代码",
-                current_step_description="正在格式化股票代码",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="📝 格式化股票代码...",
-                module_name="symbol_formatting",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.START.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤6消息失败: {e}")
-    
-    if update_progress:
-        update_progress("📝 格式化股票代码...")
+        update_progress("开始格式化股票代码...")
     formatted_symbol = format_stock_symbol(stock_symbol, market_type)
     
-    # 显示市场类型提示
     market_icons = {"A股": "🇨🇳", "港股": "🇭🇰", "美股": "🇺🇸"}
     market_icon = market_icons.get(market_type, "📊")
-    
-    # 发布步骤6完成消息
     success_msg = f"✅ {market_icon} 股票代码格式化完成: {formatted_symbol}"
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 5  # 步骤6（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="📝 格式化股票代码",
-                current_step_description=success_msg,
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message=success_msg,
-                module_name="symbol_formatting",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.COMPLETE.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤6完成消息失败: {e}")
-    
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step5_symbol_formatting", 5, success_msg, 'success')
     if update_progress:
         update_progress(success_msg)
     
-    # ========== 准备步骤6: 初始化分析引擎 ==========
-    # 发布步骤7开始消息（初始化分析引擎）
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 6  # 步骤7（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="🏗️ 初始化分析引擎",
-                current_step_description="正在初始化分析引擎",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="🔧 初始化分析引擎...",
-                module_name="graph_initialization",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.START.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤7消息失败: {e}")
-    
+    # Step 6: 初始化分析引擎
+    if task_manager:
+        task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, "开始初始化分析引擎", 'start')
     if update_progress:
-        update_progress("🔧 初始化分析引擎...")
+        update_progress("开始初始化分析引擎...")
     
     if not check_task_control(analysis_id, async_tracker):
         error_msg = '任务已被停止'
+        if task_manager:
+            task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, error_msg, 'error')
+        if update_progress:
+            update_progress(error_msg)
         return False, None, error_msg
     
-    from tradingagents.graph.trading_graph import TradingAgentsGraph
-    graph = TradingAgentsGraph(analysts, config=config, debug=False)
-    
-    # 发布步骤7完成消息
-    if message_producer and analysis_id and async_tracker:
-        try:
-            import time
-            from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 6  # 步骤7（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
-            progress_msg = TaskProgressMessage(
-                analysis_id=analysis_id,
-                current_step=current_step,
-                total_steps=total_steps,
-                progress_percentage=progress_percentage,
-                current_step_name="🏗️ 初始化分析引擎",
-                current_step_description="分析引擎初始化完成",
-                elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
-                remaining_time=0,
-                last_message="✅ 分析引擎初始化完成",
-                module_name="graph_initialization",  # 任务节点名称（英文ID）
-                node_status=NodeStatus.COMPLETE.value  # 任务节点状态
-            )
-            message_producer.publish_progress(progress_msg)
-        except Exception as e:
-            logger.debug(f"发布步骤7完成消息失败: {e}")
+    try:
+        from tradingagents.graph.trading_graph import TradingAgentsGraph
+        graph = TradingAgentsGraph(analysts, config=config, debug=False)
+        if task_manager:
+            task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, "分析引擎初始化完成", 'success')
+        if update_progress:
+            update_progress("分析引擎初始化完成")
+    except Exception as e:
+        error_msg = f"分析引擎初始化失败：{str(e)}"
+        if task_manager:
+            task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, error_msg, 'error')
+        if update_progress:
+            update_progress(error_msg)
+        raise
     
     # 返回准备结果
     preparation_result_dict = {
