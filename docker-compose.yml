@@ -73,7 +73,7 @@ services:
       MONGO_INITDB_DATABASE: tradingagents
     volumes:
       - mongodb_data:/data/db
-      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./scripts/docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - tradingagents-network
     healthcheck:

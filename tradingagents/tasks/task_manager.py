@@ -5,12 +5,14 @@
 import json
 import os
 import time
+import threading
+import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from pathlib import Path
 
 from tradingagents.utils.logging_manager import get_logger
-from tradingagents.tasks.task_state_machine import get_task_state_machine, TaskStatus
+from tradingagents.tasks.task_state_machine import TaskStateMachine, TaskStatus
 from tradingagents.utils.analysis_runner import run_stock_analysis
 
 logger = get_logger('task_manager')
@@ -22,7 +24,7 @@ class AnalysisTask(threading.Thread):
         super().__init__(name=f"AnalysisTask-{task_id}")
         self.task_id = task_id
         self.params = params
-        self.state_machine = get_task_state_machine()
+        self.state_machine = TaskStateMachine(task_id)
         self._stop_event = threading.Event()
         
         # 在初始化时立即创建任务状态
@@ -34,7 +36,7 @@ class AnalysisTask(threading.Thread):
         
         try:
             # 更新状态为运行中
-            self.state_machine.update_state(self.task_id, {
+            self.state_machine.update_state({
                 'status': TaskStatus.RUNNING.value,
                 'progress': {
                     'current_step': 0,
@@ -44,12 +46,9 @@ class AnalysisTask(threading.Thread):
                 },
             })
             
-            # 注册任务控制
-            get_task_manager().register_task(self.task_id)
-            
             # 定义进度回调
             def progress_callback(message, step=None, total_steps=None):
-                self.state_machine.update_state(self.task_id, {
+                self.state_machine.update_state({
                     'progress': {
                         'current_step': step if step is not None else 0,
                         'total_steps': total_steps if total_steps is not None else 0,
@@ -87,7 +86,7 @@ class AnalysisTask(threading.Thread):
             
             # 检查结果
             if results.get('success', False):
-                self.state_machine.update_state(self.task_id, {
+                self.state_machine.update_state({
                     'status': TaskStatus.COMPLETED.value,
                     'result': results,
                     'progress': {
@@ -98,20 +97,18 @@ class AnalysisTask(threading.Thread):
             else:
                 # 失败
                 error_msg = results.get('error', 'Unknown error')
-                self.state_machine.update_state(self.task_id, {
+                self.state_machine.update_state({
                     'status': TaskStatus.FAILED.value,
                     'error': error_msg,
                 })
 
         except Exception as e:
             logger.error(f"❌ [任务失败] 任务执行异常: {self.task_id}, {e}", exc_info=True)
-            self.state_machine.update_state(self.task_id, {
+            self.state_machine.update_state({
                 'status': TaskStatus.FAILED.value,
                 'error': str(e),
             })
         finally:
-            # 注销任务控制
-            get_task_manager().unregister_task(self.task_id)
             logger.info(f"🏁 [任务结束] 任务线程退出: {self.task_id}")
 
 
@@ -139,36 +136,24 @@ class TaskManager:
         task_id = str(uuid.uuid4())
         params['task_id'] = task_id
         
-        # 创建并启动任务（AnalysisTask 负责在状态机中创建记录）
+        # 注册任务控制(原 register_task 逻辑)
+        with self._lock:
+            # 创建停止事件(未设置表示继续运行)
+            self._control_events[task_id] = threading.Event()
+            # 创建暂停事件(未设置表示正常运行,设置表示暂停)
+            self._pause_events[task_id] = threading.Event()
+            # 初始状态为运行中
+            self._task_states[task_id] = 'running'
+            logger.info(f"📋 [任务控制] 注册任务: {task_id}")
+        
+        # 创建并启动任务(AnalysisTask 负责在状态机中创建记录)
         task = AnalysisTask(task_id, params)
         self.tasks[task_id] = task
         task.start()
         
         return task_id
     
-    def register_task(self, analysis_id: str):
-        """注册新任务"""
-        with self._lock:
-            # 创建停止事件（未设置表示继续运行）
-            self._control_events[analysis_id] = threading.Event()
-            # 创建暂停事件（未设置表示正常运行，设置表示暂停）
-            self._pause_events[analysis_id] = threading.Event()
-            # 初始状态为运行中
-            self._task_states[analysis_id] = 'running'
-            logger.info(f"📋 [任务控制] 注册任务: {analysis_id}")
-    
-    def unregister_task(self, analysis_id: str):
-        """注销任务"""
-        with self._lock:
-            if analysis_id in self._control_events:
-                del self._control_events[analysis_id]
-            if analysis_id in self._pause_events:
-                del self._pause_events[analysis_id]
-            if analysis_id in self._task_states:
-                del self._task_states[analysis_id]
-            if analysis_id in self._checkpoints:
-                del self._checkpoints[analysis_id]
-            logger.info(f"📋 [任务控制] 注销任务: {analysis_id}")
+
         
     def stop_task(self, task_id: str) -> bool:
         """停止任务"""
@@ -193,10 +178,22 @@ class TaskManager:
         
         # 更新状态机
         if success:
-            get_task_state_machine().update_state(task_id, {
+            self._get_task_state_machine(task_id).update_state({
                 'status': TaskStatus.STOPPED.value,
                 'progress': {'message': '任务已停止'}
             })
+        
+        # 注销任务控制（原 unregister_task 逻辑）
+        with self._lock:
+            if task_id in self._control_events:
+                del self._control_events[task_id]
+            if task_id in self._pause_events:
+                del self._pause_events[task_id]
+            if task_id in self._task_states:
+                del self._task_states[task_id]
+            if task_id in self._checkpoints:
+                del self._checkpoints[task_id]
+            logger.info(f"📋 [任务控制] 注销任务: {task_id}")
             
         return success
 
@@ -222,7 +219,7 @@ class TaskManager:
             success = True
 
         if success:
-            get_task_state_machine().update_state(task_id, {
+            self._get_task_state_machine(task_id).update_state({
                 'status': TaskStatus.PAUSED.value,
                 'progress': {'message': '任务已暂停'}
             })
@@ -250,7 +247,7 @@ class TaskManager:
             success = True
 
         if success:
-            get_task_state_machine().update_state(task_id, {
+            self._get_task_state_machine(task_id).update_state({
                 'status': TaskStatus.RUNNING.value,
                 'progress': {'message': '任务已恢复'}
             })
@@ -258,18 +255,24 @@ class TaskManager:
         
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务状态"""
-        return get_task_state_machine().get_current_state(task_id)
+        return self._get_task_state_machine(task_id).get_current_state()
 
     def get_task_history(self, task_id: str) -> List[Dict[str, Any]]:
         """获取任务历史"""
-        return get_task_state_machine().get_history_states(task_id)
+        return self._get_task_state_machine(task_id).get_history_states()
     
     def get_task_result(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务结果"""
-        state = get_task_state_machine().get_current_state(task_id)
+        state = self.get_task_status(task_id)
         if state and state.get('status') == TaskStatus.COMPLETED.value:
             return state.get('result')
         return None
+
+    def _get_task_state_machine(self, task_id: str) -> TaskStateMachine:
+        """获取任务状态机实例"""
+        if task_id in self.tasks:
+            return self.tasks[task_id].state_machine
+        return TaskStateMachine(task_id)
 
     def should_stop(self, analysis_id: str) -> bool:
         """检查任务是否应该停止"""
@@ -403,4 +406,3 @@ def get_task_manager() -> TaskManager:
     if _task_manager is None:
         _task_manager = TaskManager()
     return _task_manager
-

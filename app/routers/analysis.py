@@ -135,7 +135,7 @@ async def stop_analysis(analysis_id: str):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to stop task")
 
-    # 这里不立即调用 unregister_task，等待后台任务自然退出时注销
+    # stop_task 会自动处理任务注销
     
     return {
         "analysis_id": analysis_id,

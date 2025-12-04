@@ -567,24 +567,21 @@ def main():
                         logger.error(f"❌ [分析失败] {analysis_id}: {e}")
 
                     finally:
-                        # 分析结束后注销线程和任务控制
+                        # 分析结束后注销线程
                         from utils.thread_tracker import unregister_analysis_thread
-                        from tradingagents.tasks import get_task_manager
                         
                         unregister_analysis_thread(analysis_id)
-                        get_task_manager().unregister_task(analysis_id)
-                        logger.info(f"🧵 [线程清理] 分析线程和任务控制已注销: {analysis_id}")
+                        logger.info(f"🧵 [线程清理] 分析线程已注销: {analysis_id}")
 
                 # 启动后台分析线程
                 analysis_thread = threading.Thread(target=run_analysis_in_background)
                 analysis_thread.daemon = True  # 设置为守护线程，这样主程序退出时线程也会退出
                 analysis_thread.start()
 
-                # 注册任务控制和线程跟踪
+
+                # 注册线程跟踪
                 from utils.thread_tracker import register_analysis_thread
-                from tradingagents.tasks import get_task_manager
                 
-                get_task_manager().register_task(analysis_id)
                 register_analysis_thread(analysis_id, analysis_thread)
 
                 logger.info(f"🧵 [后台分析] 分析线程已启动: {analysis_id}")

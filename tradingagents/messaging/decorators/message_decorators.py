@@ -11,7 +11,6 @@ from datetime import datetime
 from tradingagents.utils.logging_manager import get_logger
 from ..config import get_message_producer, is_message_mode_enabled
 from ..business.messages import NodeStatus, TaskProgressMessage
-from tradingagents.tasks import get_task_state_machine
 
 logger = get_logger('messaging.decorators')
 
@@ -188,10 +187,21 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     
     """发布步骤消息 - 新版本"""
     # 更新任务状态机
-    state_machine = get_task_state_machine()
+    # 动态导入以避免循环依赖
+    from tradingagents.tasks import get_task_manager
+    from tradingagents.tasks.task_state_machine import TaskStateMachine
+    
+    task_manager = get_task_manager()
+    task = task_manager.tasks.get(analysis_id)
+    
+    if task:
+        state_machine = task.state_machine
+    else:
+        # 如果任务不在管理器中（例如非任务管理器启动的任务），创建临时状态机
+        state_machine = TaskStateMachine(analysis_id)
     
     # 从状态机获取当前任务信息
-    current_state = state_machine.get_current_state(analysis_id)
+    current_state = state_machine.get_current_state()
     if current_state is None:
         # 创建初始任务
         task_params = {'task_id': analysis_id}
@@ -260,7 +270,7 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
         'message': last_message
     }
     updates['progress'] = progress_update
-    state_machine.update_state(analysis_id, updates)
+    state_machine.update_state(updates)
     
     # 创建进度消息（直接发布）
     progress_msg = TaskProgressMessage(
@@ -280,7 +290,6 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     # 发布进度消息
     producer.publish_progress(progress_msg)
     
-
 
 
 def message_analysis_module(module_name: str, session_id: str = None):
