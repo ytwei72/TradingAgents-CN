@@ -436,8 +436,8 @@ class TaskStateMachine:
         # 复制历史记录
         history_with_current = [state.copy() for state in self.history]
         
-        # 如果当前步骤存在且状态为 running，将其添加到历史末尾
-        if self.current_step and self.current_step.get('status') == 'running':
+        # 如果当前步骤存在且状态为 running 或 paused，将其添加到历史末尾
+        if self.current_step and self.current_step.get('status') in ['running', 'paused']:
             history_with_current.append(self.current_step.copy())
         
         return history_with_current

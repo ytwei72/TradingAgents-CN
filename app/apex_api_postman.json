@@ -202,12 +202,12 @@
                     "response": []
                 },
                 {
-                    "name": "查询任务当前状态",
+                    "name": "查询任务当前步骤",
                     "request": {
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/state",
+                            "raw": "{{base_url}}/api/analysis/{{analysis_id}}/current_step",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -222,7 +222,7 @@
                     "response": []
                 },
                 {
-                    "name": "查询任务历史状态",
+                    "name": "查询任务历史步骤",
                     "request": {
                         "method": "GET",
                         "header": [],

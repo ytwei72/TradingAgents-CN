@@ -110,6 +110,9 @@ class AnalysisTask(threading.Thread):
             })
         finally:
             logger.info(f"🏁 [任务结束] 任务线程退出: {self.task_id}")
+            # 清理任务控制资源
+            from tradingagents.tasks import get_task_manager
+            get_task_manager().cleanup_task(self.task_id)
 
 
 class TaskManager:
@@ -156,7 +159,11 @@ class TaskManager:
 
         
     def stop_task(self, task_id: str) -> bool:
-        """停止任务"""
+        """停止任务
+        
+        注意：此方法设置停止标志，但不会立即删除控制事件。
+        控制事件会在任务线程检测到停止信号并退出后，由 cleanup_task() 方法清理。
+        """
         with self._lock:
             if task_id not in self._control_events:
                 logger.warning(f"⚠️ [任务控制] 任务不存在: {task_id}")
@@ -173,7 +180,7 @@ class TaskManager:
             # 保存停止状态到文件
             self._save_task_state(task_id)
             
-            logger.info(f"⏹️ [任务控制] 任务已停止: {task_id}")
+            logger.info(f"⏹️ [任务控制] 任务停止信号已发送: {task_id}")
             success = True
         
         # 更新状态机
@@ -183,7 +190,11 @@ class TaskManager:
                 'progress': {'message': '任务已停止'}
             })
         
-        # 注销任务控制（原 unregister_task 逻辑）
+        # 不再立即清理控制事件，等待任务线程退出后由 cleanup_task() 清理
+        return success
+    
+    def cleanup_task(self, task_id: str):
+        """清理任务资源（在任务线程退出后调用）"""
         with self._lock:
             if task_id in self._control_events:
                 del self._control_events[task_id]
@@ -193,9 +204,7 @@ class TaskManager:
                 del self._task_states[task_id]
             if task_id in self._checkpoints:
                 del self._checkpoints[task_id]
-            logger.info(f"📋 [任务控制] 注销任务: {task_id}")
-            
-        return success
+            logger.info(f"📋 [任务控制] 任务资源已清理: {task_id}")
 
     def pause_task(self, task_id: str) -> bool:
         """暂停任务"""
@@ -221,7 +230,7 @@ class TaskManager:
         if success:
             self._get_task_state_machine(task_id).update_state({
                 'status': TaskStatus.PAUSED.value,
-                'progress': {'message': '任务已暂停'}
+                'step_status': TaskStatus.PAUSED.value
             })
         return success
 
@@ -249,7 +258,7 @@ class TaskManager:
         if success:
             self._get_task_state_machine(task_id).update_state({
                 'status': TaskStatus.RUNNING.value,
-                'progress': {'message': '任务已恢复'}
+                'step_status': TaskStatus.RUNNING.value
             })
         return success
         

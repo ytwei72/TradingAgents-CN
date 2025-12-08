@@ -131,27 +131,27 @@ async def stop_analysis(analysis_id: str):
     }
 
 
-@router.get("/{analysis_id}/state")
-async def get_task_current_state(analysis_id: str):
-    """获取任务当前状态（来自状态机）"""
+@router.get("/{analysis_id}/current_step")
+async def get_task_current_step(analysis_id: str):
+    """获取任务当前步骤（从状态机获取）"""
     task_manager = get_task_manager()
-    state = task_manager.get_task_current_step(analysis_id)
+    step = task_manager.get_task_current_step(analysis_id)
     
-    if not state:
-        raise HTTPException(status_code=404, detail="Task state not found")
+    if not step:
+        raise HTTPException(status_code=404, detail="Task step not found")
     
-    return state
+    return step
 
 
 @router.get("/{analysis_id}/history")
 async def get_task_history_states(analysis_id: str):
-    """获取任务历史状态（来自状态机）
+    """获取任务历史步骤（从状态机获取）
     
     Args:
         analysis_id: 任务 ID
         
     Returns:
-        完整的历史状态列表（JSON数组）
+        完整的历史步骤列表（JSON数组）
     """
     task_manager = get_task_manager()
     history = task_manager.get_task_history(analysis_id)
