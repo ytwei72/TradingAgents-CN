@@ -63,4 +63,14 @@ export const stopAnalysis = async (analysisId: string) => {
     return response.data;
 };
 
+export const getPlannedSteps = async (analysisId: string) => {
+    const response = await api.get<any>(`/analysis/${analysisId}/planned_steps`);
+    return response.data;
+};
+
+export const getAnalysisHistory = async (analysisId: string) => {
+    const response = await api.get<any[]>(`/analysis/${analysisId}/history`);
+    return response.data;
+};
+
 export default api;

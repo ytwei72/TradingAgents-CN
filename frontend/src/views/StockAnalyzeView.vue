@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
-import { startAnalysis, getAnalysisStatus, getAnalysisResult, pauseAnalysis, resumeAnalysis, stopAnalysis, type AnalysisRequest } from '../api';
+import { ref, reactive, computed, onUnmounted, watch } from 'vue';
+import { startAnalysis, getAnalysisStatus, getAnalysisResult, pauseAnalysis, resumeAnalysis, stopAnalysis, getPlannedSteps, getAnalysisHistory, type AnalysisRequest } from '../api';
 import MarkdownIt from 'markdown-it';
 
 const md = new MarkdownIt();
@@ -34,6 +34,10 @@ const progressLog = ref<any[]>([]);
 const result = ref<any>(null);
 const error = ref<string | null>(null);
 const showAdvanced = ref(false);
+
+const plannedSteps = ref<any[]>([]);
+const historySteps = ref<any[]>([]);
+const showHistory = ref(false); // For accordion toggle
 
 // Task Control State
 const autoRefresh = ref(true);
@@ -149,6 +153,15 @@ const start = async () => {
     // Connect WS immediately
     connectWebSocket();
 
+    // Fetch planned steps
+    try {
+        const stepsData = await getPlannedSteps(analysisId.value!);
+        plannedSteps.value = stepsData.steps || [];
+        showHistory.value = true; // Auto-expand history/plan
+    } catch (e) {
+        console.error("Failed to fetch planned steps", e);
+    }
+
     // Initial check: if autoRefresh is true, start polling.
     // If false, we rely on WS (which is connected).
     if (autoRefresh.value) {
@@ -177,6 +190,14 @@ const startPolling = () => {
       status.value = res.status;
       progressLog.value = res.progress_log || [];
       
+      // Fetch history
+      try {
+          const history = await getAnalysisHistory(analysisId.value!);
+          historySteps.value = history;
+      } catch (e) {
+          console.error("Failed to fetch history", e);
+      }
+
       if (res.status === 'completed') {
         handleCompletion();
       } else if (res.status === 'failed' || res.status === 'stopped' || res.status === 'cancelled') {
@@ -296,19 +317,68 @@ const renderedReport = computed(() => {
 });
 
 // Helper to format logs into "steps" if possible, or just list them
-const formattedLogs = computed(() => {
-    return progressLog.value.map((log, index) => {
-        // Try to extract "Stage X" or similar if present, otherwise default
-        const timestamp = log.timestamp ? log.timestamp.split('T')[1].split('.')[0] : '';
+const mergedSteps = computed(() => {
+    if (plannedSteps.value.length === 0) {
+        // Fallback to history if no plan available
+        return historySteps.value.map(h => ({
+            ...h,
+            display_name: h.display_name || h.step_name,
+            status: h.status || 'completed' // Default to completed if in history?
+        }));
+    }
+
+    const historyMap = new Map(historySteps.value.map(s => [s.step_index, s]));
+    
+    return plannedSteps.value.map(plan => {
+        const history = historyMap.get(plan.step_index);
+        let status = 'pending';
+        let startTime = plan.start_time;
+        let elapsedTime = plan.elapsed_time;
+        let errorMsg = '';
+        
+        if (history) {
+            status = history.status;
+            startTime = history.start_time;
+            elapsedTime = history.elapsed_time;
+            errorMsg = history.error;
+        }
+        
         return {
-            id: index,
-            message: log.message,
-            timestamp: timestamp,
-            status: 'completed' // Assume completed for past logs
+            ...plan,
+            status: status,
+            start_time: startTime,
+            elapsed_time: elapsedTime,
+            error: errorMsg
         };
-    }).reverse(); // Show newest first or keep chronological? Image shows chronological top-down usually.
-    // Actually, let's keep chronological (oldest first) as per typical process steps
+    });
 });
+
+const completedCount = computed(() => mergedSteps.value.filter(s => s.status === 'completed').length);
+const totalCount = computed(() => mergedSteps.value.length);
+
+const getStepColorClass = (status: string) => {
+    switch (status) {
+        case 'running': return 'bg-green-600 border-green-500 text-white';
+        case 'completed': return 'bg-blue-600 border-blue-500 text-white';
+        case 'failed': 
+        case 'error': return 'bg-red-600 border-red-500 text-white';
+        case 'paused': return 'bg-yellow-600 border-yellow-500 text-white';
+        case 'stopped': return 'bg-gray-600 border-gray-500 text-white';
+        default: return 'bg-gray-800 border-gray-700 text-gray-400'; // pending
+    }
+};
+
+const getStepIcon = (status: string) => {
+     switch (status) {
+        case 'running': return '▶'; // Or a spinner svg
+        case 'completed': return '✓';
+        case 'failed': 
+        case 'error': return '✕';
+        case 'paused': return '⏸';
+        case 'stopped': return '⏹';
+        default: return '○';
+    }
+};
 
 </script>
 
@@ -515,37 +585,55 @@ const formattedLogs = computed(() => {
               </div>
            </div>
 
-           <!-- Progress Steps Visualization -->
-           <div class="space-y-3 mb-8">
-              <div v-for="log in formattedLogs" :key="log.id" class="bg-[#f0fdf4] border border-green-200 rounded p-3 flex items-start">
-                 <div class="mr-3 mt-1">
-                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                 </div>
-                 <div class="flex-1">
-                    <div class="flex justify-between items-center mb-1">
-                       <h3 class="font-bold text-gray-800 text-sm">{{ log.message }}</h3>
-                       <span class="text-xs text-gray-500 flex items-center">
-                          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                          {{ log.timestamp }}
-                       </span>
-                    </div>
-                    <p class="text-xs text-gray-600">已完成 - 状态: complete</p>
-                 </div>
-                 <div class="ml-2">
-                    <span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded">已完成</span>
-                 </div>
-              </div>
+           <!-- Task History Accordion -->
+           <div class="mb-8 border border-gray-700 rounded-lg overflow-hidden">
+              <button @click="showHistory = !showHistory" class="w-full px-4 py-3 bg-gray-800 hover:bg-gray-750 flex justify-between items-center transition">
+                  <div class="flex items-center space-x-3">
+                      <span class="font-bold text-white">任务执行步骤</span>
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">{{ completedCount }}/{{ totalCount }}</span>
+                  </div>
+                  <svg class="w-5 h-5 text-gray-400 transform transition-transform" :class="{'rotate-180': showHistory}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+              </button>
               
-              <!-- Loading State for next step -->
-              <div v-if="status === 'running'" class="bg-blue-50 border border-blue-200 rounded p-3 flex items-start animate-pulse">
-                 <div class="mr-3 mt-1">
-                    <div class="w-5 h-5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
-                 </div>
-                 <div class="flex-1">
-                    <h3 class="font-bold text-gray-800 text-sm">正在执行下一步骤...</h3>
-                    <p class="text-xs text-gray-600">系统正在处理中</p>
-                 </div>
+              <div v-if="showHistory" class="p-4 bg-[#0f172a] space-y-2 max-h-[500px] overflow-y-auto">
+                  <div v-for="step in mergedSteps" :key="step.step_index" 
+                       class="p-3 rounded border flex items-center justify-between transition-all duration-300"
+                       :class="getStepColorClass(step.status)">
+                       
+                       <div class="flex items-center space-x-3">
+                           <div class="w-6 h-6 flex items-center justify-center rounded-full bg-black/20 font-bold text-xs">
+                               <span v-if="step.status === 'running'" class="animate-spin">⟳</span>
+                               <span v-else>{{ getStepIcon(step.status) }}</span>
+                           </div>
+                           <div>
+                               <div class="font-bold text-sm">{{ step.display_name || step.step_name }}</div>
+                               <div v-if="step.phase === 'debate'" class="text-xs opacity-75">
+                                   第{{ step.round }}轮 - {{ step.role }}
+                               </div>
+                           </div>
+                       </div>
+                       
+                       <div class="text-right text-xs opacity-80">
+                           <div v-if="step.start_time">{{ step.start_time.split('T')[1]?.split('.')[0] }}</div>
+                           <div v-if="step.elapsed_time">{{ typeof step.elapsed_time === 'number' ? step.elapsed_time.toFixed(1) + 's' : step.elapsed_time }}</div>
+                       </div>
+                  </div>
+                  
+                  <div v-if="mergedSteps.length === 0" class="text-center text-gray-500 py-4">
+                      暂无步骤信息
+                  </div>
               </div>
+           </div>
+
+           <!-- Live Logs (Optional, keep if needed for detailed messages) -->
+           <div v-if="progressLog.length > 0" class="space-y-2 mb-8">
+               <h3 class="text-sm font-bold text-gray-400 mb-2">实时日志</h3>
+               <div class="bg-black/30 rounded p-4 max-h-40 overflow-y-auto font-mono text-xs text-gray-300 space-y-1">
+                   <div v-for="(log, idx) in progressLog.slice().reverse()" :key="idx">
+                       <span class="text-gray-500">[{{ log.timestamp ? log.timestamp.split('T')[1].split('.')[0] : '' }}]</span>
+                       {{ log.message }}
+                   </div>
+               </div>
            </div>
 
            <!-- Final Report -->
