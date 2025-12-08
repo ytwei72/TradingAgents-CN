@@ -152,20 +152,11 @@ class TaskStateMachine:
             'result': None
         }
         
-        # 2. 初始化当前步骤
-        self.current_step = {
-            'step_name': 'Initialization',
-            'step_index': 0,
-            'description': 'Task initialized',
-            'status': 'pending',
-            'start_time': now,
-            'end_time': None,
-            'elapsed_time': 0.0,
-            'timestamp': now
-        }
+        # 2. 初始化当前步骤（为空，等待第一个实际步骤开始）
+        self.current_step = {}
         
-        # 3. 初始化历史
-        self.history = [self.current_step.copy()]
+        # 3. 初始化历史（空列表，不包含初始化状态）
+        self.history = []
         
         # 保存所有数据
         self._save_all()
@@ -252,8 +243,10 @@ class TaskStateMachine:
             TaskStatus.CANCELLED.value
         ]
         
-        # 步骤完成的判断：明确指定 step_status 为 completed/failed，或者有新步骤开始
-        step_completed = step_status in ['completed', 'failed', 'error']
+        # 步骤完成的判断：明确指定 step_status 为 completed/failed/success/error
+        step_completed = step_status in ['completed', 'failed', 'error', 'success']
+        # 步骤开始的判断：明确指定 step_status 为 start
+        step_starting = step_status == 'start'
         new_step_starting = 'step_name' in new_step_info and new_step_info['step_name'] != self.current_step.get('step_name')
         
         if step_update_needed or task_ended:
@@ -280,46 +273,73 @@ class TaskStateMachine:
                 logger.debug(f"📊 [任务结束] {self.current_step.get('step_name', 'Unknown')} - "
                            f"耗时: {elapsed:.2f}秒, 状态: {new_status}")
             
-            # 如果当前步骤完成（但任务未结束），完成当前步骤并准备新步骤
+            # 如果当前步骤完成（但任务未结束），完成当前步骤
             elif step_completed:
-                # 完成当前步骤
-                self.current_step['end_time'] = now
-                self.current_step['elapsed_time'] = elapsed
-                self.current_step['status'] = 'completed' if step_status == 'completed' else 'failed'
-                self.current_step['timestamp'] = now
-                
-                # 更新描述（如果提供了新描述）
-                if 'description' in new_step_info:
-                    self.current_step['description'] = new_step_info['description']
-                
-                # 将完成的步骤添加到历史
-                self.history.append(self.current_step.copy())
-                
-                # 保存步骤和历史
-                self._save_data("current_step", self.current_step)
-                self._save_data("history", self.history)
-                
-                logger.debug(f"📊 [步骤完成] {self.current_step.get('step_name', 'Unknown')} - "
-                           f"耗时: {elapsed:.2f}秒, 状态: {self.current_step['status']}")
+                # 只有当前步骤存在时才处理完成
+                if self.current_step.get('step_name'):
+                    # 完成当前步骤
+                    self.current_step['end_time'] = now
+                    self.current_step['elapsed_time'] = elapsed
+                    self.current_step['status'] = 'completed' if step_status in ['completed', 'success'] else 'failed'
+                    self.current_step['timestamp'] = now
+                    
+                    # 更新描述（如果提供了新描述）
+                    if 'description' in new_step_info:
+                        self.current_step['description'] = new_step_info['description']
+                    
+                    # 将完成的步骤添加到历史
+                    self.history.append(self.current_step.copy())
+                    
+                    # 保存步骤和历史
+                    self._save_data("current_step", self.current_step)
+                    self._save_data("history", self.history)
+                    
+                    logger.debug(f"📊 [步骤完成] {self.current_step.get('step_name', 'Unknown')} - "
+                               f"耗时: {elapsed:.2f}秒, 状态: {self.current_step['status']}")
             
-            # 如果是新步骤开始
-            elif new_step_starting:
-                # 先完成当前步骤（如果存在且还没完成）
-                if self.current_step.get('step_name') and self.current_step.get('step_name') != 'Initialization':
-                    # 只有当前步骤还在运行中时才需要完成并添加到历史
-                    # 如果已经是 completed/failed 状态，说明已经被 COMPLETE 消息处理过了
-                    if self.current_step.get('status') == 'running':
-                        self.current_step['end_time'] = now
-                        self.current_step['elapsed_time'] = elapsed
-                        self.current_step['status'] = 'completed'
-                        
-                        # 添加到历史
-                        self.history.append(self.current_step.copy())
+            # 如果是步骤开始（通过 step_status='start' 明确指定）
+            elif step_starting and 'step_name' in new_step_info:
+                # 如果当前有正在运行的步骤，先完成它（异常情况处理）
+                if self.current_step.get('step_name') and self.current_step.get('status') == 'running':
+                    self.current_step['end_time'] = now
+                    self.current_step['elapsed_time'] = elapsed
+                    self.current_step['status'] = 'completed'
+                    self.history.append(self.current_step.copy())
                 
                 # 创建新步骤
                 self.current_step = {
                     'step_name': new_step_info['step_name'],
-                    'step_index': new_step_info.get('step_index', self.current_step.get('step_index', 0) + 1),
+                    'step_index': new_step_info.get('step_index', len(self.history) + 1),
+                    'description': new_step_info.get('description', ''),
+                    'status': 'running',
+                    'start_time': now,
+                    'end_time': None,
+                    'elapsed_time': 0.0,
+                    'timestamp': now
+                }
+                
+                # 重置步骤开始时间
+                self._step_start_time = now_timestamp
+                
+                # 保存步骤（不添加到历史，等完成时再添加）
+                self._save_data("current_step", self.current_step)
+                self._save_data("history", self.history)
+                
+                logger.debug(f"📊 [新步骤] {self.current_step['step_name']} (索引: {self.current_step['step_index']})")
+            
+            # 如果是新步骤开始（通过步骤名称变化检测）
+            elif new_step_starting:
+                # 先完成当前步骤（如果存在且还在运行中）
+                if self.current_step.get('step_name') and self.current_step.get('status') == 'running':
+                    self.current_step['end_time'] = now
+                    self.current_step['elapsed_time'] = elapsed
+                    self.current_step['status'] = 'completed'
+                    self.history.append(self.current_step.copy())
+                
+                # 创建新步骤
+                self.current_step = {
+                    'step_name': new_step_info['step_name'],
+                    'step_index': new_step_info.get('step_index', len(self.history) + 1),
                     'description': new_step_info.get('description', ''),
                     'status': 'running',
                     'start_time': now,
