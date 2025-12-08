@@ -391,6 +391,28 @@ class TradingAgentsGraph:
         for chunk in self.graph.stream(init_agent_state, **args):
             step_count += 1
             
+            # 检查任务控制信号（暂停/停止）
+            if analysis_id:
+                from tradingagents.tasks import get_task_manager
+                from tradingagents.exceptions import TaskControlStoppedException
+                task_manager = get_task_manager()
+                
+                # 检查停止信号
+                if task_manager.should_stop(analysis_id):
+                    logger.info(f"⏹️ [任务控制] 收到停止信号，中断分析: {analysis_id}")
+                    raise TaskControlStoppedException(f"任务已被停止: {analysis_id}")
+                
+                # 检查暂停信号并等待
+                if task_manager.should_pause(analysis_id):
+                    logger.info(f"⏸️ [任务控制] 收到暂停信号，等待恢复: {analysis_id}")
+                    task_manager.wait_if_paused(analysis_id)
+                    
+                    # 恢复后再次检查是否被停止
+                    if task_manager.should_stop(analysis_id):
+                        logger.info(f"⏹️ [任务控制] 暂停期间收到停止信号: {analysis_id}")
+                        raise TaskControlStoppedException(f"任务已被停止: {analysis_id}")
+                    logger.info(f"▶️ [任务控制] 任务恢复执行: {analysis_id}")
+            
             # 序列化chunk以便保存
             serialized_chunk = self._serialize_chunk(chunk, step_count)
             

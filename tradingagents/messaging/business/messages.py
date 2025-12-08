@@ -29,6 +29,7 @@ class NodeStatus(Enum):
     """任务节点状态"""
     START = "start"
     PAUSED = "paused"
+    TOOL_CALLING = "tool_calling"  # 工具调用中（不触发步骤完成）
     COMPLETE = "complete"
     ERROR = "error"
 

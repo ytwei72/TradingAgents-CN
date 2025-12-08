@@ -59,6 +59,27 @@ def _extract_stock_symbol(*args, **kwargs) -> Optional[str]:
     return symbol or 'unknown'
 
 
+def _check_has_tool_calls(result: Any) -> bool:
+    """检查结果是否包含工具调用
+    
+    用于检测分析师节点是否返回了工具调用请求，
+    如果是，则该步骤还未完成，不应记录为 completed。
+    
+    Args:
+        result: 函数返回结果
+        
+    Returns:
+        如果包含工具调用返回 True
+    """
+    if isinstance(result, dict):
+        messages = result.get('messages', [])
+        for msg in messages:
+            # 检查 LangChain AIMessage 的 tool_calls 属性
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                return True
+    return False
+
+
 def _find_step_by_module_name(module_name: str, analysis_steps: list) -> Optional[int]:
     """根据模块名称查找步骤索引（与AsyncProgressTracker保持一致）"""
     # 模块到关键字的映射
@@ -212,6 +233,17 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     current_state = state_machine.get_current_state() or {}
     current_step_index = current_state.get('step_index', 0)
     
+    # 从历史记录中获取最大的 step_index
+    # 这确保分析师步骤在准备步骤的基础上继续累计
+    history = state_machine.get_history_states() or []
+    if history:
+        # 获取历史记录中最大的 step_index
+        max_history_index = max(
+            step.get('step_index', 0) for step in history
+        )
+        # 使用 current_step_index 和 max_history_index 中较大的值
+        current_step_index = max(current_step_index, max_history_index)
+    
     progress = task_obj.get('progress', {})
     total_steps = progress.get('total_steps', 10)  # 默认总步骤数
     
@@ -224,6 +256,10 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
         # 完成当前步骤：保持当前索引
         step_index = current_step_index
         step_status = 'completed'  # 明确标记步骤完成
+    elif node_status == 'tool_calling':
+        # 工具调用中：保持当前索引，不完成步骤
+        step_index = current_step_index
+        step_status = 'tool_calling'  # 追加工具调用事件
     else:  # error
         # 错误：保持当前索引
         step_index = current_step_index
@@ -243,6 +279,10 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     # 构建消息文本
     if node_status == 'complete':
         last_message = f"模块完成: {module_name}"
+        if duration > 0:
+            last_message += f" (耗时: {duration:.2f}s)"
+    elif node_status == 'tool_calling':
+        last_message = f"工具调用中: {module_name}"
         if duration > 0:
             last_message += f" (耗时: {duration:.2f}s)"
     elif node_status == 'error':
@@ -335,14 +375,27 @@ def message_analysis_module(module_name: str, session_id: str = None):
                         # 计算执行时间
                         duration = time.time() - start_time
                         
-                        # 发送模块完成消息（使用 TASK_PROGRESS 格式）
-                        _publish_step_message(
-                            producer=producer,
-                            analysis_id=analysis_id,
-                            module_name=module_name,
-                            node_status=NodeStatus.COMPLETE.value,
-                            duration=duration
-                        )
+                        # 检查返回结果是否包含工具调用
+                        has_tool_calls = _check_has_tool_calls(result)
+                        
+                        if has_tool_calls:
+                            # 工具调用中 - 不记录为完成，只追加事件
+                            _publish_step_message(
+                                producer=producer,
+                                analysis_id=analysis_id,
+                                module_name=module_name,
+                                node_status=NodeStatus.TOOL_CALLING.value,
+                                duration=duration
+                            )
+                        else:
+                            # 真正完成 - 记录历史
+                            _publish_step_message(
+                                producer=producer,
+                                analysis_id=analysis_id,
+                                module_name=module_name,
+                                node_status=NodeStatus.COMPLETE.value,
+                                duration=duration
+                            )
                         
                         return result
                     except Exception as e:

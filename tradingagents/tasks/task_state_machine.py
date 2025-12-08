@@ -247,6 +247,8 @@ class TaskStateMachine:
         step_completed = step_status in ['completed', 'failed', 'error', 'success']
         # 步骤开始的判断：明确指定 step_status 为 start
         step_starting = step_status == 'start'
+        # 工具调用中的判断
+        tool_calling = step_status == 'tool_calling'
         new_step_starting = 'step_name' in new_step_info and new_step_info['step_name'] != self.current_step.get('step_name')
         
         if step_update_needed or task_ended:
@@ -273,19 +275,45 @@ class TaskStateMachine:
                 logger.debug(f"📊 [任务结束] {self.current_step.get('step_name', 'Unknown')} - "
                            f"耗时: {elapsed:.2f}秒, 状态: {new_status}")
             
+            # 如果是工具调用中（不完成步骤，只追加事件）
+            elif tool_calling:
+                if self.current_step.get('step_name'):
+                    # 计算本次阶段耗时
+                    phase_duration = elapsed
+                    
+                    # 追加工具调用事件
+                    event_message = new_step_info.get('description', f"工具调用中: {self.current_step.get('step_name')}")
+                    self._add_step_event('tool_calling', event_message, phase_duration)
+                    
+                    # 重置步骤开始时间（下一阶段从现在开始计时）
+                    self._step_start_time = now_timestamp
+                    
+                    # 保存当前步骤（不添加到历史）
+                    self._save_data("current_step", self.current_step)
+                    
+                    logger.debug(f"📊 [工具调用] {self.current_step.get('step_name', 'Unknown')} - "
+                               f"阶段耗时: {phase_duration:.2f}秒")
+            
             # 如果当前步骤完成（但任务未结束），完成当前步骤
             elif step_completed:
                 # 只有当前步骤存在时才处理完成
                 if self.current_step.get('step_name'):
+                    # 计算本次阶段耗时
+                    phase_duration = elapsed
+                    
+                    # 追加完成事件
+                    event_message = new_step_info.get('description', f"模块完成: {self.current_step.get('step_name')}")
+                    final_status = 'complete' if step_status in ['completed', 'success'] else 'error'
+                    self._add_step_event(final_status, event_message, phase_duration)
+                    
+                    # 计算总耗时（从所有事件累加）
+                    total_elapsed = sum(e.get('duration', 0) for e in self.current_step.get('events', []))
+                    
                     # 完成当前步骤
                     self.current_step['end_time'] = now
-                    self.current_step['elapsed_time'] = elapsed
+                    self.current_step['elapsed_time'] = total_elapsed
                     self.current_step['status'] = 'completed' if step_status in ['completed', 'success'] else 'failed'
                     self.current_step['timestamp'] = now
-                    
-                    # 更新描述（如果提供了新描述）
-                    if 'description' in new_step_info:
-                        self.current_step['description'] = new_step_info['description']
                     
                     # 将完成的步骤添加到历史
                     self.history.append(self.current_step.copy())
@@ -295,7 +323,7 @@ class TaskStateMachine:
                     self._save_data("history", self.history)
                     
                     logger.debug(f"📊 [步骤完成] {self.current_step.get('step_name', 'Unknown')} - "
-                               f"耗时: {elapsed:.2f}秒, 状态: {self.current_step['status']}")
+                               f"总耗时: {total_elapsed:.2f}秒, 状态: {self.current_step['status']}")
             
             # 如果是步骤开始（通过 step_status='start' 明确指定）
             elif step_starting and 'step_name' in new_step_info:
@@ -306,7 +334,7 @@ class TaskStateMachine:
                     self.current_step['status'] = 'completed'
                     self.history.append(self.current_step.copy())
                 
-                # 创建新步骤
+                # 创建新步骤（包含events数组）
                 self.current_step = {
                     'step_name': new_step_info['step_name'],
                     'step_index': new_step_info.get('step_index', len(self.history) + 1),
@@ -315,8 +343,12 @@ class TaskStateMachine:
                     'start_time': now,
                     'end_time': None,
                     'elapsed_time': 0.0,
+                    'events': [],  # 事件列表
                     'timestamp': now
                 }
+                
+                # 追加开始事件
+                self._add_step_event('start', f"模块开始: {new_step_info['step_name']}")
                 
                 # 重置步骤开始时间
                 self._step_start_time = now_timestamp
@@ -336,7 +368,7 @@ class TaskStateMachine:
                     self.current_step['status'] = 'completed'
                     self.history.append(self.current_step.copy())
                 
-                # 创建新步骤
+                # 创建新步骤（包含events数组）
                 self.current_step = {
                     'step_name': new_step_info['step_name'],
                     'step_index': new_step_info.get('step_index', len(self.history) + 1),
@@ -345,8 +377,12 @@ class TaskStateMachine:
                     'start_time': now,
                     'end_time': None,
                     'elapsed_time': 0.0,
+                    'events': [],  # 事件列表
                     'timestamp': now
                 }
+                
+                # 追加开始事件
+                self._add_step_event('start', f"模块开始: {new_step_info['step_name']}")
                 
                 # 重置步骤开始时间
                 self._step_start_time = now_timestamp
@@ -405,6 +441,39 @@ class TaskStateMachine:
             history_with_current.append(self.current_step.copy())
         
         return history_with_current
+    
+    def _add_step_event(self, event_type: str, message: str, duration: float = 0.0):
+        """向当前步骤追加事件
+        
+        Args:
+            event_type: 事件类型 (start/tool_calling/complete/error)
+            message: 事件消息
+            duration: 该阶段的耗时（秒）
+        """
+        if not self.current_step:
+            logger.warning(f"📊 [事件追加] 当前步骤不存在，无法追加事件: {event_type}")
+            return
+        
+        # 确保 events 数组存在
+        if 'events' not in self.current_step:
+            self.current_step['events'] = []
+        
+        # 创建事件对象
+        event = {
+            'event': event_type,
+            'timestamp': datetime.now().isoformat(),
+            'message': message
+        }
+        
+        # 只有非 start 事件才有 duration
+        if event_type != 'start' and duration > 0:
+            event['duration'] = round(duration, 2)
+        
+        # 追加事件
+        self.current_step['events'].append(event)
+        
+        logger.debug(f"📊 [事件追加] {event_type}: {message}" + 
+                    (f" (耗时: {duration:.2f}s)" if duration > 0 else ""))
     
     def _save_all(self):
         """保存所有数据"""

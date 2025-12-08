@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger, get_logger_manager
 from tradingagents.messaging.business.messages import NodeStatus
+from tradingagents.exceptions import TaskControlStoppedException
 logger = get_logger('web')
 
 # 添加项目根目录到Python路径
@@ -325,6 +326,29 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         publish_task_status(analysis_id, "COMPLETED", "✅ 分析成功完成！")
         
         return results
+
+    except TaskControlStoppedException as e:
+        # 任务被用户停止
+        logger.info(f"⏹️ [任务停止] 任务被用户停止: {analysis_id}")
+        
+        # 发布任务停止状态消息
+        from .message_utils import publish_task_status
+        publish_task_status(analysis_id, "STOPPED", f"⏹️ 任务已停止")
+        
+        return {
+            'stock_symbol': stock_symbol,
+            'analysis_date': analysis_date,
+            'analysts': analysts,
+            'research_depth': research_depth,
+            'llm_provider': llm_provider,
+            'llm_model': llm_model,
+            'state': {},
+            'decision': {},
+            'success': False,
+            'stopped': True,
+            'error': str(e),
+            'session_id': session_id if 'session_id' in locals() else None
+        }
 
     except Exception as e:
         # 记录分析失败的详细日志
