@@ -29,6 +29,53 @@ class AnalysisTask(threading.Thread):
         
         # 在初始化时立即创建任务状态
         self.state_machine.initialize(self.params)
+    
+    def calculate_total_steps(self) -> int:
+        """计算任务总步骤数
+        
+        步骤组成:
+        - 6个准备步骤
+        - 每个分析师1个步骤
+        - 研究团队步骤 (bull, bear, manager) = 3
+        - 交易团队步骤 (trader) = 1
+        - 风险团队步骤 (risky, safe, neutral, judge) = 4
+        
+        Returns:
+            总步骤数
+        """
+        analysts = self.params.get('analysts', [])
+        base_steps = 6  # 准备步骤
+        analyst_steps = len(analysts)  # 分析师步骤
+        team_steps = 3 + 1 + 4  # 研究+交易+风险团队
+        return base_steps + analyst_steps + team_steps
+    
+    def estimate_remaining_time(self) -> float:
+        """估算剩余时间
+        
+        基于已完成步骤的平均耗时计算剩余时间。
+        如果还没有完成任何步骤，使用默认每步5秒估算。
+        
+        Returns:
+            预估剩余时间（秒）
+        """
+        task_obj = self.state_machine.get_task_object()
+        if not task_obj:
+            return self.calculate_total_steps() * 5.0
+        
+        progress = task_obj.get('progress', {})
+        current_step = progress.get('current_step', 0)
+        total_steps = progress.get('total_steps', self.calculate_total_steps())
+        elapsed_time = progress.get('elapsed_time', 0.0)
+        
+        remaining_steps = max(0, total_steps - current_step)
+        
+        if current_step > 0 and elapsed_time > 0:
+            # 基于实际平均耗时估算
+            avg_time_per_step = elapsed_time / current_step
+            return remaining_steps * avg_time_per_step
+        else:
+            # 默认每步5秒
+            return remaining_steps * 5.0
         
     def run(self):
         """执行任务逻辑"""
@@ -36,13 +83,16 @@ class AnalysisTask(threading.Thread):
         
         try:
             # 更新状态为运行中
+            total_steps = self.calculate_total_steps()
             self.state_machine.update_state({
                 'status': TaskStatus.RUNNING.value,
                 'progress': {
                     'current_step': 0,
-                    'total_steps': 0,
+                    'total_steps': total_steps,
                     'percentage': 0.0,
                     'message': '分析任务开始执行',
+                    'elapsed_time': 0.0,
+                    'remaining_time': self.estimate_remaining_time(),
                 },
             })
             
@@ -94,6 +144,10 @@ class AnalysisTask(threading.Thread):
                         'message': '分析任务已完成',
                     },
                 })
+            elif results.get('stopped', False):
+                # 任务被用户停止，状态已在 stop_task() 中更新为 STOPPED
+                # 这里不需要再更新状态，只记录日志
+                logger.info(f"⏹️ [任务停止] 任务已停止: {self.task_id}")
             else:
                 # 失败
                 error_msg = results.get('error', 'Unknown error')
@@ -425,12 +479,38 @@ class TaskManager:
         
         state_machine = self._get_task_state_machine(task_id)
         
-        # 计算进度百分比
-        total_steps = 6  # 准备步骤总数
-        if status == 'start':
-            percentage = ((step_index - 1) / total_steps) * 100
+        # 获取任务的总步骤数
+        task = self.tasks.get(task_id)
+        if task and hasattr(task, 'calculate_total_steps'):
+            total_steps = task.calculate_total_steps()
         else:
-            percentage = (step_index / total_steps) * 100
+            total_steps = 10  # 默认值
+        
+        # 计算进度百分比
+        if total_steps > 0:
+            if status == 'start':
+                percentage = ((step_index - 1) / total_steps) * 100
+            else:
+                percentage = (step_index / total_steps) * 100
+        else:
+            percentage = 0
+        
+        # 计算 elapsed_time
+        task_obj = state_machine.get_task_object()
+        if task_obj:
+            created_at = task_obj.get('created_at', datetime.now().isoformat())
+            created_time = datetime.fromisoformat(created_at)
+            elapsed_time = (datetime.now() - created_time).total_seconds()
+        else:
+            elapsed_time = 0.0
+        
+        # 估算剩余时间
+        remaining_steps = max(0, total_steps - step_index)
+        if step_index > 0 and elapsed_time > 0:
+            avg_time_per_step = elapsed_time / step_index
+            remaining_time = remaining_steps * avg_time_per_step
+        else:
+            remaining_time = remaining_steps * 5.0  # 默认每步5秒
         
         updates = {
             'progress': {
@@ -438,6 +518,8 @@ class TaskManager:
                 'total_steps': total_steps,
                 'percentage': percentage,
                 'message': description,
+                'elapsed_time': elapsed_time,
+                'remaining_time': remaining_time,
             },
             'step_name': step_name,
             'step_status': status,

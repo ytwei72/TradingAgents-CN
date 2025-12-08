@@ -144,10 +144,10 @@ class TaskStateMachine:
                 'percentage': 0.0,
                 'message': '任务已创建,等待执行',
                 'total_steps': 0,
-                'current_step': 0
+                'current_step': 0,
+                'elapsed_time': 0.0,
+                'remaining_time': 0.0,
             },
-            'elapsed_time': 0.0,
-            'remaining_time': 0.0,
             'error': None,
             'result': None
         }
@@ -197,12 +197,6 @@ class TaskStateMachine:
             
         if 'error' in updates:
             self.task_props['error'] = updates['error']
-            
-        if 'elapsed_time' in updates:
-            self.task_props['elapsed_time'] = updates['elapsed_time']
-            
-        if 'remaining_time' in updates:
-            self.task_props['remaining_time'] = updates['remaining_time']
             
         # 2. 处理步骤更新
         step_update_needed = False
@@ -415,12 +409,16 @@ class TaskStateMachine:
         return self.get_task_object()
     
     def get_task_object(self) -> Optional[Dict[str, Any]]:
-        """获取完整的任务对象 (包含 params, progress 等)"""
+        """获取完整的任务对象 (包含 params, progress, current_step 等)"""
         if not self.task_props:
             self._load_state()
             if not self.task_props:
                 return None
-        return self.task_props.copy()
+        result = self.task_props.copy()
+        # 添加当前步骤信息
+        if self.current_step:
+            result['current_step'] = self.current_step.copy()
+        return result
     
     def get_current_state(self) -> Optional[Dict[str, Any]]:
         """获取当前步骤状态 (仅包含步骤信息)"""

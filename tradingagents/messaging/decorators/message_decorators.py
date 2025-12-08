@@ -245,7 +245,14 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
         current_step_index = max(current_step_index, max_history_index)
     
     progress = task_obj.get('progress', {})
-    total_steps = progress.get('total_steps', 10)  # 默认总步骤数
+    # 从 progress 获取 total_steps，如果为 0 或不存在，尝试从任务计算
+    total_steps = progress.get('total_steps', 0)
+    if total_steps == 0:
+        # 尝试从任务对象计算
+        if task and hasattr(task, 'calculate_total_steps'):
+            total_steps = task.calculate_total_steps()
+        else:
+            total_steps = 10  # 默认总步骤数
     
     # 根据节点状态决定步骤索引和状态
     if node_status == 'start':
@@ -290,19 +297,29 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     else:  # start
         last_message = f"模块开始: {module_name}"
     
-    # 估算剩余时间
-    remaining_time = max(0.0, total_steps * 5.0 - elapsed_time)  # 假设每步5秒
+    # 估算剩余时间：调用任务的估算函数或使用简单估算
+    if task and hasattr(task, 'estimate_remaining_time'):
+        remaining_time = task.estimate_remaining_time()
+    else:
+        # 回退：基于剩余步骤和平均步骤时间估算
+        remaining_steps = max(0, total_steps - step_index)
+        if step_index > 0 and elapsed_time > 0:
+            avg_time_per_step = elapsed_time / step_index
+            remaining_time = remaining_steps * avg_time_per_step
+        else:
+            remaining_time = remaining_steps * 5.0  # 默认每步5秒
     
     # 更新状态机（关键：传递 step_name 和 step_status）
+    # 注意：elapsed_time 和 remaining_time 放在 progress 中
     updates = {
         'progress': {
             'current_step': step_index,
             'total_steps': total_steps,
             'percentage': progress_percentage,
-            'message': last_message
+            'message': last_message,
+            'elapsed_time': elapsed_time,
+            'remaining_time': remaining_time,
         },
-        'elapsed_time': elapsed_time,
-        'remaining_time': remaining_time
     }
     
     # 只在开始新步骤时传递 step_name，触发新步骤创建

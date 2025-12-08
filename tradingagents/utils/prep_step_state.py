@@ -28,6 +28,8 @@ def update_preparation_step(
     
     try:
         from tradingagents.tasks import get_task_manager
+        from datetime import datetime
+        
         task_manager = get_task_manager()
         task = task_manager.tasks.get(analysis_id)
         
@@ -37,11 +39,44 @@ def update_preparation_step(
             from tradingagents.tasks.task_state_machine import TaskStateMachine
             state_machine = TaskStateMachine(analysis_id)
         
+        # 获取任务的总步骤数
+        if task and hasattr(task, 'calculate_total_steps'):
+            total_steps = task.calculate_total_steps()
+        else:
+            total_steps = 10  # 默认值
+        
+        # 计算进度百分比
+        if node_status == 'start':
+            percentage = ((step_index - 1) / total_steps) * 100 if total_steps > 0 else 0
+        else:
+            percentage = (step_index / total_steps) * 100 if total_steps > 0 else 0
+        
+        # 计算 elapsed_time
+        task_obj = state_machine.get_task_object()
+        if task_obj:
+            created_at = task_obj.get('created_at', datetime.now().isoformat())
+            created_time = datetime.fromisoformat(created_at)
+            elapsed_time = (datetime.now() - created_time).total_seconds()
+        else:
+            elapsed_time = 0.0
+        
+        # 估算剩余时间
+        remaining_steps = max(0, total_steps - step_index)
+        if step_index > 0 and elapsed_time > 0:
+            avg_time_per_step = elapsed_time / step_index
+            remaining_time = remaining_steps * avg_time_per_step
+        else:
+            remaining_time = remaining_steps * 5.0  # 默认每步5秒
+        
         # 构建更新数据
         updates = {
             'progress': {
                 'current_step': step_index,
-                'message': description
+                'total_steps': total_steps,
+                'percentage': percentage,
+                'message': description,
+                'elapsed_time': elapsed_time,
+                'remaining_time': remaining_time,
             }
         }
         
