@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>300229 - 分析步骤日志</title>
+  
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji'; background:#fff; color:#222; }
+      .container { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
+      .header { margin-bottom: 12px; }
+      .metric-row { display: flex; gap: 16px; margin: 8px 0 16px; }
+      .metric { background:#f6f7f9; padding:10px 12px; border-radius:8px; border:1px solid #e1e5e9; }
+      .step-card { border-left: 4px solid #9e9e9e; background:#f5f5f5; padding:12px; margin-bottom:10px; border-radius:5px; }
+      .step-card.completed { background:#e8f5e9; border-left-color:#4caf50; }
+      .step-card.running { background:#e3f2fd; border-left-color:#2196f3; }
+      .step-card.error { background:#ffebee; border-left-color:#f44336; }
+      .step-card.paused { background:#fff3e0; border-left-color:#ff9800; }
+      .step-header { display:flex; justify-content:space-between; align-items:center; }
+      .step-title { font-size:16px; font-weight:700; }
+      .step-msg { margin:5px 0; color:#555; white-space: pre-wrap; }
+      .right { text-align:right; margin-left:15px; min-width:180px; }
+      .badge { margin-left:8px; padding:2px 8px; border-radius:12px; font-size:11px; color:#fff; }
+      .badge.start { background:#2196f3; }
+      .badge.completed { background:#4caf50; }
+      .badge.error { background:#f44336; }
+      .badge.paused { background:#ff9800; }
+      .footer { margin-top:20px; }
+      .muted { color:#666; font-size:12px; }
+      .title { margin: 0 0 6px; }
+    </style>
+    
+</head>
+<body>
+  <div class="container">
+    
+    <div class="header">
+      <h2 class="title">📋 300229 - 详细分析步骤日志</h2>
+      <div class="metric-row">
+        <div class="metric">分析ID：<strong>analysis_6666993c_20251112_172449</strong></div>
+        <div class="metric">状态：<strong>running</strong></div>
+        <div class="metric">当前进度：<strong>39.1%</strong></div>
+      </div>
+    </div>
+    
+    
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 系统初始化</div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:24:49</div>
+              <div class="muted">📊 总用时: 0.0秒</div>
+            </div>
+          </div>
+          <p class="step-msg">分析系统启动，准备数据源和分析引擎</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 1: 🚀 分析启动 <span class='muted'>(用时: 1.6秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:24:50</div>
+              <div class="muted">📊 总用时: 1.6秒</div>
+            </div>
+          </div>
+          <p class="step-msg">记录分析开始日志，初始化分析会话ID
+✅ 已完成 - 节点: cost_estimation (状态: complete)</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 2: 💰 成本估算 <span class='muted'>(用时: 0.0秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:24:50</div>
+              <div class="muted">📊 总用时: 1.7秒</div>
+            </div>
+          </div>
+          <p class="step-msg">根据选择的分析师和研究深度估算分析成本，显示预估Token使用量和费用
+✅ 已完成 - 节点: data_preparation (状态: complete)</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 3: 🔍 数据预获取和验证 <span class='muted'>(用时: 15.9秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:25:06</div>
+              <div class="muted">📊 总用时: 17.5秒</div>
+            </div>
+          </div>
+          <p class="step-msg">验证股票代码格式和有效性，预获取股票基础数据（30天历史数据），缓存数据以提高效率
+✅ 已完成 - 节点: data_preparation (状态: complete)</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 4: 🔧 环境验证 <span class='muted'>(用时: 0.0秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:25:06</div>
+              <div class="muted">📊 总用时: 17.6秒</div>
+            </div>
+          </div>
+          <p class="step-msg">检查API密钥配置（DASHSCOPE_API_KEY、FINNHUB_API_KEY等），验证必要的环境变量
+✅ 已完成 - 节点: environment_validation (状态: complete)</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 5: ⚙️ 构建配置 <span class='muted'>(用时: 0.0秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:25:07</div>
+              <div class="muted">📊 总用时: 17.7秒</div>
+            </div>
+          </div>
+          <p class="step-msg">根据选择的LLM提供商和模型构建配置，设置研究深度、市场类型等参数
+✅ 已完成 - 节点: config_builder (状态: complete)</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 6: 📝 格式化股票代码 <span class='muted'>(用时: 0.0秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:25:07</div>
+              <div class="muted">📊 总用时: 17.8秒</div>
+            </div>
+          </div>
+          <p class="step-msg">根据市场类型格式化股票代码（A股/港股/美股），确保代码格式符合数据源要求
+✅ 已完成 - 节点: symbol_formatting (状态: complete)</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 7: 🏗️ 初始化分析引擎 <span class='muted'>(用时: 43.6秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:25:50</div>
+              <div class="muted">📊 总用时: 1.0分钟</div>
+            </div>
+          </div>
+          <p class="step-msg">创建TradingAgentsGraph实例，初始化所有智能体和工具节点，配置模拟模式（如果启用）
+✅ 已完成 - 节点: graph_initialization (状态: complete)</p>
+        </div>
+        
+        <div class="step-card completed">
+          <div class="step-header">
+            <div class="step-title">✅ 阶段 8: 📁 步骤输出目录准备 <span class='muted'>(用时: 0.0秒)</span> <span class='badge completed'>已完成</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:25:50</div>
+              <div class="muted">📊 总用时: 1.0分钟</div>
+            </div>
+          </div>
+          <p class="step-msg">创建步骤输出保存目录，准备保存每步执行结果
+✅ 已完成 - 节点: step_output_directory (状态: complete)</p>
+        </div>
+        
+        <div class="step-card running">
+          <div class="step-header">
+            <div class="step-title">🔄 阶段 9: 📈 市场分析师 <span class='muted'>(用时: 18.6秒)</span> <span class='badge start'>执行中</span></div>
+            <div class="right">
+              <div class="muted">🕐 2025-11-12 17:26:09</div>
+              <div class="muted">📊 总用时: 1.3分钟</div>
+            </div>
+          </div>
+          <p class="step-msg">技术面分析：K线形态、均线系统、价格趋势。技术指标分析：MACD、RSI、KDJ、布林带等。支撑阻力位分析、成交量分析。输出保存：market_report字段（每个节点的输出都会被实时保存到步骤文件）
+🔄 执行中 - 节点: market_analyst (状态: start)</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 10: 📰 新闻分析师</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">新闻事件收集：相关新闻抓取和筛选。事件影响分析：重大事件对股价的影响评估。市场动态追踪：行业动态、政策变化。输出保存：news_report字段（每个节点的输出都会被实时保存到步骤文件） - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 11: 💰 基本面分析师</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">财务数据分析：营收、利润、现金流、财务比率。公司基本面研究：业务模式、竞争优势。估值水平评估：PE、PB、PS、ROE等估值指标。输出保存：fundamentals_report字段（每个节点的输出都会被实时保存到步骤文件） - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 12: 🐂 看涨研究员</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">从乐观角度分析投资机会，输出看涨观点和投资理由。输出保存：investment_debate_state.bull_history - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 13: 🐻 看跌研究员</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">从谨慎角度分析投资风险，输出看跌观点和风险提醒。输出保存：investment_debate_state.bear_history - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 14: 👔 研究经理</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">综合多头和空头观点，做出综合投资判断。输出保存：investment_debate_state.judge_decision、investment_plan - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 15: 💼 交易员</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">基于研究结果制定交易计划，输出具体的投资建议和执行策略。输出保存：trader_investment_plan - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 16: 🔥 激进风险分析师</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">从高风险高收益角度分析，输出激进策略建议。输出保存：risk_debate_state.risky_history - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 17: 🛡️ 保守风险分析师</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">从风险控制角度分析，输出保守策略建议。输出保存：risk_debate_state.safe_history - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 18: ⚖️ 中性风险分析师</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">从平衡角度分析风险，输出平衡策略建议。输出保存：risk_debate_state.neutral_history - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 19: 🎯 风险经理</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">综合各方风险评估，做出最终风险决策和风险评级。输出保存：risk_debate_state.judge_decision、final_trade_decision - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 20: 📡 信号处理</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">处理最终交易决策信号，提取结构化的投资建议（买入/持有/卖出） - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 21: 📊 处理分析结果</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">提取风险评估数据，记录Token使用情况，格式化分析结果用于显示 - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 22: ✅ 记录完成日志</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">记录分析完成时间，计算总耗时和总成本 - 等待执行</p>
+        </div>
+        
+        <div class="step-card pending">
+          <div class="step-header">
+            <div class="step-title">⏳ 阶段 23: 💾 保存分析结果</div>
+            <div class="right">
+              <div class="muted">🕐 未开始</div>
+              <div class="muted">📊 总用时: -</div>
+            </div>
+          </div>
+          <p class="step-msg">保存分模块报告到本地目录，保存分析报告到MongoDB，步骤输出已实时保存到eval_results目录 - 等待执行</p>
+        </div>
+        
+    
+    <div class="footer">
+      <hr />
+      <div><strong>📈 进度统计</strong>：已完成 9/24 个步骤</div>
+      <div class="muted">导出时间：2025-11-12 17:26:09</div>
+    </div>
+    
+  </div>
+</body>
+</html>

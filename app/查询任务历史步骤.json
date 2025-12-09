@@ -1,0 +1,520 @@
+[
+    {
+        "step_name": "任务控制检查",
+        "step_index": 1,
+        "description": "开始任务控制检查",
+        "status": "completed",
+        "start_time": "2025-12-09T09:42:55.397392",
+        "end_time": "2025-12-09T09:42:55.403449",
+        "elapsed_time": 0.01,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:42:55.397392",
+                "message": "模块开始: 任务控制检查"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:42:55.403449",
+                "message": "任务控制检查完成",
+                "duration": 0.01
+            }
+        ],
+        "timestamp": "2025-12-09T09:42:55.403449"
+    },
+    {
+        "step_name": "数据预获取和验证",
+        "step_index": 2,
+        "description": "🔍 验证股票代码并预获取数据...",
+        "status": "completed",
+        "start_time": "2025-12-09T09:42:55.408729",
+        "end_time": "2025-12-09T09:43:18.027045",
+        "elapsed_time": 22.62,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:42:55.408729",
+                "message": "模块开始: 数据预获取和验证"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:43:18.027045",
+                "message": "数据预获取和验证完成",
+                "duration": 22.62
+            }
+        ],
+        "timestamp": "2025-12-09T09:43:18.027045"
+    },
+    {
+        "step_name": "环境验证",
+        "step_index": 3,
+        "description": "开始环境验证",
+        "status": "completed",
+        "start_time": "2025-12-09T09:43:18.041560",
+        "end_time": "2025-12-09T09:43:18.052996",
+        "elapsed_time": 0.01,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:43:18.041560",
+                "message": "模块开始: 环境验证"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:43:18.052996",
+                "message": "环境验证完成",
+                "duration": 0.01
+            }
+        ],
+        "timestamp": "2025-12-09T09:43:18.052996"
+    },
+    {
+        "step_name": "构建配置",
+        "step_index": 4,
+        "description": "开始构建配置",
+        "status": "completed",
+        "start_time": "2025-12-09T09:43:18.055637",
+        "end_time": "2025-12-09T09:43:18.065969",
+        "elapsed_time": 0.01,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:43:18.055637",
+                "message": "模块开始: 构建配置"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:43:18.065969",
+                "message": "配置构建完成",
+                "duration": 0.01
+            }
+        ],
+        "timestamp": "2025-12-09T09:43:18.065969"
+    },
+    {
+        "step_name": "格式化股票代码",
+        "step_index": 5,
+        "description": "开始格式化股票代码",
+        "status": "completed",
+        "start_time": "2025-12-09T09:43:18.075292",
+        "end_time": "2025-12-09T09:43:18.080360",
+        "elapsed_time": 0.01,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:43:18.075292",
+                "message": "模块开始: 格式化股票代码"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:43:18.080360",
+                "message": "✅ 🇨🇳 股票代码格式化完成: 600519",
+                "duration": 0.01
+            }
+        ],
+        "timestamp": "2025-12-09T09:43:18.080360"
+    },
+    {
+        "step_name": "初始化分析引擎",
+        "step_index": 6,
+        "description": "开始初始化分析引擎",
+        "status": "completed",
+        "start_time": "2025-12-09T09:43:18.085189",
+        "end_time": "2025-12-09T09:43:19.862291",
+        "elapsed_time": 1.78,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:43:18.085189",
+                "message": "模块开始: 初始化分析引擎"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:43:19.862291",
+                "message": "分析引擎初始化完成",
+                "duration": 1.78
+            }
+        ],
+        "timestamp": "2025-12-09T09:43:19.862291"
+    },
+    {
+        "step_name": "market_analyst",
+        "step_index": 7,
+        "description": "模块开始: market_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:43:19.901084",
+        "end_time": "2025-12-09T09:43:56.865332",
+        "elapsed_time": 0.022165536880493164,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:43:19.901084",
+                "message": "模块开始: market_analyst"
+            },
+            {
+                "event": "tool_calling",
+                "timestamp": "2025-12-09T09:43:56.843166",
+                "message": "工具调用中: market_analyst (耗时: 36.94s)",
+                "duration": 36.94
+            }
+        ],
+        "timestamp": "2025-12-09T09:43:19.901084"
+    },
+    {
+        "step_name": "fundamentals_analyst",
+        "step_index": 10,
+        "description": "模块开始: fundamentals_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:43:56.865332",
+        "end_time": "2025-12-09T09:44:10.941637",
+        "elapsed_time": 14.079999999999998,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:43:56.865332",
+                "message": "模块开始: fundamentals_analyst"
+            },
+            {
+                "event": "tool_calling",
+                "timestamp": "2025-12-09T09:43:58.975879",
+                "message": "工具调用中: fundamentals_analyst (耗时: 2.11s)",
+                "duration": 2.11
+            },
+            {
+                "event": "tool_calling",
+                "timestamp": "2025-12-09T09:44:05.055873",
+                "message": "工具调用中: fundamentals_analyst (耗时: 1.87s)",
+                "duration": 6.08
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:44:10.941637",
+                "message": "模块完成: fundamentals_analyst (耗时: 2.22s)",
+                "duration": 5.89
+            }
+        ],
+        "timestamp": "2025-12-09T09:44:10.941637"
+    },
+    {
+        "step_name": "news_analyst",
+        "step_index": 11,
+        "description": "模块开始: news_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:44:10.957301",
+        "end_time": "2025-12-09T09:44:46.851192",
+        "elapsed_time": 35.89,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:44:10.957301",
+                "message": "模块开始: news_analyst"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:44:46.851192",
+                "message": "模块完成: news_analyst (耗时: 35.89s)",
+                "duration": 35.89
+            }
+        ],
+        "timestamp": "2025-12-09T09:44:46.851192"
+    },
+    {
+        "step_name": "bull_researcher",
+        "step_index": 12,
+        "description": "模块开始: bull_researcher",
+        "status": "completed",
+        "start_time": "2025-12-09T09:44:46.861302",
+        "end_time": "2025-12-09T09:46:44.386272",
+        "elapsed_time": 117.52,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:44:46.861302",
+                "message": "模块开始: bull_researcher"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:46:44.386272",
+                "message": "模块完成: bull_researcher (耗时: 117.52s)",
+                "duration": 117.52
+            }
+        ],
+        "timestamp": "2025-12-09T09:46:44.386272"
+    },
+    {
+        "step_name": "bear_researcher",
+        "step_index": 13,
+        "description": "模块开始: bear_researcher",
+        "status": "completed",
+        "start_time": "2025-12-09T09:46:44.447065",
+        "end_time": "2025-12-09T09:48:02.124977",
+        "elapsed_time": 77.68,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:46:44.447065",
+                "message": "模块开始: bear_researcher"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:48:02.124977",
+                "message": "模块完成: bear_researcher (耗时: 77.63s)",
+                "duration": 77.68
+            }
+        ],
+        "timestamp": "2025-12-09T09:48:02.124977"
+    },
+    {
+        "step_name": "research_manager",
+        "step_index": 14,
+        "description": "模块开始: research_manager",
+        "status": "completed",
+        "start_time": "2025-12-09T09:48:02.177897",
+        "end_time": "2025-12-09T09:49:38.281966",
+        "elapsed_time": 96.1,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:48:02.177897",
+                "message": "模块开始: research_manager"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:49:38.281966",
+                "message": "模块完成: research_manager (耗时: 96.06s)",
+                "duration": 96.1
+            }
+        ],
+        "timestamp": "2025-12-09T09:49:38.281966"
+    },
+    {
+        "step_name": "trader",
+        "step_index": 15,
+        "description": "模块开始: trader",
+        "status": "completed",
+        "start_time": "2025-12-09T09:49:38.343601",
+        "end_time": "2025-12-09T09:50:14.912467",
+        "elapsed_time": 36.57,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:49:38.343601",
+                "message": "模块开始: trader"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:50:14.912467",
+                "message": "模块完成: trader (耗时: 36.52s)",
+                "duration": 36.57
+            }
+        ],
+        "timestamp": "2025-12-09T09:50:14.912467"
+    },
+    {
+        "step_name": "risky_analyst",
+        "step_index": 16,
+        "description": "模块开始: risky_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:50:14.972477",
+        "end_time": "2025-12-09T09:50:45.710736",
+        "elapsed_time": 30.74,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:50:14.973577",
+                "message": "模块开始: risky_analyst"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:50:45.710736",
+                "message": "模块完成: risky_analyst (耗时: 30.69s)",
+                "duration": 30.74
+            }
+        ],
+        "timestamp": "2025-12-09T09:50:45.710736"
+    },
+    {
+        "step_name": "safe_analyst",
+        "step_index": 17,
+        "description": "模块开始: safe_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:50:45.775233",
+        "end_time": "2025-12-09T09:51:15.496965",
+        "elapsed_time": 29.72,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:50:45.775233",
+                "message": "模块开始: safe_analyst"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:51:15.496965",
+                "message": "模块完成: safe_analyst (耗时: 29.68s)",
+                "duration": 29.72
+            }
+        ],
+        "timestamp": "2025-12-09T09:51:15.496965"
+    },
+    {
+        "step_name": "neutral_analyst",
+        "step_index": 18,
+        "description": "模块开始: neutral_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:51:15.559177",
+        "end_time": "2025-12-09T09:51:54.870723",
+        "elapsed_time": 39.31,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:51:15.559177",
+                "message": "模块开始: neutral_analyst"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:51:54.870723",
+                "message": "模块完成: neutral_analyst (耗时: 39.26s)",
+                "duration": 39.31
+            }
+        ],
+        "timestamp": "2025-12-09T09:51:54.870723"
+    },
+    {
+        "step_name": "risky_analyst",
+        "step_index": 19,
+        "description": "模块开始: risky_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:51:54.920344",
+        "end_time": "2025-12-09T09:52:30.917198",
+        "elapsed_time": 36.0,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:51:54.921034",
+                "message": "模块开始: risky_analyst"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:52:30.917198",
+                "message": "模块完成: risky_analyst (耗时: 35.95s)",
+                "duration": 36.0
+            }
+        ],
+        "timestamp": "2025-12-09T09:52:30.917198"
+    },
+    {
+        "step_name": "safe_analyst",
+        "step_index": 20,
+        "description": "模块开始: safe_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:52:30.978237",
+        "end_time": "2025-12-09T09:53:19.992248",
+        "elapsed_time": 49.01,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:52:30.978237",
+                "message": "模块开始: safe_analyst"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:53:19.992248",
+                "message": "模块完成: safe_analyst (耗时: 48.97s)",
+                "duration": 49.01
+            }
+        ],
+        "timestamp": "2025-12-09T09:53:19.992248"
+    },
+    {
+        "step_name": "neutral_analyst",
+        "step_index": 21,
+        "description": "模块开始: neutral_analyst",
+        "status": "completed",
+        "start_time": "2025-12-09T09:53:20.042127",
+        "end_time": "2025-12-09T09:54:01.171093",
+        "elapsed_time": 41.13,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:53:20.042127",
+                "message": "模块开始: neutral_analyst"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:54:01.171093",
+                "message": "模块完成: neutral_analyst (耗时: 41.08s)",
+                "duration": 41.13
+            }
+        ],
+        "timestamp": "2025-12-09T09:54:01.171093"
+    },
+    {
+        "step_name": "risk_manager",
+        "step_index": 22,
+        "description": "模块开始: risk_manager",
+        "status": "completed",
+        "start_time": "2025-12-09T09:54:01.233050",
+        "end_time": "2025-12-09T09:54:56.057154",
+        "elapsed_time": 54.82,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:54:01.233050",
+                "message": "模块开始: risk_manager"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:54:56.057154",
+                "message": "模块完成: risk_manager (耗时: 54.78s)",
+                "duration": 54.82
+            }
+        ],
+        "timestamp": "2025-12-09T09:54:56.057154"
+    },
+    {
+        "step_name": "graph_signal_processing",
+        "step_index": 23,
+        "description": "模块开始: graph_signal_processing",
+        "status": "completed",
+        "start_time": "2025-12-09T09:54:56.131530",
+        "end_time": "2025-12-09T09:54:59.392180",
+        "elapsed_time": 3.26,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:54:56.131530",
+                "message": "模块开始: graph_signal_processing"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:54:59.392180",
+                "message": "模块完成: graph_signal_processing (耗时: 3.21s)",
+                "duration": 3.26
+            }
+        ],
+        "timestamp": "2025-12-09T09:54:59.392180"
+    },
+    {
+        "step_name": "graph_signal_processing",
+        "step_index": 0,
+        "description": "✅ 分析成功完成！",
+        "status": "completed",
+        "start_time": "2025-12-09T09:54:56.131530",
+        "end_time": "2025-12-09T09:54:59.568382",
+        "elapsed_time": 3.4368526935577393,
+        "events": [
+            {
+                "event": "start",
+                "timestamp": "2025-12-09T09:54:56.131530",
+                "message": "模块开始: graph_signal_processing"
+            },
+            {
+                "event": "complete",
+                "timestamp": "2025-12-09T09:54:59.392180",
+                "message": "模块完成: graph_signal_processing (耗时: 3.21s)",
+                "duration": 3.26
+            }
+        ],
+        "timestamp": "2025-12-09T09:54:59.568382"
+    }
+]

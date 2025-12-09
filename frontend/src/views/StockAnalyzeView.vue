@@ -31,6 +31,7 @@ const loading = ref(false);
 const analysisId = ref<string | null>(null);
 const status = ref<string>('');
 const progressLog = ref<any[]>([]);
+const taskProgress = ref<any>(null); // Store detailed progress info
 const result = ref<any>(null);
 const error = ref<string | null>(null);
 const showAdvanced = ref(false);
@@ -133,6 +134,7 @@ const start = async () => {
   error.value = null;
   result.value = null;
   progressLog.value = [];
+  taskProgress.value = null;
   
   // Map form to API request
   const apiRequest: AnalysisRequest = {
@@ -189,6 +191,7 @@ const startPolling = () => {
       const res = await getAnalysisStatus(analysisId.value!);
       status.value = res.status;
       progressLog.value = res.progress_log || [];
+      taskProgress.value = res.progress; // Update detailed progress
       
       // Fetch history
       try {
@@ -335,12 +338,14 @@ const mergedSteps = computed(() => {
         let startTime = plan.start_time;
         let elapsedTime = plan.elapsed_time;
         let errorMsg = '';
+        let message = '';
         
         if (history) {
             status = history.status;
             startTime = history.start_time;
             elapsedTime = history.elapsed_time;
             errorMsg = history.error;
+            message = history.description || history.message;
         }
         
         return {
@@ -348,7 +353,8 @@ const mergedSteps = computed(() => {
             status: status,
             start_time: startTime,
             elapsed_time: elapsedTime,
-            error: errorMsg
+            error: errorMsg,
+            message: message
         };
     });
 });
@@ -356,27 +362,70 @@ const mergedSteps = computed(() => {
 const completedCount = computed(() => mergedSteps.value.filter(s => s.status === 'completed').length);
 const totalCount = computed(() => mergedSteps.value.length);
 
+// Helper for formatting duration
+const formatDuration = (seconds: number | undefined) => {
+    if (seconds === undefined || seconds === null) return '-';
+    if (seconds < 60) return `${seconds.toFixed(1)}秒`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(1);
+    return `${minutes}分${remainingSeconds}秒`;
+};
+
+// Helper for formatting time
+const formatTime = (isoString: string | undefined) => {
+    if (!isoString) return '-';
+    try {
+        return isoString.split('T')[1]?.split('.')[0] || isoString;
+    } catch {
+        return isoString;
+    }
+};
+
 const getStepColorClass = (status: string) => {
     switch (status) {
-        case 'running': return 'bg-green-600 border-green-500 text-white';
-        case 'completed': return 'bg-blue-600 border-blue-500 text-white';
+        case 'running': return 'bg-blue-900/20 border-blue-500';
+        case 'completed': return 'bg-green-900/20 border-green-500';
         case 'failed': 
-        case 'error': return 'bg-red-600 border-red-500 text-white';
-        case 'paused': return 'bg-yellow-600 border-yellow-500 text-white';
-        case 'stopped': return 'bg-gray-600 border-gray-500 text-white';
-        default: return 'bg-gray-800 border-gray-700 text-gray-400'; // pending
+        case 'error': return 'bg-red-900/20 border-red-500';
+        case 'paused': return 'bg-yellow-900/20 border-yellow-500';
+        case 'stopped': return 'bg-gray-700/50 border-gray-500';
+        default: return 'bg-gray-800/50 border-gray-600'; // pending
+    }
+};
+
+const getStepBadgeClass = (status: string) => {
+    switch (status) {
+        case 'running': return 'bg-blue-600 text-white';
+        case 'completed': return 'bg-green-600 text-white';
+        case 'failed': 
+        case 'error': return 'bg-red-600 text-white';
+        case 'paused': return 'bg-yellow-600 text-white';
+        case 'stopped': return 'bg-gray-600 text-white';
+        default: return 'bg-gray-700 text-gray-300';
     }
 };
 
 const getStepIcon = (status: string) => {
      switch (status) {
-        case 'running': return '▶'; // Or a spinner svg
-        case 'completed': return '✓';
+        case 'running': return '🔄'; 
+        case 'completed': return '✅';
         case 'failed': 
-        case 'error': return '✕';
+        case 'error': return '❌';
         case 'paused': return '⏸';
         case 'stopped': return '⏹';
-        default: return '○';
+        default: return '⏳';
+    }
+};
+
+const getStatusText = (status: string) => {
+     switch (status) {
+        case 'running': return '执行中'; 
+        case 'completed': return '已完成';
+        case 'failed': 
+        case 'error': return '失败';
+        case 'paused': return '已暂停';
+        case 'stopped': return '已停止';
+        default: return '等待执行';
     }
 };
 
@@ -595,27 +644,59 @@ const getStepIcon = (status: string) => {
                   <svg class="w-5 h-5 text-gray-400 transform transition-transform" :class="{'rotate-180': showHistory}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
               </button>
               
-              <div v-if="showHistory" class="p-4 bg-[#0f172a] space-y-2 max-h-[500px] overflow-y-auto">
+              <div v-if="showHistory" class="p-4 bg-[#0f172a] space-y-4 max-h-[600px] overflow-y-auto">
+                  <!-- Task Summary Info -->
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div class="bg-gray-800/50 p-3 rounded border border-gray-700">
+                         <div class="text-xs text-gray-400 mb-1">总计步骤</div>
+                         <div class="font-bold text-xl text-white">{{ taskProgress?.total_steps || totalCount }}</div>
+                      </div>
+                      <div class="bg-gray-800/50 p-3 rounded border border-gray-700">
+                         <div class="text-xs text-gray-400 mb-1">已完成</div>
+                         <div class="font-bold text-xl text-blue-400">{{ taskProgress?.current_step || completedCount }}</div>
+                      </div>
+                       <div class="bg-gray-800/50 p-3 rounded border border-gray-700">
+                         <div class="text-xs text-gray-400 mb-1">已运行时间</div>
+                         <div class="font-bold text-xl text-green-400">{{ formatDuration(taskProgress?.elapsed_time) }}</div>
+                      </div>
+                       <div class="bg-gray-800/50 p-3 rounded border border-gray-700">
+                         <div class="text-xs text-gray-400 mb-1">预计剩余</div>
+                         <div class="font-bold text-xl text-yellow-400">{{ formatDuration(taskProgress?.remaining_time) }}</div>
+                      </div>
+                  </div>
+
+                  <!-- Step List -->
                   <div v-for="step in mergedSteps" :key="step.step_index" 
-                       class="p-3 rounded border flex items-center justify-between transition-all duration-300"
+                       class="step-card p-3 rounded border-l-4 transition-all duration-300"
                        :class="getStepColorClass(step.status)">
                        
-                       <div class="flex items-center space-x-3">
-                           <div class="w-6 h-6 flex items-center justify-center rounded-full bg-black/20 font-bold text-xs">
-                               <span v-if="step.status === 'running'" class="animate-spin">⟳</span>
-                               <span v-else>{{ getStepIcon(step.status) }}</span>
-                           </div>
-                           <div>
-                               <div class="font-bold text-sm">{{ step.display_name || step.step_name }}</div>
-                               <div v-if="step.phase === 'debate'" class="text-xs opacity-75">
-                                   第{{ step.round }}轮 - {{ step.role }}
+                       <div class="flex justify-between items-start mb-2">
+                           <div class="flex items-center space-x-2">
+                               <div class="text-lg">{{ getStepIcon(step.status) }}</div>
+                               <div>
+                                   <div class="font-bold text-sm text-white flex items-center">
+                                       {{ step.display_name || step.step_name }}
+                                       <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded-full" :class="getStepBadgeClass(step.status)">
+                                           {{ getStatusText(step.status) }}
+                                       </span>
+                                   </div>
+                                   <div v-if="step.phase === 'debate'" class="text-xs text-gray-400 mt-0.5">
+                                       第{{ step.round }}轮 - {{ step.role }}
+                                   </div>
                                </div>
+                           </div>
+                           
+                           <div class="text-right">
+                               <div class="text-xs text-gray-400">🕐 {{ formatTime(step.start_time) }}</div>
+                               <div class="text-xs font-mono text-gray-500 mt-0.5">📊 用时: {{ formatDuration(step.elapsed_time) }}</div>
                            </div>
                        </div>
                        
-                       <div class="text-right text-xs opacity-80">
-                           <div v-if="step.start_time">{{ step.start_time.split('T')[1]?.split('.')[0] }}</div>
-                           <div v-if="step.elapsed_time">{{ typeof step.elapsed_time === 'number' ? step.elapsed_time.toFixed(1) + 's' : step.elapsed_time }}</div>
+                       <div class="text-xs text-gray-300 pl-7 whitespace-pre-wrap leading-relaxed">
+                           {{ step.message || step.display_name + '...' }}
+                           <div v-if="step.error" class="text-red-400 mt-1">
+                               错误信息: {{ step.error }}
+                           </div>
                        </div>
                   </div>
                   
