@@ -147,16 +147,41 @@ def estimate_analysis_cost(
         try:
             import time
             from tradingagents.messaging.business.messages import TaskProgressMessage
-            current_step = 1  # 步骤2（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
+            # 获取任务管理器和计划步骤
+            from tradingagents.tasks import get_task_manager
+            task_manager = get_task_manager()
+            
+            step_info = {
+                "step_index": 2, 
+                "display_name": "💰 成本估算", 
+                "description": "根据选择的分析师和研究深度估算分析成本，显示预估Token使用量和费用"
+            }
+            total_steps = 12
+            
+            if task_manager:
+                planned_steps = task_manager.get_task_planned_steps(analysis_id)
+                if planned_steps:
+                    total_steps = len(planned_steps)
+                    for step in planned_steps:
+                        if step['step_name'] == "cost_estimation":
+                            step_info = step
+                            break
+            
+            current_step = step_info['step_index'] - 1 # 消息中的current_step通常是0-indexed或者需要与前端对齐，这里保持原逻辑减1或者直接用index
+            # 注意：原代码 current_step = 1 (步骤2)，这里 step_index 应该是 2
+            # TaskProgressMessage 的 current_step 语义可能不一致，这里假设它需要 0-based index 或者与 total_steps 对应
+            # 原代码: current_step = 1, total_steps = ...
+            # 修正: 使用 step_index (1-based)
+            
+            progress_percentage = (step_info['step_index']) / total_steps * 100 if total_steps > 0 else 0
+            
             progress_msg = TaskProgressMessage(
                 analysis_id=analysis_id,
-                current_step=current_step,
+                current_step=step_info['step_index'],
                 total_steps=total_steps,
                 progress_percentage=progress_percentage,
-                current_step_name="💰 成本估算",
-                current_step_description=f"预估分析成本: ¥{estimated_cost:.4f}",
+                current_step_name=step_info['display_name'],
+                current_step_description=step_info['description'],
                 elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
                 remaining_time=0,
                 last_message=f"💰 预估分析成本: ¥{estimated_cost:.4f}",
@@ -164,6 +189,16 @@ def estimate_analysis_cost(
                 node_status=NodeStatus.COMPLETE.value  # 任务节点状态
             )
             message_producer.publish_progress(progress_msg)
+            
+            # 更新任务管理器状态
+            if task_manager:
+                task_manager.update_task_progress(
+                    analysis_id, 
+                    step_info['display_name'], 
+                    step_info['step_index'], 
+                    step_info['description'], 
+                    'success'
+                )
         except Exception as e:
             from tradingagents.utils.logging_manager import get_logger
             logger = get_logger('web')
@@ -373,6 +408,17 @@ def prepare_analysis_steps(
         raise ValueError("Task manager or analysis_id: {analysis_id} is not available")
     from .analysis_config import AnalysisConfigBuilder
     
+    # 获取计划步骤以确保使用统一的步骤名称和描述
+    planned_steps = task_manager.get_task_planned_steps(analysis_id)
+    
+    # 辅助函数：根据步骤名称获取步骤信息
+    def get_step_info_by_name(name_key: str) -> Dict[str, Any]:
+        for step in planned_steps:
+            if step['step_name'] == name_key:
+                return step
+        # Fallback if not found
+        return {"step_index": 0, "display_name": name_key, "description": ""}
+
     # 生成会话ID
     import uuid
     from datetime import datetime
@@ -383,16 +429,22 @@ def prepare_analysis_steps(
     config = None
     graph = None
     
-    # Step 1: 任务控制检查
-    task_manager.update_task_progress(analysis_id, "任务控制检查", 1, "开始任务控制检查", 'start')
+    # Step 1: 任务控制检查 (Internal Step)
     if not check_task_control(analysis_id, async_tracker):
         error_msg = '任务已被停止'
-        task_manager.update_task_progress(analysis_id, "任务控制检查", 1, error_msg, 'error')
+        # 这里的步骤索引和名称可能需要根据实际情况调整，或者不记录为正式步骤
+        task_manager.update_task_progress(analysis_id, "任务控制检查", 0, error_msg, 'error')
         return False, None, error_msg
-    task_manager.update_task_progress(analysis_id, "任务控制检查", 1, "任务控制检查完成", 'success')
     
-    # Step 2: 数据预获取和验证
-    task_manager.update_task_progress(analysis_id, "数据预获取和验证", 2, "🔍 验证股票代码并预获取数据...", 'start')
+    # Step 3: 数据预获取和验证
+    step_info = get_step_info_by_name("data_preparation")
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        "🔍 验证股票代码并预获取数据...", 
+        'start'
+    )
     success, error_msg, preparation_result = prepare_stock_data_for_analysis(
         stock_symbol, market_type, analysis_date, analysis_id, async_tracker
     )
@@ -400,20 +452,58 @@ def prepare_analysis_steps(
     if not success:
         suggestion = getattr(preparation_result, 'suggestion', "请检查网络连接或稍后重试") if preparation_result else "请检查网络连接或稍后重试"
         full_error = f"{error_msg} ({suggestion})"
-        task_manager.update_task_progress(analysis_id, "数据预获取和验证", 2, full_error, 'error')
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            full_error, 
+            'error'
+        )
         return False, None, full_error
-    task_manager.update_task_progress(analysis_id, "数据预获取和验证", 2, "数据预获取和验证完成", 'success')
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        step_info['description'], 
+        'success'
+    )
     
-    # Step 3: 环境验证
-    task_manager.update_task_progress(analysis_id, "环境验证", 3, "开始环境验证", 'start')
+    # Step 4: 环境验证
+    step_info = get_step_info_by_name("environment_validation")
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        "开始环境验证", 
+        'start'
+    )
     env_valid, env_error = validate_environment(analysis_id, async_tracker)
     if not env_valid:
-        task_manager.update_task_progress(analysis_id, "环境验证", 3, f"环境验证失败：{env_error}", 'error')
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            f"环境验证失败：{env_error}", 
+            'error'
+        )
         return False, None, env_error
-    task_manager.update_task_progress(analysis_id, "环境验证", 3, "环境验证完成", 'success')
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        step_info['description'], 
+        'success'
+    )
     
-    # Step 4: 构建配置
-    task_manager.update_task_progress(analysis_id, "构建配置", 4, "开始构建配置", 'start')
+    # Step 5: 构建配置
+    step_info = get_step_info_by_name("config_builder")
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        "开始构建配置", 
+        'start'
+    )
     try:
         config_builder = AnalysisConfigBuilder()
         config = config_builder.build_config(
@@ -422,10 +512,22 @@ def prepare_analysis_steps(
             research_depth=research_depth,
             market_type=market_type
         )
-        task_manager.update_task_progress(analysis_id, "构建配置", 4, "配置构建完成", 'success')
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            step_info['description'], 
+            'success'
+        )
     except Exception as e:
         error_msg = f"配置构建失败：{str(e)}"
-        task_manager.update_task_progress(analysis_id, "构建配置", 4, error_msg, 'error')
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            error_msg, 
+            'error'
+        )
         raise
     
     logger.info(f"使用配置: {config}")
@@ -433,30 +535,68 @@ def prepare_analysis_steps(
     logger.info(f"股票代码: {stock_symbol}")
     logger.info(f"分析日期: {analysis_date}")
     
-    # Step 5: 格式化股票代码
-    task_manager.update_task_progress(analysis_id, "格式化股票代码", 5, "开始格式化股票代码", 'start')
+    # Step 6: 格式化股票代码
+    step_info = get_step_info_by_name("symbol_formatting")
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        "开始格式化股票代码", 
+        'start'
+    )
     formatted_symbol = format_stock_symbol(stock_symbol, market_type)
     
     market_icons = {"A股": "🇨🇳", "港股": "🇭🇰", "美股": "🇺🇸"}
     market_icon = market_icons.get(market_type, "📊")
-    success_msg = f"✅ {market_icon} 股票代码格式化完成: {formatted_symbol}"
-    task_manager.update_task_progress(analysis_id, "格式化股票代码", 5, success_msg, 'success')
+    # success_msg = f"✅ {market_icon} 股票代码格式化完成: {formatted_symbol}"
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        step_info['description'], 
+        'success'
+    )
     
-    # Step 6: 初始化分析引擎
-    task_manager.update_task_progress(analysis_id, "初始化分析引擎", 6, "开始初始化分析引擎", 'start')
+    # Step 7: 初始化分析引擎
+    step_info = get_step_info_by_name("graph_initialization")
+    task_manager.update_task_progress(
+        analysis_id, 
+        step_info['display_name'], 
+        step_info['step_index'], 
+        "开始初始化分析引擎", 
+        'start'
+    )
     
     if not check_task_control(analysis_id, async_tracker):
         error_msg = '任务已被停止'
-        task_manager.update_task_progress(analysis_id, "初始化分析引擎", 6, error_msg, 'error')
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            error_msg, 
+            'error'
+        )
         return False, None, error_msg
     
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
         graph = TradingAgentsGraph(analysts, config=config, debug=False)
-        task_manager.update_task_progress(analysis_id, "初始化分析引擎", 6, "分析引擎初始化完成", 'success')
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            step_info['description'], 
+            'success'
+        )
     except Exception as e:
         error_msg = f"分析引擎初始化失败：{str(e)}"
-        task_manager.update_task_progress(analysis_id, "step6_graph_initialization", 6, error_msg, 'error')
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            error_msg, 
+            'error'
+        )
         raise
     
     # 返回准备结果
@@ -504,16 +644,35 @@ def save_analysis_results(
         try:
             import time
             from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-            current_step = 11  # 步骤12（索引从0开始）
-            total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-            progress_percentage = (current_step + 1) / total_steps * 100 if total_steps > 0 else 0
+            # 获取任务管理器和计划步骤
+            from tradingagents.tasks import get_task_manager
+            task_manager = get_task_manager()
+            
+            step_info = {
+                "step_index": 23, 
+                "display_name": "💾 保存分析结果", 
+                "description": "保存分模块报告到本地目录，保存分析报告到MongoDB，步骤输出已实时保存到eval_results目录"
+            }
+            total_steps = 12
+            
+            if task_manager:
+                planned_steps = task_manager.get_task_planned_steps(analysis_id)
+                if planned_steps:
+                    total_steps = len(planned_steps)
+                    for step in planned_steps:
+                        if step['step_name'] == "save_results":
+                            step_info = step
+                            break
+            
+            progress_percentage = (step_info['step_index']) / total_steps * 100 if total_steps > 0 else 0
+            
             progress_msg = TaskProgressMessage(
                 analysis_id=analysis_id,
-                current_step=current_step,
+                current_step=step_info['step_index'],
                 total_steps=total_steps,
                 progress_percentage=progress_percentage,
-                current_step_name="💾 保存分析结果",
-                current_step_description="正在保存分析报告",
+                current_step_name=step_info['display_name'],
+                current_step_description=step_info['description'],
                 elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
                 remaining_time=0,
                 last_message="💾 正在保存分析报告...",
@@ -521,6 +680,16 @@ def save_analysis_results(
                 node_status=NodeStatus.START.value  # 任务节点状态：开始
             )
             message_producer.publish_progress(progress_msg)
+            
+            # 更新任务管理器状态
+            if task_manager:
+                task_manager.update_task_progress(
+                    analysis_id, 
+                    step_info['display_name'], 
+                    step_info['step_index'], 
+                    step_info['description'], 
+                    'start'
+                )
         except Exception as e:
             logger.debug(f"发布步骤12开始消息失败: {e}")
     
@@ -577,9 +746,27 @@ def save_analysis_results(
             try:
                 import time
                 from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
-                current_step = 11  # 步骤12（索引从0开始）
-                total_steps = len(async_tracker.analysis_steps) if hasattr(async_tracker, 'analysis_steps') else 12
-                progress_percentage = 100.0  # 步骤12完成，进度为100%
+                # 获取任务管理器和计划步骤
+                from tradingagents.tasks import get_task_manager
+                task_manager = get_task_manager()
+                
+                step_info = {
+                    "step_index": 23, 
+                    "display_name": "💾 保存分析结果", 
+                    "description": "保存分模块报告到本地目录，保存分析报告到MongoDB，步骤输出已实时保存到eval_results目录"
+                }
+                total_steps = 12
+                
+                if task_manager:
+                    planned_steps = task_manager.get_task_planned_steps(analysis_id)
+                    if planned_steps:
+                        total_steps = len(planned_steps)
+                        for step in planned_steps:
+                            if step['step_name'] == "save_results":
+                                step_info = step
+                                break
+                
+                progress_percentage = 100.0  # 步骤完成，进度为100%
                 if save_success:
                     final_msg = "✅ 分析报告已保存到数据库和本地文件"
                 elif local_files:
@@ -588,10 +775,10 @@ def save_analysis_results(
                     final_msg = "⚠️ 报告保存失败，但分析已完成"
                 progress_msg = TaskProgressMessage(
                     analysis_id=analysis_id,
-                    current_step=current_step,
+                    current_step=step_info['step_index'],
                     total_steps=total_steps,
                     progress_percentage=progress_percentage,
-                    current_step_name="💾 保存分析结果",
+                    current_step_name=step_info['display_name'],
                     current_step_description=final_msg,
                     elapsed_time=async_tracker.get_effective_elapsed_time() if hasattr(async_tracker, 'get_effective_elapsed_time') else 0,
                     remaining_time=0,
@@ -600,6 +787,16 @@ def save_analysis_results(
                     node_status=NodeStatus.COMPLETE.value  # 任务节点状态：完成
                 )
                 message_producer.publish_progress(progress_msg)
+                
+                # 更新任务管理器状态
+                if task_manager:
+                    task_manager.update_task_progress(
+                        analysis_id, 
+                        step_info['display_name'], 
+                        step_info['step_index'], 
+                        step_info['description'], 
+                        'success'
+                    )
             except Exception as e:
                 logger.debug(f"发布步骤12完成消息失败: {e}")
         
@@ -684,6 +881,31 @@ def log_analysis_start(
     from .message_utils import publish_task_status
     publish_task_status(analysis_id, "RUNNING", "🚀 开始股票分析...")
     
+    # 更新任务管理器状态
+    from tradingagents.tasks import get_task_manager
+    task_manager = get_task_manager()
+    if task_manager and analysis_id:
+        # 获取计划步骤
+        planned_steps = task_manager.get_task_planned_steps(analysis_id)
+        step_info = {
+            "step_index": 1, 
+            "display_name": "🚀 分析启动", 
+            "description": "记录分析开始日志，初始化分析会话ID"
+        }
+        if planned_steps:
+            for step in planned_steps:
+                if step['step_name'] == "analysis_start":
+                    step_info = step
+                    break
+        
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            step_info['description'], 
+            'success'
+        )
+    
     return logger_manager, analysis_start_time
 
 
@@ -730,6 +952,31 @@ def prepare_step_output_directory(
         message_producer=message_producer
     )
     
+    # 更新任务管理器状态
+    from tradingagents.tasks import get_task_manager
+    task_manager = get_task_manager()
+    
+    step_info = {
+        "step_index": 8, 
+        "display_name": "📁 步骤输出目录准备", 
+        "description": "创建步骤输出保存目录，准备保存每步执行结果"
+    }
+    if task_manager and analysis_id:
+        planned_steps = task_manager.get_task_planned_steps(analysis_id)
+        if planned_steps:
+            for step in planned_steps:
+                if step['step_name'] == "step_output_directory":
+                    step_info = step
+                    break
+                    
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            step_info['description'], 
+            'start'
+        )
+    
     if update_progress:
         update_progress("📁 准备步骤输出目录...")
     
@@ -753,6 +1000,15 @@ def prepare_step_output_directory(
         analysis_start_time=analysis_start_time,
         message_producer=message_producer
     )
+    
+    if task_manager and analysis_id:
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            step_info['description'], 
+            'success'
+        )
     
     return step_output_base_dir
 
@@ -892,6 +1148,18 @@ def process_analysis_results(
         message_producer=message_producer
     )
     
+    # 更新任务管理器状态
+    from tradingagents.tasks import get_task_manager
+    task_manager = get_task_manager()
+    if task_manager and analysis_id:
+        task_manager.update_task_progress(
+            analysis_id, 
+            "处理分析结果", 
+            21, 
+            "提取风险评估数据，记录Token使用情况，格式化分析结果用于显示", 
+            'start'
+        )
+    
     if update_progress:
         update_progress("📋 分析完成，正在整理结果...")
     
@@ -920,6 +1188,15 @@ def process_analysis_results(
         analysis_start_time=analysis_start_time,
         message_producer=message_producer
     )
+    
+    if task_manager and analysis_id:
+        task_manager.update_task_progress(
+            analysis_id, 
+            "处理分析结果", 
+            21, 
+            "提取风险评估数据，记录Token使用情况，格式化分析结果用于显示", 
+            'success'
+        )
     
     return {
         'state': state,
@@ -972,6 +1249,34 @@ def log_analysis_completion(
         message_producer=message_producer
     )
     
+    # 更新任务管理器状态
+    from tradingagents.tasks import get_task_manager
+    task_manager = get_task_manager()
+    
+    step_info = {
+        "step_index": 22, 
+        "display_name": "✅ 记录完成日志", 
+        "description": "记录分析完成时间，计算总耗时和总成本"
+    }
+    total_steps = 12
+    
+    if task_manager and analysis_id:
+        planned_steps = task_manager.get_task_planned_steps(analysis_id)
+        if planned_steps:
+            total_steps = len(planned_steps)
+            for step in planned_steps:
+                if step['step_name'] == "completion_logging":
+                    step_info = step
+                    break
+                    
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            step_info['description'], 
+            'start'
+        )
+    
     if update_progress:
         update_progress("✅ 记录完成日志...")
     
@@ -1016,5 +1321,14 @@ def log_analysis_completion(
         analysis_start_time=analysis_start_time,
         message_producer=message_producer
     )
+    
+    if task_manager and analysis_id:
+        task_manager.update_task_progress(
+            analysis_id, 
+            step_info['display_name'], 
+            step_info['step_index'], 
+            step_info['description'], 
+            'success'
+        )
     
     return total_cost

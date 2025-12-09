@@ -14,6 +14,22 @@ from ..business.messages import NodeStatus, TaskProgressMessage
 
 logger = get_logger('messaging.decorators')
 
+# 模块描述映射表
+MODULE_DESCRIPTIONS = {
+    'market_analyst': "技术面分析：K线形态、均线系统、价格趋势。技术指标分析：MACD、RSI、KDJ、布林带等。支撑阻力位分析、成交量分析。输出保存：market_report字段（每个节点的输出都会被实时保存到步骤文件）",
+    'news_analyst': "新闻事件收集：相关新闻抓取和筛选。事件影响分析：重大事件对股价的影响评估。市场动态追踪：行业动态、政策变化。输出保存：news_report字段（每个节点的输出都会被实时保存到步骤文件）",
+    'fundamentals_analyst': "财务数据分析：营收、利润、现金流、财务比率。公司基本面研究：业务模式、竞争优势。估值水平评估：PE、PB、PS、ROE等估值指标。输出保存：fundamentals_report字段（每个节点的输出都会被实时保存到步骤文件）",
+    'bull_researcher': "从乐观角度分析投资机会，输出看涨观点和投资理由。输出保存：investment_debate_state.bull_history",
+    'bear_researcher': "从谨慎角度分析投资风险，输出看跌观点和风险提醒。输出保存：investment_debate_state.bear_history",
+    'research_manager': "综合多头和空头观点，做出综合投资判断。输出保存：investment_debate_state.judge_decision、investment_plan",
+    'trader': "基于研究结果制定交易计划，输出具体的投资建议和执行策略。输出保存：trader_investment_plan",
+    'risky_analyst': "从高风险高收益角度分析，输出激进策略建议。输出保存：risk_debate_state.risky_history",
+    'safe_analyst': "从风险控制角度分析，输出保守策略建议。输出保存：risk_debate_state.safe_history",
+    'neutral_analyst': "从平衡角度分析风险，输出平衡策略建议。输出保存：risk_debate_state.neutral_history",
+    'risk_manager': "综合各方风险评估，做出最终风险决策和风险评级。输出保存：risk_debate_state.judge_decision、final_trade_decision",
+    'graph_signal_processing': "处理最终交易决策信号，提取结构化的投资建议（买入/持有/卖出）",
+}
+
 
 def _extract_analysis_id(*args, **kwargs) -> Optional[str]:
     """从参数中提取分析ID"""
@@ -309,6 +325,9 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
         else:
             remaining_time = remaining_steps * 5.0  # 默认每步5秒
     
+    # 获取详细描述
+    step_description = MODULE_DESCRIPTIONS.get(module_name, last_message)
+    
     # 更新状态机（关键：传递 step_name 和 step_status）
     # 注意：elapsed_time 和 remaining_time 放在 progress 中
     updates = {
@@ -316,7 +335,8 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
             'current_step': step_index,
             'total_steps': total_steps,
             'percentage': progress_percentage,
-            'message': last_message,
+            'message': step_description,  # 使用详细描述
+            'duration': duration,  # 传递 duration
             'elapsed_time': elapsed_time,
             'remaining_time': remaining_time,
         },
@@ -340,7 +360,7 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
         total_steps=total_steps,
         progress_percentage=progress_percentage,
         current_step_name=step_name,
-        current_step_description='',
+        current_step_description=step_description,  # 使用详细描述
         elapsed_time=elapsed_time,
         remaining_time=remaining_time,
         last_message=last_message,

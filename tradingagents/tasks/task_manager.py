@@ -17,6 +17,51 @@ from tradingagents.utils.analysis_runner import run_stock_analysis
 
 logger = get_logger('task_manager')
 
+# 步骤显示名称映射 (保持与 async_progress_tracker.py 一致)
+STEP_DISPLAY_NAMES = {
+    # 准备阶段
+    "analysis_start": "🚀 分析启动",
+    "cost_estimation": "💰 成本估算",
+    "data_preparation": "🔍 数据预获取和验证",
+    "environment_validation": "🔧 环境验证",
+    "config_builder": "⚙️ 构建配置",
+    "symbol_formatting": "📝 格式化股票代码",
+    "graph_initialization": "🏗️ 初始化分析引擎",
+    "step_output_directory": "📁 步骤输出目录准备",
+    # 分析师阶段
+    "market_analyst": "📈 市场分析师",
+    "market": "📈 市场分析师",
+    "fundamentals_analyst": "💰 基本面分析师",
+    "fundamentals": "💰 基本面分析师",
+    "news_analyst": "📰 新闻分析师",
+    "news": "📰 新闻分析师",
+    "social_media_analyst": "💭 社交媒体分析师",
+    "social": "💭 社交媒体分析师",
+    "risk_analyst": "⚠️ 风险分析师",
+    "risk": "⚠️ 风险分析师",
+    "technical_analyst": "📈 技术分析师",
+    "technical": "📈 技术分析师",
+    "sentiment_analyst": "💭 情绪分析师",
+    "sentiment": "💭 情绪分析师",
+    # 研究团队
+    "bull": "🐂 看涨研究员",
+    "bear": "🐻 看跌研究员",
+    "manager": "👔 研究经理",
+    # 交易决策
+    "trader": "💼 交易员",
+    # 风险评估
+    "risky": "🔥 激进风险分析师",
+    "safe": "🛡️ 保守风险分析师",
+    "neutral": "⚖️ 中性风险分析师",
+    "judge": "🎯 风险经理",
+    "risk_tip": "⚠️ 风险提示",
+    # 后处理
+    "graph_signal_processing": "📡 信号处理",
+    "result_processing": "📊 处理分析结果",
+    "completion_logging": "✅ 记录完成日志",
+    "save_results": "💾 保存分析结果",
+}
+
 class AnalysisTask(threading.Thread):
     """分析任务线程包装类"""
     
@@ -31,23 +76,165 @@ class AnalysisTask(threading.Thread):
         self.state_machine.initialize(self.params)
     
     def calculate_total_steps(self) -> int:
-        """计算任务总步骤数
+        """计算任务总步骤数"""
+        return len(self.generate_planned_steps())
+    
+    def generate_planned_steps(self) -> List[Dict[str, Any]]:
+        """生成任务计划步骤列表 (与 async_progress_tracker.py 保持一致)"""
+        steps = []
+        step_index = 1
         
-        步骤组成:
-        - 6个准备步骤
-        - 每个分析师1个步骤
-        - 研究团队步骤 (bull, bear, manager) = 3
-        - 交易团队步骤 (trader) = 1
-        - 风险团队步骤 (risky, safe, neutral, judge) = 4
+        # 1. 准备阶段 (8步)
+        preparation_steps = [
+            ("analysis_start", "🚀 分析启动", "记录分析开始日志，初始化分析会话ID"),
+            ("cost_estimation", "💰 成本估算", "根据选择的分析师和研究深度估算分析成本，显示预估Token使用量和费用"),
+            ("data_preparation", "🔍 数据预获取和验证", "验证股票代码格式和有效性，预获取股票基础数据（30天历史数据），缓存数据以提高效率"),
+            ("environment_validation", "🔧 环境验证", "检查API密钥配置（DASHSCOPE_API_KEY、FINNHUB_API_KEY等），验证必要的环境变量"),
+            ("config_builder", "⚙️ 构建配置", "根据选择的LLM提供商和模型构建配置，设置研究深度、市场类型等参数"),
+            ("symbol_formatting", "📝 格式化股票代码", "根据市场类型格式化股票代码（A股/港股/美股），确保代码格式符合数据源要求"),
+            ("graph_initialization", "🏗️ 初始化分析引擎", "创建TradingAgentsGraph实例，初始化所有智能体和工具节点，配置模拟模式（如果启用）"),
+            ("step_output_directory", "📁 步骤输出目录准备", "创建步骤输出保存目录，准备保存每步执行结果"),
+        ]
+        for step_name, display_name, desc in preparation_steps:
+            steps.append({
+                "step_index": step_index,
+                "step_name": step_name,
+                "display_name": display_name,
+                "description": desc,
+                "phase": "preparation",
+                "status": "pending"
+            })
+            step_index += 1
         
-        Returns:
-            总步骤数
-        """
+        # 2. 分析师阶段
         analysts = self.params.get('analysts', [])
-        base_steps = 6  # 准备步骤
-        analyst_steps = len(analysts)  # 分析师步骤
-        team_steps = 3 + 1 + 4  # 研究+交易+风险团队
-        return base_steps + analyst_steps + team_steps
+        analyst_mapping = {
+            "market": "market_analyst",
+            "fundamentals": "fundamentals_analyst",
+            "news": "news_analyst",
+            "social": "social_media_analyst",
+            "risk": "risk_analyst",
+            "technical": "technical_analyst",
+            "sentiment": "sentiment_analyst",
+        }
+        
+        # 完整的分析师描述映射
+        analyst_descriptions = {
+            "market_analyst": "技术面分析：K线形态、均线系统、价格趋势。技术指标分析：MACD、RSI、KDJ、布林带等。支撑阻力位分析、成交量分析。输出保存：market_report字段",
+            "fundamentals_analyst": "财务数据分析：营收、利润、现金流、财务比率。公司基本面研究：业务模式、竞争优势。估值水平评估：PE、PB、PS、ROE等估值指标。输出保存：fundamentals_report字段",
+            "news_analyst": "新闻事件收集：相关新闻抓取和筛选。事件影响分析：重大事件对股价的影响评估。市场动态追踪：行业动态、政策变化。输出保存：news_report字段",
+            "social_media_analyst": "社交媒体数据采集：Reddit、Twitter等平台。投资者情绪分析：散户情绪、机构观点。热度指标监测：讨论热度、关注度变化。输出保存：sentiment_report字段（非A股市场）",
+            "risk_analyst": "识别投资风险、评估风险等级、制定风控措施",
+            "technical_analyst": "分析K线图形、技术指标、支撑阻力等技术面",
+            "sentiment_analyst": "分析市场情绪、投资者心理、舆论倾向等",
+        }
+        
+        for analyst in analysts:
+            full_name = analyst_mapping.get(analyst, analyst)
+            display_name = STEP_DISPLAY_NAMES.get(full_name, STEP_DISPLAY_NAMES.get(analyst, f"🔍 {analyst}分析师"))
+            
+            # 确保描述包含统一后缀
+            base_desc = analyst_descriptions.get(full_name, f"进行{analyst}相关的专业分析")
+            desc = f"{base_desc}（每个节点的输出都会被实时保存到步骤文件）"
+            
+            steps.append({
+                "step_index": step_index,
+                "step_name": full_name,
+                "display_name": display_name,
+                "description": desc,
+                "phase": "analyst",
+                "status": "pending"
+            })
+            step_index += 1
+        
+        # 获取配置中的轮数和深度
+        research_depth = self.params.get('research_depth', 2)
+        extra_config = self.params.get('extra_config', {}) or {}
+        max_debate_rounds = extra_config.get('max_debate_rounds', 1)
+        # max_risk_discuss_rounds = extra_config.get('max_risk_discuss_rounds', 1) # 暂时没用到
+
+        # 3. 研究团队辩论阶段 (深度 >= 2)
+        if research_depth >= 2:
+            # 标准和深度分析包含研究员辩论
+            debate_roles = [
+                ("bull_researcher", "🐂 看涨研究员", "从乐观角度分析投资机会，输出看涨观点和投资理由。输出保存：investment_debate_state.bull_history"),
+                ("bear_researcher", "🐻 看跌研究员", "从谨慎角度分析投资风险，输出看跌观点和风险提醒。输出保存：investment_debate_state.bear_history"),
+                ("research_manager", "👔 研究经理", "综合多头和空头观点，做出综合投资判断。输出保存：investment_debate_state.judge_decision、investment_plan"),
+            ]
+            
+            for step_name, display_name, desc in debate_roles:
+                steps.append({
+                    "step_index": step_index,
+                    "step_name": step_name,
+                    "display_name": display_name,
+                    "description": desc,
+                    "phase": "debate",
+                    "status": "pending"
+                })
+                step_index += 1
+        
+        # 4. 交易决策阶段 (所有深度)
+        steps.append({
+            "step_index": step_index,
+            "step_name": "trader",
+            "display_name": "💼 交易员",
+            "description": "基于研究结果制定交易计划，输出具体的投资建议和执行策略。输出保存：trader_investment_plan",
+            "phase": "trading",
+            "status": "pending"
+        })
+        step_index += 1
+        
+        # 5. 风险评估阶段
+        if research_depth >= 3:
+            # 深度分析包含详细风险评估
+            risk_roles = [
+                ("risky_analyst", "🔥 激进风险分析师", "从高风险高收益角度分析，输出激进策略建议。输出保存：risk_debate_state.risky_history"),
+                ("safe_analyst", "🛡️ 保守风险分析师", "从风险控制角度分析，输出保守策略建议。输出保存：risk_debate_state.safe_history"),
+                ("neutral_analyst", "⚖️ 中性风险分析师", "从平衡角度分析风险，输出平衡策略建议。输出保存：risk_debate_state.neutral_history"),
+                ("risk_manager", "🎯 风险经理", "综合各方风险评估，做出最终风险决策和风险评级。输出保存：risk_debate_state.judge_decision、final_trade_decision"),
+            ]
+            for step_name, display_name, desc in risk_roles:
+                steps.append({
+                    "step_index": step_index,
+                    "step_name": step_name,
+                    "display_name": display_name,
+                    "description": desc,
+                    "phase": "risk_assessment",
+                    "status": "pending"
+                })
+                step_index += 1
+        else:
+            # 快速和标准分析的简化风险评估
+            steps.append({
+                "step_index": step_index,
+                "step_name": "risk_tip",
+                "display_name": "⚠️ 风险提示",
+                "description": "识别主要投资风险并提供风险提示（快速和标准分析模式）",
+                "phase": "risk_assessment",
+                "status": "pending"
+            })
+            step_index += 1
+        
+        # 6. 后处理阶段
+        post_processing_steps = [
+            ("graph_signal_processing", "📡 信号处理", "处理最终交易决策信号，提取结构化的投资建议（买入/持有/卖出）"),
+            ("result_processing", "📊 处理分析结果", "提取风险评估数据，记录Token使用情况，格式化分析结果用于显示"),
+            ("completion_logging", "✅ 记录完成日志", "记录分析完成时间，计算总耗时和总成本"),
+            ("save_results", "💾 保存分析结果", "保存分模块报告到本地目录，保存分析报告到MongoDB，步骤输出已实时保存到eval_results目录"),
+        ]
+        
+        for step_name, display_name, desc in post_processing_steps:
+            steps.append({
+                "step_index": step_index,
+                "step_name": step_name,
+                "display_name": display_name,
+                "description": desc,
+                "phase": "post_processing",
+                "status": "pending"
+            })
+            step_index += 1
+            
+        return steps
     
     def estimate_remaining_time(self) -> float:
         """估算剩余时间
@@ -334,6 +521,23 @@ class TaskManager:
         if state and state.get('status') == TaskStatus.COMPLETED.value:
             return state.get('result')
         return None
+
+    def get_task_planned_steps(self, task_id: str) -> List[Dict[str, Any]]:
+        """获取任务计划步骤"""
+        task = self.tasks.get(task_id)
+        if task:
+            return task.generate_planned_steps()
+        
+        # 如果任务不在内存中（可能是重启后），尝试从 checkpoint 恢复 params 并生成
+        # 这里简化处理，如果找不到任务实例，尝试从状态机获取 params
+        state_machine = self._get_task_state_machine(task_id)
+        task_obj = state_machine.get_task_object()
+        if task_obj and 'params' in task_obj:
+            # 创建临时任务对象来生成步骤
+            temp_task = AnalysisTask(task_id, task_obj['params'])
+            return temp_task.generate_planned_steps()
+            
+        return []
 
     def _get_task_state_machine(self, task_id: str) -> TaskStateMachine:
         """获取任务状态机实例"""

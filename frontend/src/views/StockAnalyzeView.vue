@@ -338,6 +338,8 @@ const mergedSteps = computed(() => {
         let startTime = plan.start_time;
         let elapsedTime = plan.elapsed_time;
         let errorMsg = '';
+        // 优先使用历史记录中的描述（通常包含动态信息），如果没有则使用计划中的静态描述
+        let description = plan.description || '';
         let message = '';
         
         if (history) {
@@ -345,7 +347,11 @@ const mergedSteps = computed(() => {
             startTime = history.start_time;
             elapsedTime = history.elapsed_time;
             errorMsg = history.error;
-            message = history.description || history.message;
+            // 如果历史记录中有description，优先使用
+            if (history.description) {
+                description = history.description;
+            }
+            message = history.message;
         }
         
         return {
@@ -354,6 +360,7 @@ const mergedSteps = computed(() => {
             start_time: startTime,
             elapsed_time: elapsedTime,
             error: errorMsg,
+            description: description,
             message: message
         };
     });
@@ -693,7 +700,7 @@ const getStatusText = (status: string) => {
                        </div>
                        
                        <div class="text-xs text-gray-300 pl-7 whitespace-pre-wrap leading-relaxed">
-                           {{ step.message || step.display_name + '...' }}
+                           {{ step.description || step.message || step.display_name + '...' }}
                            <div v-if="step.error" class="text-red-400 mt-1">
                                错误信息: {{ step.error }}
                            </div>

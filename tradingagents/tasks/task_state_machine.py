@@ -243,7 +243,13 @@ class TaskStateMachine:
         step_starting = step_status == 'start'
         # 工具调用中的判断
         tool_calling = step_status == 'tool_calling'
-        new_step_starting = 'step_name' in new_step_info and new_step_info['step_name'] != self.current_step.get('step_name')
+        
+        # 新步骤开始的判断：step_name 变化且不是工具调用
+        new_step_starting = (
+            'step_name' in new_step_info 
+            and new_step_info['step_name'] != self.current_step.get('step_name')
+            and not tool_calling
+        )
         
         if step_update_needed or task_ended:
             # 计算当前步骤的耗时
@@ -273,7 +279,10 @@ class TaskStateMachine:
             elif tool_calling:
                 if self.current_step.get('step_name'):
                     # 计算本次阶段耗时
-                    phase_duration = elapsed
+                    # 优先使用传入的 duration，否则使用计算的 elapsed
+                    phase_duration = updates.get('progress', {}).get('duration', elapsed)
+                    if phase_duration <= 0:
+                        phase_duration = elapsed
                     
                     # 追加工具调用事件
                     event_message = new_step_info.get('description', f"工具调用中: {self.current_step.get('step_name')}")
@@ -293,7 +302,10 @@ class TaskStateMachine:
                 # 只有当前步骤存在时才处理完成
                 if self.current_step.get('step_name'):
                     # 计算本次阶段耗时
-                    phase_duration = elapsed
+                    # 优先使用传入的 duration，否则使用计算的 elapsed
+                    phase_duration = updates.get('progress', {}).get('duration', elapsed)
+                    if phase_duration <= 0:
+                        phase_duration = elapsed
                     
                     # 追加完成事件
                     event_message = new_step_info.get('description', f"模块完成: {self.current_step.get('step_name')}")
