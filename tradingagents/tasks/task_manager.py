@@ -668,14 +668,13 @@ class TaskManager:
         except Exception as e:
             logger.error(f"❌ [清理] 清理检查点文件失败: {e}")
 
-    def update_task_progress(self, task_id: str, step_name: str, step_index: int, description: str, status: str):
+    def update_task_progress(self, task_id: str, step_name: str, exec_msg: str, status: str):
         """更新任务进度状态并发布状态更新消息
         
         Args:
             task_id: 任务ID
             step_name: 步骤名称
-            step_index: 步骤索引
-            description: 步骤描述
+            exec_msg: 执行消息
             status: 状态 ('start', 'success', 'error')
         """
         if not task_id:
@@ -683,12 +682,18 @@ class TaskManager:
         
         state_machine = self._get_task_state_machine(task_id)
         
+        # 获取任务计划步骤以查找 step_index
+        planned_steps = self.get_task_planned_steps(task_id)
+        step_index = 0
+        
+        # 查找对应的 step_index
+        for step in planned_steps:
+            if step['step_name'] == step_name:
+                step_index = step['step_index']
+                break
+        
         # 获取任务的总步骤数
-        task = self.tasks.get(task_id)
-        if task and hasattr(task, 'calculate_total_steps'):
-            total_steps = task.calculate_total_steps()
-        else:
-            total_steps = 10  # 默认值
+        total_steps = len(planned_steps) if planned_steps else 10
         
         # 计算进度百分比
         if total_steps > 0:
@@ -721,7 +726,7 @@ class TaskManager:
                 'current_step': step_index,
                 'total_steps': total_steps,
                 'percentage': percentage,
-                'message': description,
+                'message': exec_msg,
                 'elapsed_time': elapsed_time,
                 'remaining_time': remaining_time,
             },
@@ -744,7 +749,7 @@ class TaskManager:
                         "historical_states": historical_states,
                         'step_name': step_name,
                         'step_index': step_index,
-                        'description': description,
+                        'description': exec_msg,
                         'status': status,
                     }
                     producer.publish("task_status_update", message_body)

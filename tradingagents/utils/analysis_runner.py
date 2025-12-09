@@ -176,27 +176,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     
     analysts = normalized_analysts
 
-    # ========== 步骤1: 记录分析开始日志 ==========
-    logger_manager, analysis_start_time = log_analysis_start(
-        stock_symbol=stock_symbol,
-        analysis_date=analysis_date,
-        analysts=analysts,
-        research_depth=research_depth,
-        llm_provider=llm_provider,
-        llm_model=llm_model,
-        market_type=market_type,
-        update_progress=update_progress,
-        analysis_id=analysis_id,
-        async_tracker=async_tracker
-    )
-
-    # ========== 步骤2: 成本估算 ==========
-    estimate_analysis_cost(
-        llm_provider, llm_model, analysts, research_depth, 
-        update_progress, analysis_id, async_tracker
-    )
-
-    # ========== 准备步骤3-8: 准备分析步骤 ==========
+    # ========== 准备步骤1-8: 准备分析步骤 ==========
     prep_success, prep_result, prep_error = prepare_analysis_steps(
         stock_symbol=stock_symbol,
         analysis_date=analysis_date,
@@ -246,16 +226,6 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                })
 
     try:
-        # ========== 步骤8: 步骤输出目录准备 ==========
-        prepare_step_output_directory(
-            formatted_symbol=formatted_symbol,
-            analysis_date=analysis_date,
-            update_progress=update_progress,
-            analysis_id=analysis_id,
-            async_tracker=async_tracker,
-            analysis_start_time=analysis_start_time
-        )
-        
         # ========== 步骤9: 执行分析 ==========
         def check_task_control():
             return check_task_control_helper(analysis_id, async_tracker)
