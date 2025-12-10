@@ -3,14 +3,15 @@
 提供报告生成和下载接口
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from app.schemas.report import ReportGenerateRequest, ReportGenerateResponse
-from app.services.report_service import report_service
+from app.schemas.report import ReportGenerateRequest, ReportGenerateResponse, ReportResponse
+from app.services.report_service import report_service, get_reports
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
+from typing import Optional
 
 router = APIRouter()
 logger = get_logger("reports_router")
@@ -156,3 +157,23 @@ async def download_report(report_id: str):
             status_code=500,
             detail=f"下载报告失败: {str(e)}"
         )
+
+
+@router.get("/{analysis_id}/reports", response_model=ReportResponse)
+async def get_analysis_reports(analysis_id: str, stage: Optional[str] = Query(None, description="Filter reports by stage")):
+    """获取分析任务的报告列表"""
+    try:
+        reports = get_reports(analysis_id, stage)
+        return ReportResponse(
+            success=True,
+            data={
+                "analysis_id": analysis_id,
+                "reports": [r.model_dump() for r in reports]
+            },
+            message="报告获取成功"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching reports for {analysis_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

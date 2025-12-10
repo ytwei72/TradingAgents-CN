@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
@@ -180,7 +180,6 @@ class PlannedStep(BaseModel):
 class PlannedStepsResponse(BaseModel):
     total_steps: int
     steps: List[PlannedStep]
-
 
 @router.get("/{analysis_id}/planned_steps", response_model=PlannedStepsResponse)
 async def get_planned_steps(analysis_id: str):
