@@ -89,9 +89,11 @@ def _check_has_tool_calls(result: Any) -> bool:
     """
     if isinstance(result, dict):
         messages = result.get('messages', [])
-        for msg in messages:
+        # 只检查最后一条消息
+        if messages and isinstance(messages, list):
+            last_msg = messages[-1]
             # 检查 LangChain AIMessage 的 tool_calls 属性
-            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+            if hasattr(last_msg, 'tool_calls') and last_msg.tool_calls:
                 return True
     return False
 

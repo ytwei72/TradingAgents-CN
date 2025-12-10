@@ -351,8 +351,14 @@ class TaskStateMachine:
             elif should_start_new_step:
                 # 先完成当前步骤（如果存在且还在运行中）
                 if self.current_step.get('step_name') and self.current_step.get('status') == 'running':
+                    # 追加隐式完成事件
+                    self._add_step_event('complete', '步骤被新步骤隐式完成', elapsed)
+                    
+                    # 计算总耗时
+                    total_elapsed = sum(e.get('duration', 0) for e in self.current_step.get('events', []))
+                    
                     self.current_step['end_time'] = now
-                    self.current_step['elapsed_time'] = elapsed
+                    self.current_step['elapsed_time'] = total_elapsed
                     self.current_step['status'] = 'completed'
                     self.history.append(self.current_step.copy())
                 
