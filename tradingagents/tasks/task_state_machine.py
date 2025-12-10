@@ -370,7 +370,7 @@ class TaskStateMachine:
                 }
                 
                 # 追加开始事件
-                self._add_step_event('start', f"模块开始: {new_step_info['step_name']}")
+                self._add_step_event('start', new_step_info['message'])
                 
                 # 重置步骤开始时间
                 self._step_start_time = now_timestamp

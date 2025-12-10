@@ -142,88 +142,10 @@ def _get_progress_info(analysis_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _old_publish(producer, analysis_id: str, module_name: str, 
-                              node_status: str, duration: float = 0.0,
-                              error_message: str = None):
-    """发布进度消息（统一格式） - 旧版本"""
-    # 获取进度信息
-    progress_data = _get_progress_info(analysis_id)
-    if not progress_data:
-        logger.warning(f"无法获取进度信息，跳过消息发布: {analysis_id}")
-        return
-    
-    analysis_steps = progress_data.get('steps', [])
-    current_step = progress_data.get('current_step', 0)
-    total_steps = progress_data.get('total_steps', len(analysis_steps))
-    elapsed_time = progress_data.get('elapsed_time', 0.0)
-    
-    # 根据模块名称查找步骤索引
-    step_index = _find_step_by_module_name(module_name, analysis_steps)
-    if step_index is None:
-        # 如果找不到，使用当前步骤
-        step_index = current_step
-    
-    # 如果是完成状态，使用步骤索引；如果是开始状态，也使用步骤索引
-    # 如果是错误状态，保持当前步骤
-    if node_status == 'complete':
-        # 完成当前步骤，推进到下一步
-        progress_step = step_index
-        # 进度百分比基于下一步
-        next_step = min(step_index + 1, total_steps - 1)
-        progress_percentage = (next_step + 1) / total_steps * 100 if total_steps > 0 else 0
-    elif node_status == 'start':
-        progress_step = step_index
-        progress_percentage = (step_index + 1) / total_steps * 100 if total_steps > 0 else 0
-    else:  # error
-        progress_step = step_index
-        progress_percentage = (step_index + 1) / total_steps * 100 if total_steps > 0 else 0
-    
-    # 获取步骤信息
-    step_info = analysis_steps[progress_step] if progress_step < len(analysis_steps) else {'name': '未知', 'description': ''}
-    step_name = step_info.get('name', '未知')
-    step_description = step_info.get('description', '')
-    
-    # 构建消息文本
-    if node_status == 'complete':
-        last_message = f"模块完成: {module_name}"
-        if duration > 0:
-            last_message += f" (耗时: {duration:.2f}s)"
-    elif node_status == 'error':
-        last_message = f"模块错误: {module_name} - {error_message or '未知错误'}"
-    else:  # start
-        last_message = f"模块开始: {module_name}"
-    
-    # 估算剩余时间
-    remaining_time = max(0.0, progress_data.get('estimated_total_time', 0.0) - elapsed_time)
-    
-    # 创建进度消息
-    progress_msg = TaskProgressMessage(
-        analysis_id=analysis_id,
-        current_step=progress_step,
-        total_steps=total_steps,
-        progress_percentage=progress_percentage,
-        current_step_name=step_name,
-        current_step_description=step_description,
-        elapsed_time=elapsed_time,
-        remaining_time=remaining_time,
-        last_message=last_message,
-        module_name=module_name,  # 任务节点名称（英文ID）
-        node_status=node_status  # 任务节点状态
-    )
-    
-    # 发布进度消息
-    producer.publish_progress(progress_msg)
-
-
 def _publish_step_message(producer, analysis_id: str, module_name: str, 
                           node_status: str, duration: float = 0.0,
                           error_message: str = None):
-    # 旧版发布逻辑（用于老版web页面切换，取消注释使用）
-    # _old_publish(producer, analysis_id, module_name, node_status, duration, error_message)
-    # return
-    
     """发布步骤消息 - 新版本"""
-    # 更新任务状态机
     # 动态导入以避免循环依赖
     from tradingagents.tasks import get_task_manager
     from tradingagents.tasks.task_state_machine import TaskStateMachine
@@ -239,11 +161,6 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     
     # 从状态机获取当前任务对象
     task_obj = state_machine.get_task_object()
-    if task_obj is None:
-        # 创建初始任务
-        task_params = {'task_id': analysis_id}
-        task_obj = state_machine.initialize(task_params)
-        logger.warning(f"任务 {analysis_id} 不存在，已创建初始状态")
     
     # 获取当前步骤信息
     current_state = state_machine.get_current_state() or {}
@@ -251,14 +168,14 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     
     # 从历史记录中获取最大的 step_index
     # 这确保分析师步骤在准备步骤的基础上继续累计
-    history = state_machine.get_history_states() or []
-    if history:
-        # 获取历史记录中最大的 step_index
-        max_history_index = max(
-            step.get('step_index', 0) for step in history
-        )
-        # 使用 current_step_index 和 max_history_index 中较大的值
-        current_step_index = max(current_step_index, max_history_index)
+    # history = state_machine.get_history_states() or []
+    # if history:
+    #     # 获取历史记录中最大的 step_index
+    #     max_history_index = max(
+    #         step.get('step_index', 0) for step in history
+    #     )
+    #     # 使用 current_step_index 和 max_history_index 中较大的值
+    #     current_step_index = max(current_step_index, max_history_index)
     
     progress = task_obj.get('progress', {})
     # 从 progress 获取 total_steps，如果为 0 或不存在，尝试从任务计算
@@ -270,22 +187,34 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
         else:
             total_steps = 10  # 默认总步骤数
     
+    # 尝试从 planned_steps 中查找 step_index
+    planned_step_index = None
+    if task_manager and analysis_id:
+        planned_steps = task_manager.get_task_planned_steps(analysis_id)
+        if planned_steps:
+            for step in planned_steps:
+                if step.get('step_name') == module_name:
+                    planned_step_index = step.get('step_index')
+                    break
+    
     # 根据节点状态决定步骤索引和状态
-    if node_status == 'start':
-        # 开始新步骤：递增索引
+    if planned_step_index is not None:
+        # 如果在计划步骤中找到了，直接使用计划的索引
+        step_index = planned_step_index
+    elif node_status == 'start':
+        # 开始新步骤且未在计划中找到：递增索引
         step_index = current_step_index + 1
+    else:
+        # 其他状态：保持当前索引
+        step_index = current_step_index
+
+    if node_status == 'start':
         step_status = None  # 新步骤开始时不设置 step_status，由 step_name 触发新步骤
     elif node_status == 'complete':
-        # 完成当前步骤：保持当前索引
-        step_index = current_step_index
         step_status = 'completed'  # 明确标记步骤完成
     elif node_status == 'tool_calling':
-        # 工具调用中：保持当前索引，不完成步骤
-        step_index = current_step_index
         step_status = 'tool_calling'  # 追加工具调用事件
     else:  # error
-        # 错误：保持当前索引
-        step_index = current_step_index
         step_status = 'failed'  # 明确标记步骤失败
     
     # 计算进度百分比
@@ -371,8 +300,6 @@ def _publish_step_message(producer, analysis_id: str, module_name: str,
     # 发布进度消息
     producer.publish_progress(progress_msg)
     
-
-
 
 def message_analysis_module(module_name: str, session_id: str = None):
     """消息版分析模块装饰器
