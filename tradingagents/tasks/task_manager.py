@@ -73,11 +73,12 @@ class AnalysisTask(threading.Thread):
         self._stop_event = threading.Event()
         
         # 在初始化时立即创建任务状态
-        self.state_machine.initialize(self.params)
+        self.planned_steps = self.generate_planned_steps()
+        self.state_machine.initialize(self.params, self.planned_steps)
     
     def calculate_total_steps(self) -> int:
         """计算任务总步骤数"""
-        return len(self.generate_planned_steps())
+        return len(self.planned_steps)
     
     def generate_planned_steps(self) -> List[Dict[str, Any]]:
         """生成任务计划步骤列表 (与 async_progress_tracker.py 保持一致)"""
@@ -396,7 +397,6 @@ class TaskManager:
         task.start()
         
         return task_id
-    
 
         
     def stop_task(self, task_id: str) -> bool:
@@ -526,17 +526,7 @@ class TaskManager:
         """获取任务计划步骤"""
         task = self.tasks.get(task_id)
         if task:
-            return task.generate_planned_steps()
-        
-        # 如果任务不在内存中（可能是重启后），尝试从 checkpoint 恢复 params 并生成
-        # 这里简化处理，如果找不到任务实例，尝试从状态机获取 params
-        state_machine = self._get_task_state_machine(task_id)
-        task_obj = state_machine.get_task_object()
-        if task_obj and 'params' in task_obj:
-            # 创建临时任务对象来生成步骤
-            temp_task = AnalysisTask(task_id, task_obj['params'])
-            return temp_task.generate_planned_steps()
-            
+            return task.planned_steps
         return []
 
     def _get_task_state_machine(self, task_id: str) -> TaskStateMachine:

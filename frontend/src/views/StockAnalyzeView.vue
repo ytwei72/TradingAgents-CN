@@ -12,7 +12,7 @@ const form = reactive({
   analysis_date: new Date().toISOString().split('T')[0], // Default to today
   market_type: 'A股',
   research_depth: 3,
-  analysts: ['market', 'fundamentals', 'news', 'risk'], // Default selection
+  analysts: ['market', 'fundamentals', 'news'], // Default selection
   include_sentiment: true,
   include_risk_assessment: true,
   custom_prompt: ''

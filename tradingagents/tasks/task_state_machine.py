@@ -118,7 +118,7 @@ class TaskStateMachine:
         self.current_step = self._load_data("current_step") or {}
         self.history = self._load_data("history") or []
     
-    def initialize(self, task_params: Dict[str, Any]) -> Dict[str, Any]:
+    def initialize(self, task_params: Dict[str, Any], planned_steps: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """状态机初始化
         
         Args:
@@ -140,6 +140,7 @@ class TaskStateMachine:
             'created_at': now,
             'updated_at': now,
             'params': task_params,
+            'planned_steps': planned_steps or [],
             'progress': {
                 'percentage': 0.0,
                 'message': '任务已创建,等待执行',
@@ -207,6 +208,14 @@ class TaskStateMachine:
             new_step_info['step_name'] = updates['step_name']
             step_update_needed = True
             
+            # 从 planned_steps 获取描述
+            planned_steps = self.task_props.get('planned_steps', [])
+            if planned_steps:
+                for step in planned_steps:
+                    if step.get('step_name') == updates['step_name']:
+                        new_step_info['description'] = step.get('description', '')
+                        break
+            
         if 'step_index' in updates:
             new_step_info['step_index'] = updates['step_index']
             step_update_needed = True
@@ -215,7 +224,7 @@ class TaskStateMachine:
         if 'progress' in updates:
             prog = updates['progress']
             if 'message' in prog:
-                new_step_info['description'] = prog['message']
+                new_step_info['message'] = prog['message']
                 step_update_needed = True
             if 'current_step' in prog:
                 new_step_info['step_index'] = prog['current_step']
@@ -251,6 +260,13 @@ class TaskStateMachine:
             and not tool_calling
         )
         
+        # 合并判断：明确开始 或 隐式开始
+        should_start_new_step = (
+            'step_name' in new_step_info and (
+                step_starting or new_step_starting
+            )
+        )
+
         if step_update_needed or task_ended:
             # 计算当前步骤的耗时
             if self._step_start_time is not None:
@@ -285,7 +301,7 @@ class TaskStateMachine:
                         phase_duration = elapsed
                     
                     # 追加工具调用事件
-                    event_message = new_step_info.get('description', f"工具调用中: {self.current_step.get('step_name')}")
+                    event_message = new_step_info.get('message', f"工具调用中: {self.current_step.get('step_name')}")
                     self._add_step_event('tool_calling', event_message, phase_duration)
                     
                     # 重置步骤开始时间（下一阶段从现在开始计时）
@@ -308,7 +324,7 @@ class TaskStateMachine:
                         phase_duration = elapsed
                     
                     # 追加完成事件
-                    event_message = new_step_info.get('description', f"模块完成: {self.current_step.get('step_name')}")
+                    event_message = new_step_info.get('message', f"模块完成: {self.current_step.get('step_name')}")
                     final_status = 'complete' if step_status in ['completed', 'success'] else 'error'
                     self._add_step_event(final_status, event_message, phase_duration)
                     
@@ -331,42 +347,8 @@ class TaskStateMachine:
                     logger.debug(f"📊 [步骤完成] {self.current_step.get('step_name', 'Unknown')} - "
                                f"总耗时: {total_elapsed:.2f}秒, 状态: {self.current_step['status']}")
             
-            # 如果是步骤开始（通过 step_status='start' 明确指定）
-            elif step_starting and 'step_name' in new_step_info:
-                # 如果当前有正在运行的步骤，先完成它（异常情况处理）
-                if self.current_step.get('step_name') and self.current_step.get('status') == 'running':
-                    self.current_step['end_time'] = now
-                    self.current_step['elapsed_time'] = elapsed
-                    self.current_step['status'] = 'completed'
-                    self.history.append(self.current_step.copy())
-                
-                # 创建新步骤（包含events数组）
-                self.current_step = {
-                    'step_name': new_step_info['step_name'],
-                    'step_index': new_step_info.get('step_index', len(self.history) + 1),
-                    'description': new_step_info.get('description', ''),
-                    'status': 'running',
-                    'start_time': now,
-                    'end_time': None,
-                    'elapsed_time': 0.0,
-                    'events': [],  # 事件列表
-                    'timestamp': now
-                }
-                
-                # 追加开始事件
-                self._add_step_event('start', f"模块开始: {new_step_info['step_name']}")
-                
-                # 重置步骤开始时间
-                self._step_start_time = now_timestamp
-                
-                # 保存步骤（不添加到历史，等完成时再添加）
-                self._save_data("current_step", self.current_step)
-                self._save_data("history", self.history)
-                
-                logger.debug(f"📊 [新步骤] {self.current_step['step_name']} (索引: {self.current_step['step_index']})")
-            
-            # 如果是新步骤开始（通过步骤名称变化检测）
-            elif new_step_starting:
+            # 如果是新步骤开始（合并了显式开始和隐式开始）
+            elif should_start_new_step:
                 # 先完成当前步骤（如果存在且还在运行中）
                 if self.current_step.get('step_name') and self.current_step.get('status') == 'running':
                     self.current_step['end_time'] = now
@@ -402,8 +384,6 @@ class TaskStateMachine:
             
             else:
                 # 只是更新当前步骤的信息，不创建新步骤，不添加历史
-                if 'description' in new_step_info:
-                    self.current_step['description'] = new_step_info['description']
                 if 'step_index' in new_step_info:
                     self.current_step['step_index'] = new_step_info['step_index']
                 

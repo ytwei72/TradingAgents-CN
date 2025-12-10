@@ -135,12 +135,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     # 导入辅助模块
     from .analysis_helpers import (
         prepare_analysis_steps,
-        estimate_analysis_cost,
         check_task_control as check_task_control_helper,
         track_token_usage,
         save_analysis_results,
         log_analysis_start,
-        prepare_step_output_directory,
         execute_analysis,
         process_analysis_results,
         log_analysis_completion
@@ -205,11 +203,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     formatted_symbol = prep_result['formatted_symbol']
     graph = prep_result['graph']
     session_id = prep_result['session_id']
-
-    # 记录分析开始日志
-    logger_manager.log_analysis_start(
-        logger, stock_symbol, "comprehensive_analysis", session_id
-    )
+    analysis_start_time = prep_result['analysis_start_time']
 
     # TODO: 需解决extra参数中字段未输出的问题
     logger.info(f"🚀 [分析开始] 股票分析启动",

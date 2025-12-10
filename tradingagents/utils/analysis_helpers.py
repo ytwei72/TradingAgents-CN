@@ -84,7 +84,6 @@ def estimate_analysis_cost(
     llm_model: str,
     analysts: list,
     research_depth: int,
-    update_progress: Optional[Callable] = None,
     analysis_id: Optional[str] = None,
     async_tracker: Optional[Any] = None
 ) -> Optional[float]:
@@ -96,7 +95,6 @@ def estimate_analysis_cost(
         llm_model: 模型名称
         analysts: 分析师列表
         research_depth: 研究深度
-        update_progress: 进度回调函数
         analysis_id: 分析ID（用于消息发布）
         async_tracker: 异步进度跟踪器（用于消息发布）
         
@@ -367,7 +365,7 @@ def prepare_analysis_steps(
     _update_step_start("💰 开始成本估算...")
     success, estimated_cost, exec_msg = estimate_analysis_cost(
         llm_provider, llm_model, analysts, research_depth, 
-        update_progress, analysis_id, async_tracker
+        analysis_id, async_tracker
     )
     if not success:
         _update_step_error(exec_msg)
@@ -447,7 +445,6 @@ def prepare_analysis_steps(
     step_output_base_dir = prepare_step_output_directory(
         formatted_symbol=formatted_symbol,
         analysis_date=analysis_date,
-        update_progress=update_progress,
         analysis_id=analysis_id,
         async_tracker=async_tracker,
         analysis_start_time=analysis_start_time
@@ -460,6 +457,7 @@ def prepare_analysis_steps(
         'formatted_symbol': formatted_symbol,
         'graph': graph,
         'session_id': analysis_id,
+        'analysis_start_time': analysis_start_time,
         'preparation_result': preparation_result
     }
     
@@ -713,7 +711,6 @@ def log_analysis_start(analysis_id: Optional[str] = None) -> tuple[Any, float]:
 def prepare_step_output_directory(
     formatted_symbol: str,
     analysis_date: str,
-    update_progress: Optional[Callable] = None,
     analysis_id: Optional[str] = None,
     async_tracker: Optional[Any] = None,
     analysis_start_time: Optional[float] = None
@@ -724,7 +721,6 @@ def prepare_step_output_directory(
     Args:
         formatted_symbol: 格式化后的股票代码
         analysis_date: 分析日期
-        update_progress: 进度回调函数
         analysis_id: 分析ID
         async_tracker: 异步进度跟踪器
         analysis_start_time: 分析开始时间
