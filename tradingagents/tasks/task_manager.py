@@ -677,9 +677,14 @@ class TaskManager:
         step_index = 0
         
         # 查找对应的 step_index
+        # 查找对应的 step_index 和信息
+        step_desc = ""
+        step_display = step_name
         for step in planned_steps:
             if step['step_name'] == step_name:
                 step_index = step['step_index']
+                step_desc = step.get('description', '')
+                step_display = step.get('display_name', step_name)
                 break
         
         # 获取任务的总步骤数
@@ -726,26 +731,41 @@ class TaskManager:
         state_machine.update_state(updates)
         
         # 发布消息
+        # 发布消息
         try:
             from tradingagents.messaging.config import get_message_producer, is_message_mode_enabled
+            from tradingagents.messaging.business.messages import TaskProgressMessage, NodeStatus
+            
             if is_message_mode_enabled():
                 producer = get_message_producer()
                 if producer:
-                    current_state = state_machine.get_current_state()
-                    historical_states = state_machine.get_history_states()
-                    message_body = {
-                        "task_id": task_id,
-                        "current_state": current_state,
-                        "historical_states": historical_states,
-                        'step_name': step_name,
-                        'step_index': step_index,
-                        'description': exec_msg,
-                        'status': status,
+                    # 映射状态
+                    node_status_map = {
+                        'start': NodeStatus.START.value,
+                        'success': NodeStatus.COMPLETE.value,
+                        'error': NodeStatus.ERROR.value
                     }
-                    producer.publish("task_status_update", message_body)
-                    logger.info(f"📤 发布任务状态更新: {task_id} - {step_name} - {status}")
+                    node_status = node_status_map.get(status, NodeStatus.START.value)
+                    
+                    # 构建进度消息
+                    progress_msg = TaskProgressMessage(
+                        analysis_id=task_id,
+                        current_step=step_index,
+                        total_steps=total_steps,
+                        progress_percentage=percentage,
+                        current_step_name=step_display,
+                        current_step_description=step_desc or exec_msg,
+                        elapsed_time=elapsed_time,
+                        remaining_time=remaining_time,
+                        last_message=exec_msg,
+                        module_name=step_name,
+                        node_status=node_status
+                    )
+                    
+                    producer.publish_progress(progress_msg)
+                    logger.info(f"📤 发布任务进度消息: {task_id} - {step_name} - {status}")
         except Exception as e:
-            logger.debug(f"发布任务状态更新失败: {e}")
+            logger.debug(f"发布任务进度消息失败: {e}")
 
 
 # 全局单例

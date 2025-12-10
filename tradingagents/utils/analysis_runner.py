@@ -106,19 +106,20 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     """执行股票分析
     
     主函数结构：
-    - 步骤1: 记录分析开始日志
-    - 步骤2: 成本估算
-    - 步骤3-8: 准备分析步骤（封装在prepare_analysis_steps中）
-      * 准备步骤1: 任务控制检查
-      * 准备步骤2: 数据预获取和验证
-      * 准备步骤3: 环境验证
-      * 准备步骤4: 构建配置
-      * 准备步骤5: 格式化股票代码
-      * 准备步骤6: 初始化分析引擎
-    - 步骤9: 执行分析
-    - 步骤10: 处理分析结果
-    - 步骤11: 记录完成日志
-    - 步骤12: 保存分析结果
+    - 第一阶段：配置与准备
+      * 准备步骤1: 记录分析开始日志
+      * 准备步骤2: 成本估算
+      * 准备步骤3: 任务控制检查
+      * 准备步骤4: 数据预获取和验证
+      * 准备步骤5: 环境验证
+      * 准备步骤6: 构建配置
+      * 准备步骤7: 格式化股票代码
+      * 准备步骤8: 初始化分析引擎
+    - 第二阶段：多智能体分析执行
+    - 第三阶段：结果处理与保存
+      * 后处理步骤1: 处理分析结果
+      * 后处理步骤2: 记录完成日志
+      * 后处理步骤3: 保存分析结果
 
     Args:
         stock_symbol: 股票代码
@@ -136,12 +137,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     from .analysis_helpers import (
         prepare_analysis_steps,
         check_task_control as check_task_control_helper,
-        track_token_usage,
-        save_analysis_results,
-        log_analysis_start,
         execute_analysis,
-        process_analysis_results,
-        log_analysis_completion
+        post_process_analysis_steps
     )
 
     def update_progress(message, step=None, total_steps=None):
@@ -174,7 +171,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     
     analysts = normalized_analysts
 
-    # ========== 准备步骤1-8: 准备分析步骤 ==========
+    # ========== 第一阶段：配置与准备（准备步骤1-8） ==========
     prep_success, prep_result, prep_error = prepare_analysis_steps(
         stock_symbol=stock_symbol,
         analysis_date=analysis_date,
@@ -220,7 +217,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                })
 
     try:
-        # ========== 步骤9: 执行分析 ==========
+        # ========== 第二阶段：多智能体分析执行（步骤9 ~ n） ==========
         def check_task_control():
             return check_task_control_helper(analysis_id, async_tracker)
         
@@ -236,52 +233,17 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             check_task_control=check_task_control
         )
 
-        # ========== 步骤10: 处理分析结果 ==========
+        # ========== 第三阶段：结果处理与保存（步骤n+1 ~ n+3） ==========
         logger.debug(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")
         logger.debug(f"🔍 [DEBUG] decision内容: {decision}")
         
-        processed_results = process_analysis_results(
+        # ========== 后处理步骤1-3: 处理结果、记录日志、保存结果 ==========
+        results = post_process_analysis_steps(
             state=state,
             decision=decision,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
-            session_id=session_id,
-            analysts=analysts,
-            research_depth=research_depth,
-            market_type=market_type,
-            update_progress=update_progress,
             analysis_id=analysis_id,
-            async_tracker=async_tracker,
             analysis_start_time=analysis_start_time
         )
-
-        results = {
-            'stock_symbol': stock_symbol,
-            'analysis_date': analysis_date,
-            'analysts': analysts,
-            'research_depth': research_depth,
-            'llm_provider': llm_provider,
-            'llm_model': llm_model,
-            'state': processed_results['state'],
-            'decision': processed_results['decision'],
-            'success': True,
-            'error': None,
-            'session_id': session_id if TOKEN_TRACKING_ENABLED else None
-        }
-
-        # ========== 步骤11: 记录完成日志 ==========
-        log_analysis_completion(
-            logger_manager=logger_manager,
-            stock_symbol=stock_symbol,
-            session_id=session_id,
-            analysis_start_time=analysis_start_time,
-            update_progress=update_progress,
-            analysis_id=analysis_id,
-            async_tracker=async_tracker
-        )
-
-        # ========== 步骤12: 保存分析结果 ==========
-        save_analysis_results(results, stock_symbol, analysis_id, update_progress, async_tracker)
 
         update_progress("✅ 分析成功完成！")
         
