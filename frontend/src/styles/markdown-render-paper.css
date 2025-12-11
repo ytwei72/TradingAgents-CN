@@ -1,0 +1,309 @@
+/* 羊皮纸容器背景 */
+.report-content {
+    background: linear-gradient(
+      to bottom,
+      #f4e8d0 0%,
+      #f9f0dd 20%,
+      #f4e8d0 40%,
+      #efe3c8 60%,
+      #f4e8d0 80%,
+      #f9f0dd 100%
+    );
+    position: relative;
+    padding: 3rem;
+    border-radius: 4px;
+    box-shadow: 
+      0 2px 8px rgba(101, 67, 33, 0.15),
+      inset 0 0 100px rgba(194, 154, 108, 0.1);
+  }
+  
+  /* 羊皮纸纹理效果 */
+  .report-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(139, 101, 61, 0.03) 2px,
+        rgba(139, 101, 61, 0.03) 4px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(139, 101, 61, 0.03) 2px,
+        rgba(139, 101, 61, 0.03) 4px
+      );
+    pointer-events: none;
+    border-radius: 4px;
+  }
+  
+  /* 报告头部 */
+  .report-header {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(101, 67, 33, 0.3);
+  }
+  
+  .report-header h3 {
+    color: #3d2817;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+  }
+  
+  .created-at {
+    color: #654321;
+    font-size: 0.9rem;
+    font-style: italic;
+    margin: 0;
+  }
+  
+  /* Markdown 内容区域 */
+  .markdown-content {
+    position: relative;
+    z-index: 1;
+    color: #2d1810;
+    line-height: 1.8;
+    font-size: 1.05rem;
+  }
+  
+  /* 标题样式 */
+  .markdown-content h1,
+  .markdown-content h2,
+  .markdown-content h3,
+  .markdown-content h4 {
+    color: #3d2817;
+    font-weight: 700;
+    margin-top: 2em;
+    margin-bottom: 0.75em;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3);
+  }
+  
+  .markdown-content h1 {
+    font-size: 2em;
+    border-bottom: 3px double #8b6539;
+    padding-bottom: 0.4em;
+    margin-bottom: 1em;
+  }
+  
+  .markdown-content h2 {
+    font-size: 1.6em;
+    border-bottom: 2px solid #a0826d;
+    padding-bottom: 0.3em;
+  }
+  
+  .markdown-content h3 {
+    font-size: 1.3em;
+    color: #4a2f1a;
+  }
+  
+  .markdown-content h4 {
+    font-size: 1.1em;
+    color: #5d3a21;
+  }
+  
+  /* 段落 */
+  .markdown-content p {
+    margin: 1em 0;
+    text-align: justify;
+  }
+  
+  /* 代码块 */
+  .markdown-content pre {
+    background: linear-gradient(135deg, #e8dcc5 0%, #d9c9ad 100%);
+    border: 2px solid #a0826d;
+    border-radius: 6px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    box-shadow: 
+      inset 2px 2px 5px rgba(101, 67, 33, 0.1),
+      0 2px 4px rgba(101, 67, 33, 0.15);
+    margin: 1.5em 0;
+  }
+  
+  .markdown-content code {
+    background-color: rgba(139, 101, 61, 0.15);
+    padding: 0.2em 0.5em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #5d3a21;
+    border: 1px solid rgba(139, 101, 61, 0.2);
+    font-family: 'Courier New', Courier, monospace;
+  }
+  
+  .markdown-content pre code {
+    background: none;
+    padding: 0;
+    border: none;
+    color: #3d2817;
+    font-size: 0.95em;
+  }
+  
+  /* 列表 */
+  .markdown-content ul,
+  .markdown-content ol {
+    margin: 1.25em 0;
+    padding-left: 2.5em;
+  }
+  
+  .markdown-content li {
+    margin: 0.6em 0;
+    color: #2d1810;
+  }
+  
+  .markdown-content ul li::marker {
+    color: #8b6539;
+  }
+  
+  .markdown-content ol li::marker {
+    color: #8b6539;
+    font-weight: 600;
+  }
+  
+  /* 引用块 */
+  .markdown-content blockquote {
+    border-left: 5px solid #a0826d;
+    background: linear-gradient(
+      to right,
+      rgba(139, 101, 61, 0.08),
+      transparent
+    );
+    padding: 1em 1em 1em 1.5em;
+    margin: 1.5em 0;
+    color: #4a2f1a;
+    font-style: italic;
+    border-radius: 0 4px 4px 0;
+    position: relative;
+  }
+  
+  .markdown-content blockquote::before {
+    content: '"';
+    font-size: 3em;
+    color: rgba(139, 101, 61, 0.3);
+    position: absolute;
+    left: 0.2em;
+    top: -0.1em;
+    font-family: Georgia, serif;
+  }
+  
+  /* 表格 */
+  .markdown-content table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 1.5em 0;
+    background: rgba(255, 255, 255, 0.3);
+    border: 2px solid #a0826d;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(101, 67, 33, 0.1);
+  }
+  
+  .markdown-content th,
+  .markdown-content td {
+    border: 1px solid #c9b896;
+    padding: 0.85em 1em;
+    text-align: left;
+  }
+  
+  .markdown-content th {
+    background: linear-gradient(to bottom, #d9c9ad, #c9b896);
+    font-weight: 700;
+    color: #3d2817;
+    text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
+  }
+  
+  .markdown-content tr:nth-child(even) {
+    background: rgba(233, 220, 197, 0.3);
+  }
+  
+  .markdown-content tr:hover {
+    background: rgba(233, 220, 197, 0.5);
+  }
+  
+  /* 链接 */
+  .markdown-content a {
+    color: #8b4513;
+    text-decoration: underline;
+    text-decoration-color: rgba(139, 69, 19, 0.4);
+    transition: all 0.2s ease;
+  }
+  
+  .markdown-content a:hover {
+    color: #654321;
+    text-decoration-color: #654321;
+    text-shadow: 0 0 8px rgba(139, 69, 19, 0.3);
+  }
+  
+  /* 水平线 */
+  .markdown-content hr {
+    border: none;
+    height: 3px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      #a0826d 20%,
+      #8b6539 50%,
+      #a0826d 80%,
+      transparent
+    );
+    margin: 2.5em 0;
+    position: relative;
+  }
+  
+  .markdown-content hr::after {
+    content: '❦';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: #f4e8d0;
+    padding: 0 0.5em;
+    color: #8b6539;
+    font-size: 1.2em;
+  }
+  
+  /* 图片 */
+  .markdown-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 1.5em auto;
+    display: block;
+    border: 3px solid #a0826d;
+    box-shadow: 
+      0 4px 8px rgba(101, 67, 33, 0.2),
+      0 0 0 8px rgba(244, 232, 208, 0.5);
+  }
+  
+  /* 强调文本 */
+  .markdown-content strong {
+    color: #3d2817;
+    font-weight: 700;
+  }
+  
+  .markdown-content em {
+    color: #4a2f1a;
+    font-style: italic;
+  }
+  
+  /* 删除线 */
+  .markdown-content del {
+    color: #8b6539;
+    text-decoration-color: #654321;
+  }
+  
+  /* 内联代码特殊样式 */
+  .markdown-content :not(pre) > code {
+    font-weight: 500;
+  }

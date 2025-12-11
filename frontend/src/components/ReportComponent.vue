@@ -20,11 +20,11 @@
       <!-- 活动报告内容 -->
       <div class="report-content">
         <div class="report-header">
-          <h3>{{ currentReport.title }}</h3>
+          <!-- <h3>{{ currentReport.title }}</h3> -->
           <p class="created-at">创建时间: {{ formatDate(currentReport.created_at) }}</p>
         </div>
         <div 
-          class="markdown-content prose prose-invert max-w-none"
+          class="markdown-content prose prose-invert prose-lg max-w-none"
           v-html="renderedContent"
         ></div>
       </div>
@@ -37,7 +37,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import '../styles/markdown-render-2.css'
+import '../styles/markdown-render-paper.css'
 
 const props = defineProps({
   analysisId: {
