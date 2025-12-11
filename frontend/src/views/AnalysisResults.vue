@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getReportsList, type ReportListItem } from '../api/index.ts'
+import ReportComponent from '../components/ReportComponent.vue'
 
 const reports = ref<ReportListItem[]>([])
 const total = ref(0)
@@ -8,6 +9,7 @@ const currentPage = ref(1)
 const pageSize = 10
 const pages = ref(0)
 const loading = ref(false)
+const selectedAnalysisId = ref<string | null>(null)
 
 const fetchReports = async (page: number = 1) => {
   loading.value = true
@@ -39,6 +41,14 @@ const handlePageChange = (page: number) => {
   if (page >= 1 && page <= pages.value) {
     fetchReports(page)
   }
+}
+
+const openReport = (analysisId: string) => {
+  selectedAnalysisId.value = analysisId
+}
+
+const closeReport = () => {
+  selectedAnalysisId.value = null
 }
 
 onMounted(() => {
@@ -91,7 +101,12 @@ onMounted(() => {
         </div>
 
         <div class="flex justify-end">
-          <button class="text-blue-400 hover:text-blue-300 text-sm">查看详情</button>
+          <button 
+            class="text-blue-400 hover:text-blue-300 text-sm"
+            @click="openReport(report.analysis_id)"
+          >
+            查看详情
+          </button>
         </div>
       </div>
     </div>
@@ -135,12 +150,32 @@ onMounted(() => {
         下一页
       </button>
     </div>
+    
+    <!-- 报告全屏覆盖层 -->
+    <div 
+      v-if="selectedAnalysisId" 
+      class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-sm flex flex-col"
+    >
+      <div class="flex justify-end p-4">
+        <button
+          class="text-gray-300 hover:text-white text-2xl leading-none"
+          aria-label="关闭报告"
+          @click="closeReport"
+        >
+          ×
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4 md:p-8">
+        <ReportComponent :analysis-id="selectedAnalysisId" />
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .line-clamp-3 {
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;

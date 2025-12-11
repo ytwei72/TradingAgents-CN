@@ -442,64 +442,16 @@ const getStatusText = (status: string) => {
 </script>
 
 <template>
-  <div class="flex h-screen bg-[#0f172a] text-gray-100 font-sans overflow-hidden">
-    
-    <!-- Sidebar -->
-    <aside class="w-64 bg-[#1e293b] border-r border-gray-700 flex flex-col">
-      <div class="p-6 flex items-center space-x-3 border-b border-gray-700">
-        <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">L</div>
-        <div>
-            <div class="font-bold">Li Ming</div>
-            <div class="text-xs text-gray-400">businessman</div>
-        </div>
+  <div class="space-y-8">
+    <header class="flex justify-between items-center mb-8">
+      <h1 class="text-2xl font-bold text-white">投资顾问协同分析平台</h1>
+      <div class="flex items-center space-x-4">
+          <button class="text-gray-400 hover:text-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg></button>
+          <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm">L</div>
       </div>
-      
-      <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-        <a href="#" class="flex items-center space-x-3 px-4 py-3 bg-blue-600 rounded-lg text-white shadow-lg shadow-blue-900/50">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-            <span>股票分析</span>
-        </a>
-        <a href="#" class="flex items-center space-x-3 px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            <span>配置管理</span>
-        </a>
-        <a href="#" class="flex items-center space-x-3 px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
-            <span>缓存管理</span>
-        </a>
-         <a href="#" class="flex items-center space-x-3 px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <span>Token统计</span>
-        </a>
-         <a href="#" class="flex items-center space-x-3 px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <span>操作日志</span>
-        </a>
-        <a href="#" class="flex items-center space-x-3 px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-            <span>分析结果</span>
-        </a>
-      </nav>
-      
-      <div class="p-4 border-t border-gray-700">
-         <div class="flex items-center space-x-3 text-gray-400">
-             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-             <span>系统状态</span>
-         </div>
-      </div>
-    </aside>
+    </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-8">
-      <header class="flex justify-between items-center mb-8">
-        <h1 class="text-2xl font-bold text-white">投资顾问协同分析平台</h1>
-        <div class="flex items-center space-x-4">
-            <button class="text-gray-400 hover:text-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg></button>
-            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm">L</div>
-        </div>
-      </header>
-
-      <div class="space-y-6 max-w-5xl mx-auto">
+    <div class="space-y-6 max-w-5xl mx-auto">
         
         <!-- Configuration Panel -->
         <section class="bg-[#1e293b] rounded-xl p-6 shadow-lg border border-gray-700">
@@ -770,8 +722,7 @@ const getStatusText = (status: string) => {
            </div>
         </section>
 
-      </div>
-    </main>
+    </div>
   </div>
 </template>
 
