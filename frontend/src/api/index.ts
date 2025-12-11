@@ -74,4 +74,34 @@ export const getAnalysisHistory = async (analysisId: string) => {
     return response.data;
 };
 
+export interface ReportListItem {
+  analysis_id: string;
+  analysis_date: string;
+  analysts: string[];
+  formatted_decision: Record<string, any>;
+  research_depth: number;
+  status: string;
+  stock_symbol: string;
+  summary: string;
+  updated_at: string;
+}
+
+export interface ReportsResponse {
+  success: boolean;
+  data: {
+    reports: ReportListItem[];
+    total: number;
+    page: number;
+    page_size: number;
+    pages: number;
+  };
+  message: string;
+}
+
+export const getReportsList = async (page: number = 1, page_size: number = 10): Promise<ReportsResponse> => {
+  const params = new URLSearchParams({ page: page.toString(), page_size: page_size.toString() });
+  const response = await api.get<ReportsResponse>(`/reports/list?${params.toString()}`);
+  return response.data;
+};
+
 export default api;

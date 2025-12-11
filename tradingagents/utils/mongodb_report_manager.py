@@ -453,6 +453,36 @@ class MongoDBReportManager:
             logger.error(f"❌ 保存报告到MongoDB失败: {e}")
             return False
 
+    def get_paginated_reports(self, page: int = 1, page_size: int = 10) -> tuple[List[Dict[str, Any]], int]:
+        """
+        获取分页的分析报告列表
+        
+        :param page: 页码，从1开始
+        :param page_size: 每页大小，最大10
+        :return: (报告列表, 总条数)
+        """
+        if not self.connected:
+            return [], 0
+        
+        try:
+            skip = (page - 1) * page_size
+            total = self.collection.count_documents({})
+            
+            cursor = self.collection.find({}).sort("updated_at", -1).skip(skip).limit(page_size)
+            reports = list(cursor)
+            
+            # 转换ObjectId为字符串
+            for report in reports:
+                if '_id' in report:
+                    report['_id'] = str(report['_id'])
+            
+            logger.info(f"✅ 从MongoDB获取分页报告: 页 {page}, 大小 {page_size}, 总计 {total}")
+            return reports, total
+            
+        except Exception as e:
+            logger.error(f"❌ 分页获取报告失败: {e}")
+            return [], 0
+
 
 # 创建全局实例
 mongodb_report_manager = MongoDBReportManager()

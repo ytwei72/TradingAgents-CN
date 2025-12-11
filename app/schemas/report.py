@@ -89,3 +89,21 @@ class ReportResponse(BaseModel):
     message: str = ""
     error: Optional[str] = None
     code: Optional[int] = None
+
+
+class ReportListItem(BaseModel):
+    analysis_id: str = Field(..., description="分析ID")
+    analysis_date: str = Field(..., description="分析日期")
+    analysts: List[str] = Field(default_factory=list, description="分析师列表")
+    formatted_decision: Optional[dict] = Field(default_factory=dict, description="格式化决策")
+    research_depth: int = Field(default=1, description="研究深度")
+    status: str = Field(..., description="状态")
+    stock_symbol: str = Field(..., description="股票代码")
+    summary: str = Field(..., description="摘要")
+    updated_at: datetime = Field(..., description="更新时间")
+
+
+class ReportsListResponse(BaseModel):
+    success: bool
+    data: dict = Field(default_factory=dict, description="数据")
+    message: str = Field(default="", description="消息")

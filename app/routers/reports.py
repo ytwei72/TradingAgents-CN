@@ -6,15 +6,78 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pathlib import Path
+from datetime import datetime
 
-from app.schemas.report import ReportGenerateRequest, ReportGenerateResponse, ReportResponse
+from app.schemas.report import (
+    ReportGenerateRequest, ReportGenerateResponse, ReportResponse, 
+    ReportsListResponse, ReportListItem
+)
 from app.services.report_service import report_service, get_reports_from_fs, get_reports_from_db
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
-from typing import Optional
+from typing import Optional, List
 
 router = APIRouter()
 logger = get_logger("reports_router")
+
+
+@router.get("/list", response_model=ReportsListResponse)
+async def get_reports_list(
+    page: int = Query(1, ge=1, le=100, description="页码"), 
+    page_size: int = Query(10, ge=1, le=10, description="每页大小（最大10）")
+):
+    """
+    获取报告列表，支持分页
+    
+    - **page**: 页码
+    - **page_size**: 每页大小（最大10）
+    """
+    try:
+        if not mongodb_report_manager or not mongodb_report_manager.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="报告数据库未连接"
+            )
+
+        raw_reports, total = mongodb_report_manager.get_paginated_reports(page, min(page_size, 10))
+        
+        items = []
+        for report in raw_reports:
+            item = ReportListItem(
+                analysis_id=report["analysis_id"],
+                analysis_date=report.get("analysis_date", ""),
+                analysts=report.get("analysts", []),
+                formatted_decision=report.get("formatted_decision", {}),
+                research_depth=report.get("research_depth", 1),
+                status=report.get("status", "completed"),
+                stock_symbol=report["stock_symbol"],
+                summary=report.get("summary", ""),
+                updated_at=report.get("updated_at") or report.get("timestamp", datetime.now())
+            )
+            items.append(item.model_dump())
+        
+        data = {
+            "reports": items,
+            "total": total,
+            "page": page,
+            "page_size": min(page_size, 10),
+            "pages": (total + min(page_size, 10) - 1) // min(page_size, 10)
+        }
+        
+        return ReportsListResponse(
+            success=True,
+            data=data,
+            message="报告列表获取成功"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取报告列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取报告列表失败: {str(e)}"
+        )
 
 
 @router.post("/generate", response_model=ReportGenerateResponse)
