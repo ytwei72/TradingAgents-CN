@@ -13,7 +13,7 @@
           :class="{ active: activeTab === index }"
           class="tab-button"
         >
-          {{ report.title }} ({{ report.stage }})
+          {{ report.stage_display_name }}
         </button>
       </div>
       
@@ -24,7 +24,7 @@
           <p class="created-at">创建时间: {{ formatDate(currentReport.created_at) }}</p>
         </div>
         <div 
-          class="markdown-content"
+          class="markdown-content prose prose-invert max-w-none"
           v-html="renderedContent"
         ></div>
       </div>
@@ -33,15 +33,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import '../styles/markdown-render-2.css'
 
 const props = defineProps({
   analysisId: {
     type: String,
-    required: true
+    default: ''
   }
 })
 
@@ -62,9 +63,15 @@ const formatDate = (dateString) => {
 }
 
 const fetchReports = async () => {
+  // 如果 analysisId 为空，不发起请求
+  if (!props.analysisId) {
+    loading.value = false
+    return
+  }
+  
   try {
     loading.value = true
-    const response = await axios.get(`/api/analysis/${props.analysisId}/reports`)
+    const response = await axios.get(`/api/reports/${props.analysisId}/reports`)
     reports.value = response.data.data.reports || []
     if (reports.value.length > 0) {
       // 默认选择最终报告（假设 stage 为 'final_decision'）
@@ -79,6 +86,16 @@ const fetchReports = async () => {
   }
 }
 
+// 监听 analysisId 变化
+watch(() => props.analysisId, (newId) => {
+  if (newId) {
+    fetchReports()
+  } else {
+    reports.value = []
+    error.value = ''
+  }
+})
+
 onMounted(() => {
   fetchReports()
 })
@@ -86,8 +103,8 @@ onMounted(() => {
 
 <style scoped>
 .report-component {
-  max-width: 800px;
-  margin: 20px auto;
+  max-width: 100%;
+  margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -95,29 +112,30 @@ onMounted(() => {
   text-align: center;
   padding: 20px;
   margin: 20px 0;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .loading {
-  background-color: #d1ecf1;
-  color: #0c5460;
+  background-color: #1e293b;
+  color: #60a5fa;
+  border: 1px solid #3b82f6;
 }
 
 .error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: #7f1d1d;
+  color: #fca5a5;
+  border: 1px solid #dc2626;
 }
 
 .no-reports {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
+  background-color: #78350f;
+  color: #fcd34d;
+  border: 1px solid #f59e0b;
 }
 
 .tabs {
   display: flex;
-  border-bottom: 2px solid #dee2e6;
+  border-bottom: 2px solid #475569;
   margin-bottom: 20px;
   overflow-x: auto;
 }
@@ -127,78 +145,38 @@ onMounted(() => {
   border: none;
   padding: 10px 20px;
   cursor: pointer;
-  color: #6c757d;
+  color: #94a3b8;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
+  transition: all 0.2s;
 }
 
 .tab-button:hover {
-  color: #0056b3;
+  color: #60a5fa;
+  background-color: #1e293b;
 }
 
 .tab-button.active {
-  color: #0056b3;
-  border-bottom-color: #0056b3;
+  color: #60a5fa;
+  border-bottom-color: #3b82f6;
   font-weight: bold;
 }
 
 .report-header {
   margin-bottom: 20px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid #475569;
 }
 
 .report-header h3 {
   margin: 0 0 5px 0;
-  color: #212529;
+  color: #f1f5f9;
 }
 
 .created-at {
   margin: 0;
-  color: #6c757d;
+  color: #94a3b8;
   font-size: 0.9em;
-}
-
-.markdown-content {
-  line-height: 1.6;
-  color: #212529;
-}
-
-.markdown-content h1, .markdown-content h2, .markdown-content h3 {
-  margin-top: 0;
-  color: #0056b3;
-}
-
-.markdown-content pre {
-  background-color: #f8f9fa;
-  padding: 15px;
-  border-radius: 4px;
-  overflow-x: auto;
-  border: 1px solid #dee2e6;
-}
-
-.markdown-content code {
-  background-color: #f8f9fa;
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-size: 0.9em;
-}
-
-.markdown-content table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 10px 0;
-}
-
-.markdown-content th, .markdown-content td {
-  border: 1px solid #dee2e6;
-  padding: 8px;
-  text-align: left;
-}
-
-.markdown-content th {
-  background-color: #f8f9fa;
-  font-weight: bold;
 }
 
 @media (max-width: 768px) {

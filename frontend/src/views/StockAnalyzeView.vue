@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onUnmounted, watch } from 'vue';
 import { startAnalysis, getAnalysisStatus, getAnalysisResult, pauseAnalysis, resumeAnalysis, stopAnalysis, getPlannedSteps, getAnalysisHistory, type AnalysisRequest } from '../api';
 import MarkdownIt from 'markdown-it';
+import ReportComponent from '../components/ReportComponent.vue';
 
 const md = new MarkdownIt();
 
@@ -28,7 +29,7 @@ const analystOptions = [
 ];
 
 const loading = ref(false);
-const analysisId = ref<string | null>(null);
+const analysisId = ref<string | null>('c870901e-643b-4cd3-a81a-da67b73acb9d');
 const status = ref<string>('');
 const progressLog = ref<any[]>([]);
 const taskProgress = ref<any>(null); // Store detailed progress info
@@ -39,6 +40,8 @@ const showAdvanced = ref(false);
 const plannedSteps = ref<any[]>([]);
 const historySteps = ref<any[]>([]);
 const showHistory = ref(false); // For accordion toggle
+const showReportResult = ref(false); // For report result accordion toggle, default collapsed
+const showResearchReport = ref(false); // For research report accordion toggle, default collapsed
 
 // Task Control State
 const autoRefresh = ref(true);
@@ -724,10 +727,46 @@ const getStatusText = (status: string) => {
                </div>
            </div>
 
-           <!-- Final Report -->
+           <!-- Final Report (Collapsible) -->
            <div v-if="result" class="mt-8 border-t border-gray-700 pt-6">
-              <h3 class="text-lg font-bold text-white mb-4">分析报告结果</h3>
-              <div class="prose prose-invert max-w-none bg-gray-900 p-6 rounded-lg border border-gray-700" v-html="renderedReport"></div>
+              <button 
+                @click="showReportResult = !showReportResult" 
+                class="w-full flex items-center justify-between text-left mb-4 hover:bg-gray-800/50 p-3 rounded-lg transition"
+              >
+                 <h3 class="text-lg font-bold text-white">分析报告结果</h3>
+                 <svg 
+                   class="w-5 h-5 text-gray-400 transform transition-transform" 
+                   :class="{'rotate-180': showReportResult}" 
+                   fill="none" 
+                   stroke="currentColor" 
+                   viewBox="0 0 24 24"
+                 >
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                 </svg>
+              </button>
+              <div v-if="showReportResult" class="prose prose-invert max-w-none bg-gray-900 p-6 rounded-lg border border-gray-700" v-html="renderedReport"></div>
+           </div>
+
+           <!-- Research Report Component -->
+           <div class="mt-8 border-t border-gray-700 pt-6">
+              <button 
+                @click="showResearchReport = !showResearchReport" 
+                class="w-full flex items-center justify-between text-left mb-4 hover:bg-gray-800/50 p-3 rounded-lg transition"
+              >
+                 <h3 class="text-lg font-bold text-white">研究报告</h3>
+                 <svg 
+                   class="w-5 h-5 text-gray-400 transform transition-transform" 
+                   :class="{'rotate-180': showResearchReport}" 
+                   fill="none" 
+                   stroke="currentColor" 
+                   viewBox="0 0 24 24"
+                 >
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                 </svg>
+              </button>
+              <div v-if="showResearchReport" class="prose prose-invert max-w-none bg-gray-900 p-6 rounded-lg border border-gray-700">
+                <ReportComponent :analysisId="analysisId || ''" />
+              </div>
            </div>
         </section>
 

@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from tradingagents.default_config import DEFAULT_CONFIG
 
+from app.core.config import get_settings
+
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('web')
@@ -59,6 +61,9 @@ class AnalysisConfigBuilder:
         
         # 设置路径配置
         config.update(self._get_path_config())
+        
+        # 添加MongoDB配置，用于报告存储
+        config.update(self._get_mongo_config())
         
         # 确保目录存在
         self._ensure_directories(config)
@@ -246,7 +251,28 @@ class AnalysisConfigBuilder:
                 config["data_cache_dir"] = str(self.project_root / env_cache_dir)
         
         return config
-    
+
+    def _get_mongo_config(self) -> Dict[str, Any]:
+        """获取MongoDB配置，用于报告存储"""
+        settings = get_settings()
+        mongo_config = {
+            "mongo_host": settings.MONGODB_HOST,
+            "mongo_port": settings.MONGODB_PORT,
+            "mongo_username": settings.MONGODB_USERNAME,
+            "mongo_password": settings.MONGODB_PASSWORD,
+            "mongo_database": settings.MONGODB_DATABASE,
+            "mongo_auth_source": settings.MONGODB_AUTH_SOURCE,
+            "mongo_max_connections": settings.MONGO_MAX_CONNECTIONS,
+            "mongo_min_connections": settings.MONGO_MIN_CONNECTIONS,
+            "mongo_connect_timeout_ms": settings.MONGO_CONNECT_TIMEOUT_MS,
+            "mongo_socket_timeout_ms": settings.MONGO_SOCKET_TIMEOUT_MS,
+            "mongo_server_selection_timeout_ms": settings.MONGO_SERVER_SELECTION_TIMEOUT_MS,
+            "mongo_uri": settings.MONGO_URI,
+            "mongo_db": settings.MONGO_DB,
+        }
+        logger.info(f"🗄️ [MongoDB配置] 连接URL: {mongo_config['mongo_uri'][:20]}... (已加载)")
+        return {"db": {"mongo": mongo_config}}
+        
     def _ensure_directories(self, config: Dict[str, Any]) -> None:
         """确保必要的目录存在"""
         directories = [
@@ -262,4 +288,3 @@ class AnalysisConfigBuilder:
         logger.info(f"📁 [目录配置] 数据目录: {config.get('data_dir')}")
         logger.info(f"📁 [目录配置] 结果目录: {config.get('results_dir')}")
         logger.info(f"📁 [目录配置] 缓存目录: {config.get('data_cache_dir')}")
-

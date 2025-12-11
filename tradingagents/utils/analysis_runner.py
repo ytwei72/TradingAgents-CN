@@ -283,11 +283,6 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         # 如果session_id未定义（异常发生在准备阶段之前），使用临时ID
         error_session_id = session_id if 'session_id' in locals() else f"analysis_error_{uuid.uuid4().hex[:8]}"
 
-        logger_manager.log_module_error(
-            logger, "comprehensive_analysis", stock_symbol, error_session_id,
-            analysis_duration, str(e)
-        )
-
         logger.error(f"❌ [分析失败] 股票分析执行失败",
                     extra={
                         'stock_symbol': stock_symbol,

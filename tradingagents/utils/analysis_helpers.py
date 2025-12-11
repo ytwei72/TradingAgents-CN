@@ -372,14 +372,14 @@ def prepare_analysis_steps(
     # ========== Step 3: 数据预获取和验证 ==========
     step_name = "data_preparation"
     _update_step_start("🔍 验证股票代码并预获取数据...")
-    success, exec_msg, result = prepare_stock_data_for_analysis(
+    success, exec_msg, preparation_result = prepare_stock_data_for_analysis(
         stock_symbol, market_type, analysis_date, analysis_id, async_tracker
     )
     
     if not success:
         _update_step_error(exec_msg)
         return False, None, exec_msg
-    _update_step_success(f"✅ 数据准备完成: {result.stock_name} ({result.market_type})")
+    _update_step_success(f"✅ 数据准备完成: {preparation_result.stock_name} ({preparation_result.market_type})")
     
     # ========== Step 4: 环境验证 ==========
     step_name = "environment_validation"

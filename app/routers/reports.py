@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 
 from app.schemas.report import ReportGenerateRequest, ReportGenerateResponse, ReportResponse
-from app.services.report_service import report_service, get_reports
+from app.services.report_service import report_service, get_reports_from_fs, get_reports_from_db
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
 from typing import Optional
@@ -163,7 +163,8 @@ async def download_report(report_id: str):
 async def get_analysis_reports(analysis_id: str, stage: Optional[str] = Query(None, description="Filter reports by stage")):
     """获取分析任务的报告列表"""
     try:
-        reports = get_reports(analysis_id, stage)
+        # reports = get_reports_from_fs(analysis_id, stage)
+        reports = get_reports_from_db(analysis_id, stage)
         return ReportResponse(
             success=True,
             data={

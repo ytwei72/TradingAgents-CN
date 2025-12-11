@@ -30,6 +30,7 @@ export interface AnalysisStatus {
     status: string;
     current_message?: string;
     progress_log?: any[];
+    progress?: any;
     error?: string;
 }
 
