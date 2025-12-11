@@ -104,4 +104,20 @@ export const getReportsList = async (page: number = 1, page_size: number = 10): 
   return response.data;
 };
 
+export interface SystemConfigResponse {
+  success: boolean;
+  data: Record<string, any>;
+  message: string;
+}
+
+export const getSystemConfig = async (): Promise<SystemConfigResponse> => {
+  const response = await api.get<SystemConfigResponse>('/config/system');
+  return response.data;
+};
+
+export const updateSystemConfig = async (payload: Record<string, any>): Promise<SystemConfigResponse> => {
+  const response = await api.put<SystemConfigResponse>('/config/system', payload);
+  return response.data;
+};
+
 export default api;

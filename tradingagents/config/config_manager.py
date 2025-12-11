@@ -74,6 +74,7 @@ class ConfigManager:
         self.pricing_file = self.config_dir / "pricing.json"
         self.usage_file = self.config_dir / "usage.json"
         self.settings_file = self.config_dir / "settings.json"
+        self.system_config_file = self.config_dir / "system_config.json"
 
         # 加载.env文件（保持向后兼容）
         self._load_env_file()
@@ -280,6 +281,29 @@ class ConfigManager:
                 "openai_enabled": False,  # OpenAI模型是否启用
             }
             self.save_settings(default_settings)
+
+    def load_system_config(self) -> Dict[str, Any]:
+        """加载系统配置（用于Web端配置管理）"""
+        try:
+            if not self.system_config_file.exists():
+                return {}
+            with open(self.system_config_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                logger.warning("⚠️ system_config.json 内容不是对象，已忽略")
+                return {}
+        except Exception as e:
+            logger.error(f"加载系统配置失败: {e}")
+            return {}
+
+    def save_system_config(self, config: Dict[str, Any]):
+        """保存系统配置（用于Web端配置管理）"""
+        try:
+            with open(self.system_config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"保存系统配置失败: {e}")
     
     def load_models(self) -> List[ModelConfig]:
         """加载模型配置，优先使用.env中的API密钥"""

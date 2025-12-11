@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional
 from tradingagents.default_config import DEFAULT_CONFIG
 
 from app.core.config import get_settings
+from tradingagents.config.config_manager import config_manager
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -41,34 +42,61 @@ class AnalysisConfigBuilder:
         Returns:
             配置字典
         """
-        # 从默认配置开始
+        # 读取持久化配置，用户可在Web端修改
+        system_overrides = self._load_system_overrides()
+
+        # 从默认配置开始，应用持久化覆盖
         config = DEFAULT_CONFIG.copy()
+        config.update({k: v for k, v in system_overrides.items() if k != "db"})
+
+        # 计算有效的参数（优先使用持久化配置）
+        effective_market_type = system_overrides.get("market_type_default", market_type)
+        effective_research_depth = system_overrides.get("research_depth_default", research_depth)
+        effective_llm_provider = system_overrides.get("llm_provider", llm_provider)
+        effective_llm_model = system_overrides.get("deep_think_llm", llm_model)
+        effective_quick_model = system_overrides.get("quick_think_llm", llm_model)
         
         # 设置基础LLM配置
-        config["llm_provider"] = llm_provider
-        config["deep_think_llm"] = llm_model
-        config["quick_think_llm"] = llm_model
+        config["llm_provider"] = effective_llm_provider
+        config["deep_think_llm"] = effective_llm_model
+        config["quick_think_llm"] = effective_quick_model
         
         # 根据研究深度设置辩论轮次
-        config.update(self._get_debate_config(research_depth))
+        config.update(self._get_debate_config(effective_research_depth))
         
-        # 设置通用配置
-        config["memory_enabled"] = True
-        config["online_tools"] = True
+        # 设置通用配置（允许覆盖）
+        config["memory_enabled"] = system_overrides.get("memory_enabled", True)
+        config["online_tools"] = system_overrides.get("online_tools", True)
+        config["online_news"] = system_overrides.get("online_news", config.get("online_news", True))
+        config["realtime_data"] = system_overrides.get("realtime_data", config.get("realtime_data", False))
+        if "max_recur_limit" in system_overrides:
+            config["max_recur_limit"] = system_overrides["max_recur_limit"]
         
         # 根据LLM提供商设置模型和backend_url
-        config.update(self._get_provider_config(llm_provider, llm_model, research_depth))
+        provider_config = self._get_provider_config(effective_llm_provider, effective_llm_model, effective_research_depth)
+        config.update(provider_config)
         
         # 设置路径配置
         config.update(self._get_path_config())
+        for path_key in ["data_dir", "results_dir", "data_cache_dir", "backend_url", "custom_openai_base_url"]:
+            if path_key in system_overrides:
+                config[path_key] = system_overrides[path_key]
         
-        # 添加MongoDB配置，用于报告存储
-        config.update(self._get_mongo_config())
+        # 添加MongoDB配置，用于报告存储，支持持久化覆盖
+        mongo_config = self._get_mongo_config().get("db", {})
+        if "db" in system_overrides:
+            mongo_config = self._merge_db_config(mongo_config, system_overrides["db"])
+        config["db"] = mongo_config
+        
+        # 额外信息：用于前端展示
+        config["research_depth_default"] = effective_research_depth
+        config["market_type_default"] = effective_market_type
+        config["market_type"] = effective_market_type
         
         # 确保目录存在
         self._ensure_directories(config)
         
-        logger.info(f"📋 [配置构建] 研究深度: {research_depth}, 提供商: {llm_provider}")
+        logger.info(f"📋 [配置构建] 研究深度: {effective_research_depth}, 提供商: {effective_llm_provider}")
         logger.info(f"📋 [配置构建] 快速模型: {config['quick_think_llm']}, 深度模型: {config['deep_think_llm']}")
         
         return config
@@ -272,6 +300,31 @@ class AnalysisConfigBuilder:
         }
         logger.info(f"🗄️ [MongoDB配置] 连接URL: {mongo_config['mongo_uri'][:20]}... (已加载)")
         return {"db": {"mongo": mongo_config}}
+    
+    def _load_system_overrides(self) -> Dict[str, Any]:
+        """加载Web端保存的系统配置覆盖"""
+        try:
+            overrides = config_manager.load_system_config()
+            return overrides if isinstance(overrides, dict) else {}
+        except Exception as e:
+            logger.warning(f"⚠️ 加载系统配置覆盖失败，将使用默认配置: {e}")
+            return {}
+
+    def _merge_db_config(self, base_db: Dict[str, Any], override_db: Dict[str, Any]) -> Dict[str, Any]:
+        """合并数据库配置，保证嵌套字典安全覆盖"""
+        merged = base_db.copy() if isinstance(base_db, dict) else {}
+        if not isinstance(override_db, dict):
+            return merged
+
+        for key, value in override_db.items():
+            if key == "mongo" and isinstance(value, dict):
+                base_mongo = merged.get("mongo", {}) if isinstance(merged.get("mongo"), dict) else {}
+                new_mongo = base_mongo.copy()
+                new_mongo.update(value)
+                merged["mongo"] = new_mongo
+            else:
+                merged[key] = value
+        return merged
         
     def _ensure_directories(self, config: Dict[str, Any]) -> None:
         """确保必要的目录存在"""

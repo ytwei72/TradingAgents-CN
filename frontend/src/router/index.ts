@@ -1,17 +1,23 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import StockAnalyzeView from '../views/StockAnalyzeView.vue'
 import AnalysisResultsView from '../views/AnalysisResults.vue'
+import SystemConfigView from '../views/SystemConfig.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
     name: 'StockAnalyze',
-    component: () => import('../views/StockAnalyzeView.vue')
+    component: StockAnalyzeView
   },
   {
     path: '/analysis-results',
     name: 'AnalysisResults',
-    component: () => import('../views/AnalysisResults.vue')
+    component: AnalysisResultsView
+  },
+  {
+    path: '/config',
+    name: 'SystemConfig',
+    component: SystemConfigView
   }
 ]
 
