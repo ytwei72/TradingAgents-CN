@@ -1,6 +1,6 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict
 
 from tradingagents.config.config_manager import config_manager
@@ -64,9 +64,17 @@ class SystemConfigResponse(BaseModel):
     message: str
 
 
-class UpdateSystemConfigRequest(SystemConfig):
-    """更新系统配置请求"""
-    pass
+class UpdateSystemConfigRequest(BaseModel):
+    """
+    更新系统配置请求
+    可以包含 'models', 'pricing', 'usage', 'settings' 中的任意几个键
+    """
+    models: Optional[List[Dict[str, Any]]] = Field(None, description="模型配置列表")
+    pricing: Optional[List[Dict[str, Any]]] = Field(None, description="定价配置列表")
+    usage: Optional[List[Dict[str, Any]]] = Field(None, description="使用记录列表")
+    settings: Optional[Dict[str, Any]] = Field(None, description="设置字典")
+    
+    model_config = ConfigDict(extra="forbid")  # 禁止额外字段
 
 
 def _deep_merge(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
@@ -80,12 +88,75 @@ def _deep_merge(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, An
     return merged
 
 
+def _normalize_config_types(config_types: Optional[Any]) -> List[str]:
+    """将传入的 config_types 规范化为去重有序列表"""
+    valid_types = ['models', 'pricing', 'usage', 'settings']
+
+    def _split_str(val: str) -> List[str]:
+        return [t.strip() for t in val.split(',') if t.strip()]
+
+    parsed: List[str] = []
+    if config_types is None:
+        parsed = ['settings']
+    elif isinstance(config_types, str):
+        parsed = _split_str(config_types)
+    elif isinstance(config_types, list):
+        # 兼容误传多个同名 query 参数的情况
+        for item in config_types:
+            parsed.extend(_split_str(str(item)))
+    else:
+        parsed = ['settings']
+
+    # 去重保持顺序
+    seen = set()
+    normalized = []
+    for t in parsed or ['settings']:
+        if t not in seen:
+            seen.add(t)
+            normalized.append(t)
+
+    # 校验
+    invalid = [t for t in normalized if t not in valid_types]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效的配置类型: {invalid}。有效类型: {valid_types}"
+        )
+    return normalized or ['settings']
+
+
 @router.get("/system", response_model=SystemConfigResponse)
-async def get_system_config():
-    """获取系统配置（持久化覆盖项）"""
+async def get_system_config(
+    config_types: Optional[str] = Query(
+        None,
+        description="逗号分隔的配置类型，可选值：'models', 'pricing', 'usage', 'settings'。不传默认只返回 'settings'"
+    )
+):
+    """
+    获取系统配置（持久化覆盖项）
+    
+    Args:
+        config_types: 要获取的配置类型列表，可选值：'models', 'pricing', 'usage', 'settings'
+                     如果不指定，默认只返回 'settings'
+    """
     try:
-        config = config_manager.load_system_config()
+        # 规范化配置类型，支持逗号分隔的单参数或重复 query 参数
+        config_type_list = _normalize_config_types(config_types)
+        
+        # 获取指定类型的配置
+        config = config_manager.fetch_system_config(config_types=config_type_list)
+
+        # usage 只返回最后 10 条，并附带 usage_size
+        if 'usage' in config:
+            usage_list = config.get('usage') or []
+            usage_size = len(usage_list)
+            config['usage'] = usage_list[-10:]
+            config['usage_size'] = usage_size
+
+        # 始终返回包含键名的对象（即使只请求单一类型）
         return SystemConfigResponse(success=True, data=config, message="系统配置获取成功")
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(f"获取系统配置失败: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取系统配置失败: {exc}")
@@ -93,14 +164,38 @@ async def get_system_config():
 
 @router.put("/system", response_model=SystemConfigResponse)
 async def update_system_config(request: UpdateSystemConfigRequest):
-    """更新系统配置并持久化"""
+    """
+    更新系统配置并持久化
+    
+    请求体应该是一个 JSON 对象，可以包含以下键的任意几个：
+    - 'models': List[Dict] - 模型配置列表
+    - 'pricing': List[Dict] - 定价配置列表
+    - 'usage': List[Dict] - 使用记录列表
+    - 'settings': Dict - 设置字典
+    
+    根据请求中包含的键来更新对应的配置。
+    对于 'settings'，会进行深度合并；对于其他配置，会完全替换。
+    """
     try:
+        # 获取请求数据，排除 None 值
         incoming = request.model_dump(exclude_none=True)
-        current = config_manager.load_system_config()
-        merged = _deep_merge(current, incoming)
-        config_manager.save_system_config(merged)
-        logger.info("✅ 系统配置已更新")
-        return SystemConfigResponse(success=True, data=merged, message="系统配置更新成功")
+        
+        # 验证至少包含一个配置类型
+        valid_keys = ['models', 'pricing', 'usage', 'settings']
+        provided_keys = [key for key in incoming.keys() if key in valid_keys]
+        
+        if not provided_keys:
+            raise HTTPException(
+                status_code=400,
+                detail=f"请求中必须包含至少一个配置类型。有效类型: {valid_keys}"
+            )
+
+        # 保存配置（save_system_config 会根据包含的键来更新对应的配置）
+        config_manager.save_system_config(incoming)
+        
+        logger.info(f"✅ 系统配置已更新: {', '.join(provided_keys)}")
+        # 不返回更新后的配置，保持响应精简
+        return SystemConfigResponse(success=True, data={}, message="系统配置更新成功")
     except HTTPException:
         raise
     except Exception as exc:

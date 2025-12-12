@@ -304,7 +304,9 @@ class AnalysisConfigBuilder:
     def _load_system_overrides(self) -> Dict[str, Any]:
         """加载Web端保存的系统配置覆盖"""
         try:
-            overrides = config_manager.load_system_config()
+            # 从 settings 中获取系统配置覆盖项
+            config = config_manager.fetch_system_config(config_types=['settings'])
+            overrides = config.get('settings', {})
             return overrides if isinstance(overrides, dict) else {}
         except Exception as e:
             logger.warning(f"⚠️ 加载系统配置覆盖失败，将使用默认配置: {e}")

@@ -112,7 +112,9 @@ const loadConfig = async () => {
   try {
     const res = await getSystemConfig()
     if (res.success && res.data) {
-      deepAssign(config, res.data)
+      // 后端默认返回 { settings: { ... } } 结构
+      const settings = res.data.settings || res.data
+      deepAssign(config, settings)
     } else {
       error.value = res.message || '加载配置失败'
     }
@@ -132,7 +134,8 @@ const saveConfig = async () => {
     const res = await updateSystemConfig(payload)
     if (res.success) {
       message.value = '配置已保存'
-      deepAssign(config, res.data)
+      // 更新接口不返回最新配置，保存后重新拉取一次
+      await loadConfig()
     } else {
       error.value = res.message || '保存失败'
     }

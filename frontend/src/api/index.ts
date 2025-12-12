@@ -110,13 +110,15 @@ export interface SystemConfigResponse {
   message: string;
 }
 
-export const getSystemConfig = async (): Promise<SystemConfigResponse> => {
-  const response = await api.get<SystemConfigResponse>('/config/system');
+export const getSystemConfig = async (configTypes: string[] = ['settings']): Promise<SystemConfigResponse> => {
+  const query = configTypes.length ? `?config_types=${configTypes.join(',')}` : '';
+  const response = await api.get<SystemConfigResponse>(`/config/system${query}`);
   return response.data;
 };
 
 export const updateSystemConfig = async (payload: Record<string, any>): Promise<SystemConfigResponse> => {
-  const response = await api.put<SystemConfigResponse>('/config/system', payload);
+  // 后端要求按照 config_types 分类提交，这里只更新 settings
+  const response = await api.put<SystemConfigResponse>('/config/system', { settings: payload });
   return response.data;
 };
 

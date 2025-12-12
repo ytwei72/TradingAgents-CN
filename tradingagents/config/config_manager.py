@@ -74,7 +74,6 @@ class ConfigManager:
         self.pricing_file = self.config_dir / "pricing.json"
         self.usage_file = self.config_dir / "usage.json"
         self.settings_file = self.config_dir / "settings.json"
-        self.system_config_file = self.config_dir / "system_config.json"
 
         # 加载.env文件（保持向后兼容）
         self._load_env_file()
@@ -282,28 +281,84 @@ class ConfigManager:
             }
             self.save_settings(default_settings)
 
-    def load_system_config(self) -> Dict[str, Any]:
-        """加载系统配置（用于Web端配置管理）"""
+    def fetch_system_config(self, config_types: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        获取系统配置（models、pricing、usage、settings的组合）
+        
+        Args:
+            config_types: 要获取的配置类型列表，可选值：'models', 'pricing', 'usage', 'settings'
+                         如果为 None，则返回所有配置
+        
+        Returns:
+            包含指定配置类型的字典
+        """
+        if config_types is None:
+            config_types = ['models', 'pricing', 'usage', 'settings']
+        
+        result = {}
+        
         try:
-            if not self.system_config_file.exists():
-                return {}
-            with open(self.system_config_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-                logger.warning("⚠️ system_config.json 内容不是对象，已忽略")
-                return {}
+            if 'models' in config_types:
+                result['models'] = [asdict(model) for model in self.load_models()]
+            
+            if 'pricing' in config_types:
+                result['pricing'] = [asdict(price) for price in self.load_pricing()]
+            
+            if 'usage' in config_types:
+                result['usage'] = [asdict(record) for record in self.load_usage_records()]
+            
+            if 'settings' in config_types:
+                result['settings'] = self.load_settings()
+        
         except Exception as e:
-            logger.error(f"加载系统配置失败: {e}")
-            return {}
+            logger.error(f"获取系统配置失败: {e}")
+        
+        return result
 
     def save_system_config(self, config: Dict[str, Any]):
-        """保存系统配置（用于Web端配置管理）"""
+        """
+        保存系统配置（用于Web端配置管理）
+        config 中可以包含 'models', 'pricing', 'usage', 'settings' 键
+        根据包含的键来更新对应的配置
+        
+        Args:
+            config: 包含配置的字典，可以包含以下键：
+                   - 'models': List[Dict] - 模型配置列表
+                   - 'pricing': List[Dict] - 定价配置列表
+                   - 'usage': List[Dict] - 使用记录列表
+                   - 'settings': Dict - 设置字典
+        """
         try:
-            with open(self.system_config_file, "w", encoding="utf-8") as f:
-                json.dump(config, f, ensure_ascii=False, indent=2)
+            if 'models' in config:
+                models_data = config['models']
+                if isinstance(models_data, list):
+                    models = [ModelConfig(**item) for item in models_data]
+                    self.save_models(models)
+                    logger.info("✅ 模型配置已更新")
+            
+            if 'pricing' in config:
+                pricing_data = config['pricing']
+                if isinstance(pricing_data, list):
+                    pricing = [PricingConfig(**item) for item in pricing_data]
+                    self.save_pricing(pricing)
+                    logger.info("✅ 定价配置已更新")
+            
+            if 'usage' in config:
+                usage_data = config['usage']
+                if isinstance(usage_data, list):
+                    records = [UsageRecord(**item) for item in usage_data]
+                    self.save_usage_records(records)
+                    logger.info("✅ 使用记录已更新")
+            
+            if 'settings' in config:
+                settings_data = config['settings']
+                if isinstance(settings_data, dict):
+                    self.save_settings(settings_data)
+                    logger.info("✅ 设置已更新")
+        
         except Exception as e:
             logger.error(f"保存系统配置失败: {e}")
+            raise
     
     def load_models(self) -> List[ModelConfig]:
         """加载模型配置，优先使用.env中的API密钥"""

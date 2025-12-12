@@ -405,7 +405,44 @@
 			"name": "配置管理",
 			"item": [
 				{
-					"name": "获取系统配置",
+					"name": "获取系统配置（默认settings）",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data) {",
+									"    // 将整个响应数据存储到环境变量",
+									"    pm.environment.set(\"system_config\", JSON.stringify(jsonData.data));",
+									"    ",
+									"    // 如果返回的是 settings 对象，存储常用字段",
+									"    if (jsonData.data.llm_provider) {",
+									"        pm.environment.set(\"config_llm_provider\", jsonData.data.llm_provider);",
+									"        pm.environment.set(\"config_deep_think_llm\", jsonData.data.deep_think_llm || \"\");",
+									"        pm.environment.set(\"config_quick_think_llm\", jsonData.data.quick_think_llm || \"\");",
+									"        pm.environment.set(\"config_research_depth\", jsonData.data.research_depth_default || 3);",
+									"    }",
+									"    ",
+									"    // 如果返回的是包含多种配置的对象",
+									"    if (jsonData.data.models) {",
+									"        pm.environment.set(\"config_models\", JSON.stringify(jsonData.data.models));",
+									"    }",
+									"    if (jsonData.data.pricing) {",
+									"        pm.environment.set(\"config_pricing\", JSON.stringify(jsonData.data.pricing));",
+									"    }",
+									"    if (jsonData.data.usage) {",
+									"        pm.environment.set(\"config_usage\", JSON.stringify(jsonData.data.usage));",
+									"    }",
+									"    if (jsonData.data.settings) {",
+									"        pm.environment.set(\"config_settings\", JSON.stringify(jsonData.data.settings));",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -420,12 +457,116 @@
 								"system"
 							]
 						},
-						"description": "获取系统配置（持久化覆盖项），包括 LLM 提供商、模型设置、研究深度、市场类型、功能开关、数据库配置等"
+						"description": "获取系统配置（默认只返回 settings）。响应数据会自动存储到环境变量中。"
 					},
 					"response": []
 				},
 				{
-					"name": "更新系统配置",
+					"name": "获取系统配置（所有类型）",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data) {",
+									"    // 将整个响应数据存储到环境变量",
+									"    pm.environment.set(\"system_config\", JSON.stringify(jsonData.data));",
+									"    ",
+									"    // 存储各个配置类型",
+									"    if (jsonData.data.models) {",
+									"        pm.environment.set(\"config_models\", JSON.stringify(jsonData.data.models));",
+									"    }",
+									"    if (jsonData.data.pricing) {",
+									"        pm.environment.set(\"config_pricing\", JSON.stringify(jsonData.data.pricing));",
+									"    }",
+									"    if (jsonData.data.usage) {",
+									"        pm.environment.set(\"config_usage\", JSON.stringify(jsonData.data.usage));",
+									"    }",
+									"    if (jsonData.data.settings) {",
+									"        pm.environment.set(\"config_settings\", JSON.stringify(jsonData.data.settings));",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/config/system?config_types=models,pricing,usage,settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"system"
+							],
+							"query": [
+								{
+									"key": "config_types",
+									"value": "models,pricing,usage,settings"
+								}
+							]
+						},
+						"description": "获取所有类型的系统配置（models、pricing、usage、settings）。响应数据会自动存储到环境变量中。"
+					},
+					"response": []
+				},
+				{
+					"name": "获取系统配置（models和pricing）",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data) {",
+									"    // 将整个响应数据存储到环境变量",
+									"    pm.environment.set(\"system_config\", JSON.stringify(jsonData.data));",
+									"    ",
+									"    // 存储各个配置类型",
+									"    if (jsonData.data.models) {",
+									"        pm.environment.set(\"config_models\", JSON.stringify(jsonData.data.models));",
+									"    }",
+									"    if (jsonData.data.pricing) {",
+									"        pm.environment.set(\"config_pricing\", JSON.stringify(jsonData.data.pricing));",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/config/system?config_types=models,pricing",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"system"
+							],
+							"query": [
+								{
+									"key": "config_types",
+									"value": "models,pricing"
+								}
+							]
+						},
+						"description": "获取 models 和 pricing 配置。响应数据会自动存储到环境变量中。"
+					},
+					"response": []
+				},
+				{
+					"name": "更新系统配置（只更新settings）",
 					"request": {
 						"method": "PUT",
 						"header": [
@@ -437,7 +578,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"llm_provider\": \"dashscope\",\n    \"deep_think_llm\": \"qwen-max\",\n    \"research_depth_default\": 4,\n    \"memory_enabled\": false,\n    \"db\": {\n        \"mongo\": {\n            \"mongo_host\": \"localhost\",\n            \"mongo_port\": 27017,\n            \"mongo_database\": \"tradingagents\"\n        }\n    }\n}"
+							"raw": "{\n    \"settings\": {\n        \"llm_provider\": \"dashscope\",\n        \"deep_think_llm\": \"qwen-max\",\n        \"research_depth_default\": 4,\n        \"memory_enabled\": false\n    }\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/config/system",
@@ -450,7 +591,37 @@
 								"system"
 							]
 						},
-						"description": "更新系统配置并持久化。支持部分更新，只传递需要修改的字段即可。配置会与现有配置进行深度合并。"
+						"description": "更新系统配置。请求体可以包含 'models'、'pricing'、'usage'、'settings' 中的任意几个键。此示例只更新 settings。"
+					},
+					"response": []
+				},
+				{
+					"name": "更新系统配置（models和pricing）",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"models\": [\n        {\n            \"provider\": \"dashscope\",\n            \"model_name\": \"qwen-turbo\",\n            \"api_key\": \"\",\n            \"base_url\": null,\n            \"max_tokens\": 4000,\n            \"temperature\": 0.7,\n            \"enabled\": true\n        }\n    ],\n    \"pricing\": [\n        {\n            \"provider\": \"dashscope\",\n            \"model_name\": \"qwen-turbo\",\n            \"input_price_per_1k\": 0.002,\n            \"output_price_per_1k\": 0.006,\n            \"currency\": \"CNY\"\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/config/system",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"system"
+							]
+						},
+						"description": "同时更新 models 和 pricing 配置。"
 					},
 					"response": []
 				}
