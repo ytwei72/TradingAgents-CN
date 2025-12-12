@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Callable
 from pathlib import Path
 
 # 导入日志模块
-from tradingagents.utils.logging_manager import get_logger
+from tradingagents.utils.logging_manager import get_logger, get_logger_manager
 from tradingagents.messaging.business.messages import NodeStatus
 from tradingagents.tasks import get_task_manager
 logger = get_logger('analysis')
@@ -240,22 +240,15 @@ def check_task_control(
 
 
 def track_token_usage(
-    llm_provider: str,
-    llm_model: str,
-    session_id: str,
-    analysts: list,
-    research_depth: int,
-    market_type: str
+    results: Dict[str, Any],
+    params: Dict[str, Any]
 ) -> Optional[float]:
     """
     记录Token使用情况
-        llm_provider: LLM提供商
-        llm_model: 模型名称
-        session_id: 会话ID
-        analysts: 分析师列表
-        research_depth: 研究深度
-        market_type: 市场类型
-        update_progress: 进度回调函数
+    
+    Args:
+        results: 分析结果字典，包含 llm_provider, llm_model, session_id, analysts, research_depth
+        params: 参数字典，包含 market_type
         
     Returns:
         总成本（元），如果无法跟踪则返回None
@@ -264,6 +257,11 @@ def track_token_usage(
         from tradingagents.config.config_manager import token_tracker
     except ImportError:
         return None
+    
+    # 从 results 和 params 中提取所需信息
+    analysts = results.get('analysts', [])
+    research_depth = results.get('research_depth', 2)
+    market_type = params.get('market_type', '美股')
     
     # 估算实际使用的token（基于分析师数量和研究深度）
     depth_token_map = {
@@ -275,22 +273,17 @@ def track_token_usage(
     }
     
     input_per_analyst, output_per_analyst = depth_token_map.get(research_depth, (2500, 1200))
-    actual_input_tokens = len(analysts) * input_per_analyst
-    actual_output_tokens = len(analysts) * output_per_analyst
     
     usage_record = token_tracker.track_usage(
-        provider=llm_provider,
-        model_name=llm_model,
-        input_tokens=actual_input_tokens,
-        output_tokens=actual_output_tokens,
-        session_id=session_id,
+        provider=results.get('llm_provider', 'dashscope'),
+        model_name=results.get('llm_model', 'qwen-max'),
+        input_tokens=len(analysts) * input_per_analyst,
+        output_tokens=len(analysts) * output_per_analyst,
+        session_id=results.get('session_id', ''),
         analysis_type=f"{market_type}_analysis"
     )
-    
-    if usage_record:
-        return usage_record.cost
-    
-    return None
+
+    return usage_record.cost if usage_record else None
 
 
 def prepare_analysis_steps(
@@ -464,57 +457,39 @@ def prepare_analysis_steps(
 
 def save_analysis_results(
     results: Dict[str, Any],
-    analysis_id: Optional[str] = None,
-    stock_symbol: Optional[str] = None
+    analysis_id: str
 ) -> tuple[bool, Dict[str, str]]:
     """
-    保存分析结果到本地和MongoDB
+    后处理步骤3: 保存分析结果
+    
+    处理步骤包括：
+    - 格式化分析结果
+    - 保存分模块报告到本地目录
+    - 保存分析报告到MongoDB
     
     Args:
-        results: 分析结果
-        analysis_id: 分析ID
-        stock_symbol: 股票代码 (可选)
+        results: 分析结果字典
+        analysis_id: 分析ID（必选）
         
     Returns:
         (是否成功, 保存的文件路径字典)
+        文件路径字典包含各模块报告的本地保存路径
     """
     from tradingagents.tasks import get_task_manager
 
-    task_manager = get_task_manager() if analysis_id else None
+    task_manager = get_task_manager()
 
-    # Fetch stock_symbol if not provided
-    if stock_symbol is None and analysis_id and task_manager:
+    # 从内部获取 stock_symbol：优先从 task_manager 获取，其次从 results 获取
+    stock_symbol = None
+    if analysis_id and task_manager:
         task_status = task_manager.get_task_status(analysis_id)
         if task_status:
             params = task_status.get('params', {})
             stock_symbol = params.get('stock_symbol')
     
-    # Fallback if still None (try to get from results)
+    # 如果仍未获取到，从 results 中获取
     if stock_symbol is None:
         stock_symbol = results.get('stock_symbol', 'UNKNOWN')
-
-    # 更新任务进度（开始）
-    step_info = {
-        "step_index": 23,
-        "step_name": "save_results",
-        "display_name": "💾 保存分析结果",
-        "description": "保存分模块报告到本地目录，保存分析报告到MongoDB，步骤输出已实时保存到eval_results目录"
-    }
-    total_steps = 12
-    if analysis_id and task_manager:
-        planned_steps = task_manager.get_task_planned_steps(analysis_id)
-        if planned_steps:
-            total_steps = len(planned_steps)
-            for step in planned_steps:
-                if step['step_name'] == "save_results":
-                    step_info = step
-                    break
-        task_manager.update_task_progress(
-            analysis_id,
-            step_info.get('step_name', 'save_results'),
-            step_info['description'],
-            'start'
-        )
     
     saved_files = {}
     
@@ -551,48 +526,41 @@ def save_analysis_results(
             logger.info(f"✅ [MongoDB保存] 分析报告已成功保存到MongoDB")
         else:
             logger.warning(f"⚠️ [MongoDB保存] MongoDB报告保存失败")
-        
-        if analysis_id and task_manager:
-            task_manager.update_task_progress(
-                analysis_id,
-                step_info.get('step_name', 'save_results'),
-                step_info['description'],
-                'success'
-            )
 
         return save_success or bool(local_files), saved_files
         
     except Exception as save_error:
         logger.error(f"❌ [报告保存] 保存分析报告时发生错误: {str(save_error)}")
-        error_msg = f"⚠️ 报告保存出错: {str(save_error)}"
-
-        if analysis_id and task_manager:
-            task_manager.update_task_progress(
-                analysis_id,
-                step_info.get('step_name', 'save_results'),
-                error_msg,
-                'error'
-            )
         return False, saved_files
 
 
 # ========== 封装的步骤函数 ==========
 
-def log_analysis_start(analysis_id: Optional[str] = None) -> tuple[Any, float]:
+def log_analysis_start(analysis_id: str) -> tuple[Any, float]:
     """
     步骤1: 记录分析开始日志
     
     Args:
-        analysis_id: 分析ID
+        analysis_id: 分析ID（必选）
         
     Returns:
         (logger_manager, analysis_start_time)
     """
     from tradingagents.utils.logging_manager import get_logger_manager
+    from tradingagents.tasks import get_task_manager
     import time
     
     logger_manager = get_logger_manager()
     analysis_start_time = time.time()
+    
+    # 将 analysis_start_time 保存到任务状态中
+    task_manager = get_task_manager()
+    if task_manager:
+        try:
+            state_machine = task_manager._get_task_state_machine(analysis_id)
+            state_machine.update_state({'progress': {'analysis_start_time': analysis_start_time}})
+        except Exception as e:
+            logger.warning(f"⚠️ [分析启动] 保存analysis_start_time到任务状态失败: {e}")
     
     return logger_manager, analysis_start_time
 
@@ -698,61 +666,35 @@ def execute_analysis(
 
 
 def process_analysis_results(
+    analysis_id: str,
     state: Any,
-    decision: Any,
-    analysis_id: Optional[str] = None,
-    llm_provider: Optional[str] = None,
-    llm_model: Optional[str] = None,
-    session_id: Optional[str] = None,
-    analysts: Optional[list] = None,
-    research_depth: Optional[int] = None,
-    market_type: Optional[str] = None
+    decision: Any
 ) -> Dict[str, Any]:
     """
-    步骤10: 处理分析结果
+    后处理步骤1: 处理分析结果
+    
+    处理步骤包括：
+    - 提取风险评估数据
+    - 记录Token使用情况
+    - 构建完整的结果字典
     
     Args:
+        analysis_id: 分析ID（必选）
         state: 分析状态
         decision: 分析决策
-        analysis_id: 分析ID
-        ... (other optional params)
         
     Returns:
-        处理后的结果字典
+        处理后的完整结果字典，包含所有需要的属性
     """
-    from tradingagents.tasks import get_task_manager
-    
+    # 获取并验证 task_manager、task_status、params、extra_config，如果无效则抛出异常
     task_manager = get_task_manager()
     
-    # Fetch params from TaskManager if analysis_id is present
-    if analysis_id and task_manager:
-        task_status = task_manager.get_task_status(analysis_id)
-        if task_status:
-            params = task_status.get('params', {})
-            extra_config = params.get('extra_config', {})
-            
-            if llm_provider is None:
-                llm_provider = extra_config.get('llm_provider', 'dashscope')
-            if llm_model is None:
-                llm_model = extra_config.get('llm_model', 'qwen-max')
-            if analysts is None:
-                analysts = params.get('analysts', [])
-            if research_depth is None:
-                research_depth = params.get('research_depth', 2)
-            if market_type is None:
-                market_type = params.get('market_type', '美股')
-            
-            # session_id is typically analysis_id in this context
-            if session_id is None:
-                session_id = analysis_id
-
-    # Fallback defaults if still None
-    llm_provider = llm_provider or 'dashscope'
-    llm_model = llm_model or 'qwen-max'
-    analysts = analysts or []
-    research_depth = research_depth or 2
-    market_type = market_type or '美股'
-    session_id = session_id or analysis_id or "unknown_session"
+    task_status = task_manager.get_task_status(analysis_id)
+    params = task_status.get('params') if task_status else None
+    extra_config = params.get('extra_config') if params else None
+    
+    if not task_status or not params or not extra_config:
+        raise ValueError(f"Task status data is abnormal for analysis_id: {analysis_id}")
 
     # 延迟导入以避免循环依赖
     def extract_risk_assessment(state):
@@ -764,105 +706,72 @@ def process_analysis_results(
             # 如果无法导入，返回None
             return None
     
-    if task_manager and analysis_id:
-        task_manager.update_task_progress(
-            analysis_id, 
-            "result_processing",
-            "提取风险评估数据，记录Token使用情况，格式化分析结果用于显示", 
-            'start'
-        )
-    
     # 提取风险评估数据
     risk_assessment = extract_risk_assessment(state)
     if risk_assessment:
         state['risk_assessment'] = risk_assessment
     
+    # 检查 Token 跟踪是否启用
+    token_tracking_enabled = False
+    try:
+        from tradingagents.config.config_manager import token_tracker
+        token_tracking_enabled = True
+    except ImportError:
+        pass
+    
+    # 直接对 results 进行赋值，从 params 和 extra_config 中获取所有需要的值
+    results = {}
+    results['stock_symbol'] = params.get('stock_symbol', 'UNKNOWN')
+    results['analysis_date'] = params.get('analysis_date') or params.get('date', '')
+    results['analysts'] = params.get('analysts', [])
+    results['research_depth'] = params.get('research_depth', 2)
+    results['llm_provider'] = extra_config.get('llm_provider', 'dashscope')
+    results['llm_model'] = extra_config.get('llm_model', 'qwen-max')
+    results['state'] = state
+    results['decision'] = decision
+    results['success'] = True
+    results['error'] = None
+    results['session_id'] = params.get('session_id') or analysis_id
+    
     # 记录Token使用
-    track_token_usage(
-        llm_provider, llm_model, session_id, analysts, 
-        research_depth, market_type
-    )
+    track_token_usage(results, params)
     
-    if task_manager and analysis_id:
-        task_manager.update_task_progress(
-            analysis_id, 
-            "result_processing", 
-            "提取风险评估数据，记录Token使用情况，格式化分析结果用于显示", 
-            'success'
-        )
-    
-    return {
-        'state': state,
-        'decision': decision
-    }
+    return results
 
 
 def log_analysis_completion(
-    analysis_id: Optional[str] = None,
-    # Optional parameters
-    stock_symbol: Optional[str] = None,
-    session_id: Optional[str] = None,
-    analysis_start_time: Optional[float] = None,
-    logger_manager: Optional[Any] = None
+    analysis_id: str
 ) -> float:
     """
-    步骤11: 记录完成日志
+    后处理步骤2: 记录完成日志
+    
+    处理步骤包括：
+    - 计算分析持续时间
+    - 获取Token使用总成本
+    - 记录分析完成日志
+    - 保存分析完成信息到数据库
     
     Args:
-        analysis_id: 分析ID
-        stock_symbol: 股票代码 (可选)
-        session_id: 会话ID (可选)
-        analysis_start_time: 分析开始时间 (可选)
-        logger_manager: 日志管理器 (可选)
+        analysis_id: 分析ID（必选）
         
     Returns:
-        总成本
+        总成本（元），如果无法跟踪则返回0.0
     """
     import time
-    from tradingagents.tasks import get_task_manager
-    from tradingagents.utils.logging_manager import get_logger_manager
     
-    if logger_manager is None:
-        logger_manager = get_logger_manager()
-        
+    logger_manager = get_logger_manager()
     task_manager = get_task_manager()
     
-    if analysis_id and task_manager:
-        task_status = task_manager.get_task_status(analysis_id)
-        if task_status:
-            params = task_status.get('params', {})
-            if stock_symbol is None:
-                stock_symbol = params.get('stock_symbol')
-            if session_id is None:
-                session_id = params.get('session_id') or analysis_id
-            if analysis_start_time is None:
-                analysis_start_time = params.get('analysis_start_time') or params.get('start_time')
-    
-    stock_symbol = stock_symbol or "UNKNOWN"
-    session_id = session_id or analysis_id or "unknown_session"
-    analysis_start_time = analysis_start_time or time.time()
-    
-    step_info = {
-        "step_index": 22, 
-        "display_name": "✅ 记录完成日志", 
-        "description": "记录分析完成时间，计算总耗时和总成本"
-    }
-    
-    if task_manager and analysis_id:
-        planned_steps = task_manager.get_task_planned_steps(analysis_id)
-        if planned_steps:
-            for step in planned_steps:
-                if step['step_name'] == "completion_logging":
-                    step_info = step
-                    break
-                    
-        task_manager.update_task_progress(
-            analysis_id, 
-            "completion_logging", 
-            step_info['description'], 
-            'start'
-        )
-    
+    task_status = task_manager.get_task_status(analysis_id)
+    params = task_status.get('params', {})
+    progress = task_status.get('progress', {})
+    # 股票代码
+    stock_symbol = params.get('stock_symbol')
+    # 会话ID
+    session_id = params.get('session_id') or analysis_id
+    # 分析开始时间
+    analysis_start_time = progress.get('analysis_start_time')
+        
     analysis_duration = time.time() - analysis_start_time
     
     total_cost = 0.0
@@ -877,40 +786,13 @@ def log_analysis_completion(
         analysis_duration, total_cost
     )
     
-    logger.info(f"✅ [分析完成] 股票分析成功完成",
-               extra={
-                   'stock_symbol': stock_symbol,
-                   'session_id': session_id,
-                   'duration': analysis_duration,
-                   'total_cost': total_cost,
-                   'success': True,
-                   'event_type': 'web_analysis_complete'
-               })
-    
-    if task_manager and analysis_id:
-        task_manager.update_task_progress(
-            analysis_id, 
-            "completion_logging", 
-            step_info['description'], 
-            'success'
-        )
-    
     return total_cost
 
 
 def post_process_analysis_steps(
     state: Dict[str, Any],
     decision: Any,
-    analysis_id: Optional[str] = None,
-    stock_symbol: Optional[str] = None,
-    analysis_date: Optional[str] = None,
-    analysts: Optional[list] = None,
-    research_depth: Optional[int] = None,
-    llm_provider: Optional[str] = None,
-    llm_model: Optional[str] = None,
-    market_type: Optional[str] = None,
-    session_id: Optional[str] = None,
-    analysis_start_time: Optional[float] = None
+    analysis_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     后处理步骤：执行所有分析后的处理工作
@@ -924,97 +806,60 @@ def post_process_analysis_steps(
         state: 分析状态
         decision: 分析决策
         analysis_id: 分析ID
-        stock_symbol: 股票代码（可选，会通过analysis_id自动补充）
-        analysis_date: 分析日期（可选，会通过analysis_id自动补充）
-        analysts: 分析师列表（可选，会通过analysis_id自动补充）
-        research_depth: 研究深度（可选，会通过analysis_id自动补充）
-        llm_provider: LLM提供商（可选，会通过analysis_id自动补充）
-        llm_model: 模型名称（可选，会通过analysis_id自动补充）
-        market_type: 市场类型（可选，会通过analysis_id自动补充）
-        session_id: 会话ID（可选，会通过analysis_id自动补充）
-        analysis_start_time: 分析开始时间
-        
+
     Returns:
         最终的分析结果字典
     """
-    # 导入必要的模块
-    from tradingagents.utils.logging_manager import get_logger_manager
-    from tradingagents.tasks import get_task_manager
-
-    # 获取 logger_manager
-    logger_manager = get_logger_manager()
-
-    # 通过 analysis_id 尽量补充参数
-    params: Dict[str, Any] = {}
-    extra_config: Dict[str, Any] = {}
+    # 获取 task_manager
     task_manager = get_task_manager()
-    if analysis_id and task_manager:
-        task_status = task_manager.get_task_status(analysis_id) or {}
-        params = task_status.get('params', {}) or {}
-        extra_config = params.get('extra_config', {}) or {}
-        if analysis_start_time is None:
-            analysis_start_time = params.get('analysis_start_time') or params.get('start_time')
-        if session_id is None:
-            session_id = params.get('session_id') or analysis_id
+    
+    # 验证 task_manager 和 analysis_id（提前验证，无效则抛出异常）
+    if not task_manager or not analysis_id:
+        raise ValueError(f"Task manager or analysis_id is not available: analysis_id={analysis_id}")
+    
+    # 初始化 step_name 变量
+    step_name = ""
+    
+    def _update_step_start(message: str):
+        task_manager.update_task_progress(analysis_id, step_name, message, 'start')
 
-    stock_symbol = stock_symbol or params.get('stock_symbol') or "UNKNOWN"
-    analysis_date = analysis_date or params.get('analysis_date') or params.get('date') or ""
-    analysts = analysts or params.get('analysts') or []
-    research_depth = research_depth or params.get('research_depth') or 2
-    llm_provider = llm_provider or extra_config.get('llm_provider') or 'dashscope'
-    llm_model = llm_model or extra_config.get('llm_model') or 'qwen-max'
-    market_type = market_type or params.get('market_type') or '美股'
-    session_id = session_id or analysis_id or "unknown_session"
-
-    # 检查 Token 跟踪是否启用
-    token_tracking_enabled = False
-    try:
-        from tradingagents.config.config_manager import token_tracker
-        token_tracking_enabled = True
-    except ImportError:
-        pass
+    def _update_step_success(message: str):
+        task_manager.update_task_progress(analysis_id, step_name, message, 'success')
+    
+    def _update_step_error(message: str):
+        task_manager.update_task_progress(analysis_id, step_name, message, 'error')
 
     # ========== 后处理步骤1: 处理分析结果 ==========
-    processed_results = process_analysis_results(
-        state=state,
-        decision=decision,
-        llm_provider=llm_provider,
-        llm_model=llm_model,
-        session_id=session_id,
-        analysts=analysts,
-        research_depth=research_depth,
-        market_type=market_type,
-        analysis_id=analysis_id
-    )
-
-    results = {
-        'stock_symbol': stock_symbol,
-        'analysis_date': analysis_date,
-        'analysts': analysts,
-        'research_depth': research_depth,
-        'llm_provider': llm_provider,
-        'llm_model': llm_model,
-        'state': processed_results['state'],
-        'decision': processed_results['decision'],
-        'success': True,
-        'error': None,
-        'session_id': session_id if token_tracking_enabled else None
-    }
+    step_name = "result_processing"
+    _update_step_start("📊 开始处理分析结果...")
+    try:
+        results = process_analysis_results(analysis_id, state, decision)
+        _update_step_success("✅ 分析结果处理完成")
+    except Exception as e:
+        error_msg = f"⚠️ 分析结果处理失败：{str(e)}"
+        _update_step_error(error_msg)
+        raise
 
     # ========== 后处理步骤2: 记录完成日志 ==========
-    log_analysis_completion(
-        logger_manager=logger_manager,
-        stock_symbol=stock_symbol,
-        session_id=session_id,
-        analysis_start_time=analysis_start_time if analysis_start_time else 0,
-        analysis_id=analysis_id
-    )
+    step_name = "completion_logging"
+    _update_step_start("✅ 开始记录分析结束日志，并计算本次分析任务总成本...")
+    try:
+        log_analysis_completion(analysis_id=analysis_id)
+        _update_step_success("✅ 完成分析任务结束日志记录和总成本计算，并保存到数据库")
+    except Exception as e:
+        error_msg = f"⚠️ 完成日志记录失败：{str(e)}"
+        _update_step_error(error_msg)
+        raise
 
     # ========== 后处理步骤3: 保存分析结果 ==========
-    save_analysis_results(
-        results=results, 
-        stock_symbol=stock_symbol, 
-        analysis_id=analysis_id
-    )
+    step_name = "save_results"
+    _update_step_start("💾 开始保存分析结果...")
+    try:
+        save_analysis_results(results, analysis_id)
+        _update_step_success("✅ 分析结果保存完成")
+    except Exception as e:
+        error_msg = f"⚠️ 分析结果保存失败：{str(e)}"
+        _update_step_error(error_msg)
+        raise
 
     return results

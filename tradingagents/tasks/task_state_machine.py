@@ -193,6 +193,9 @@ class TaskStateMachine:
         if 'progress' in updates and isinstance(updates['progress'], dict):
             self.task_props.setdefault('progress', {}).update(updates['progress'])
             
+        if 'params' in updates and isinstance(updates['params'], dict):
+            self.task_props.setdefault('params', {}).update(updates['params'])
+            
         if 'result' in updates:
             self.task_props['result'] = updates['result']
             

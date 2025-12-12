@@ -347,11 +347,12 @@
 							"raw": "{\n    \"analysis_id\": \"{{analysis_id}}\",\n    \"format\": \"markdown\",\n    \"include_charts\": true,\n    \"language\": \"zh-CN\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/reports/generate",
+							"raw": "{{base_url}}/api/reports/generate",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
 								"reports",
 								"generate"
 							]
@@ -365,15 +366,91 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/reports/{{report_id}}",
+							"raw": "{{base_url}}/api/reports/{{report_id}}",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
 								"reports",
 								"{{report_id}}"
 							]
 						}
+					},
+					"response": []
+				},
+				{
+					"name": "获取分析任务的报告",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/reports/{{analysis_id}}/reports",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"reports",
+								"{{analysis_id}}",
+								"reports"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "配置管理",
+			"item": [
+				{
+					"name": "获取系统配置",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/config/system",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"system"
+							]
+						},
+						"description": "获取系统配置（持久化覆盖项），包括 LLM 提供商、模型设置、研究深度、市场类型、功能开关、数据库配置等"
+					},
+					"response": []
+				},
+				{
+					"name": "更新系统配置",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"llm_provider\": \"dashscope\",\n    \"deep_think_llm\": \"qwen-max\",\n    \"research_depth_default\": 4,\n    \"memory_enabled\": false,\n    \"db\": {\n        \"mongo\": {\n            \"mongo_host\": \"localhost\",\n            \"mongo_port\": 27017,\n            \"mongo_database\": \"tradingagents\"\n        }\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/config/system",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"system"
+							]
+						},
+						"description": "更新系统配置并持久化。支持部分更新，只传递需要修改的字段即可。配置会与现有配置进行深度合并。"
 					},
 					"response": []
 				}
