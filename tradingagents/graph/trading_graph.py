@@ -297,6 +297,10 @@ class TradingAgentsGraph:
         # 从环境变量读取sleep时间配置，如果没有则使用默认值
         self.mock_sleep_min = float(os.getenv('MOCK_SLEEP_MIN', '2'))  # 默认2秒
         self.mock_sleep_max = float(os.getenv('MOCK_SLEEP_MAX', '10'))  # 默认10秒
+        
+        # MongoDB步骤状态管理器（用于存储和读取步骤状态）
+        from tradingagents.utils.mongodb_steps_status_manager import mongodb_steps_status_manager
+        self.steps_status_manager = mongodb_steps_status_manager
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
@@ -524,7 +528,7 @@ class TradingAgentsGraph:
         return self.mock_mode_config.get(node_name, False)
     
     def _load_historical_step_output(self, node_name: str, ticker: str, trade_date: str, current_state: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-        """从历史步骤文件中加载指定节点的输出
+        """从MongoDB的analysis_steps_status集合中加载指定节点的历史输出
         
         Args:
             node_name: 节点名称
@@ -535,6 +539,27 @@ class TradingAgentsGraph:
         Returns:
             如果找到历史输出则返回状态字典，否则返回None
         """
+        # 优先从MongoDB读取
+        if self.steps_status_manager.is_connected():
+            try:
+                doc = self.steps_status_manager.load_step_status(ticker, trade_date)
+                
+                if doc:
+                    # 查找匹配的节点输出
+                    # 由于MongoDB中存储的是单个步骤数据，直接使用该文档
+                    # 检查是否匹配当前节点
+                    if self._match_node_output(node_name, "", doc):
+                        logger.info(f"🎭 [模拟模式] 从MongoDB找到历史输出: {node_name} (股票: {ticker}, 日期: {trade_date})")
+                        return self._convert_historical_to_state(doc, node_name, current_state)
+                    else:
+                        logger.debug(f"🔍 [模拟模式] MongoDB中找到记录但节点不匹配: {node_name}")
+                else:
+                    logger.debug(f"🔍 [模拟模式] MongoDB中未找到记录: {ticker} - {trade_date}")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ [模拟模式] 从MongoDB读取失败: {e}，尝试从文件系统读取")
+        
+        # 如果MongoDB读取失败，回退到文件系统
         # 查找历史步骤文件
         step_output_dir = Path(f"eval_results/{ticker}/TradingAgentsStrategy_logs/step_outputs")
         
@@ -578,7 +603,7 @@ class TradingAgentsGraph:
                                     best_match_score = match_score
                     
                     if best_match:
-                        logger.info(f"🎭 [模拟模式] 找到历史输出: {node_name} (步骤 {best_match.get('step_number', '?')}, 匹配分数: {best_match_score})")
+                        logger.info(f"🎭 [模拟模式] 从文件系统找到历史输出: {node_name} (步骤 {best_match.get('step_number', '?')}, 匹配分数: {best_match_score})")
                         return self._convert_historical_to_state(best_match, node_name, current_state)
                 except Exception as e:
                     logger.debug(f"🔍 [模拟模式] 读取历史文件失败: {e}")
@@ -875,14 +900,28 @@ class TradingAgentsGraph:
         return serialized
     
     def _save_chunk_to_file(self, serialized_chunk: Dict[str, Any], step_number: int, output_dir: Path):
-        """保存单个chunk到文件"""
+        """保存单个chunk到MongoDB和/或文件"""
+        # 优先保存到MongoDB
+        if self.steps_status_manager.is_connected():
+            try:
+                success = self.steps_status_manager.save_step_status(serialized_chunk)
+                if success:
+                    ticker = serialized_chunk.get('company_of_interest', '')
+                    trade_date = serialized_chunk.get('trade_date', '')
+                    logger.debug(f"💾 [步骤保存] 已保存步骤 {step_number} 到MongoDB: {ticker} - {trade_date}")
+                else:
+                    logger.warning(f"⚠️ [步骤保存] 保存到MongoDB失败，将尝试保存到文件系统")
+            except Exception as e:
+                logger.warning(f"⚠️ [步骤保存] 保存到MongoDB失败: {e}，将尝试保存到文件系统")
+        
+        # 同时保存到文件系统（作为备份）
         filename = output_dir / f"step_{step_number:04d}.json"
         try:
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(serialized_chunk, f, ensure_ascii=False, indent=2)
             logger.debug(f"💾 [步骤保存] 已保存步骤 {step_number} 到 {filename}")
         except Exception as e:
-            logger.error(f"❌ [步骤保存] 保存步骤 {step_number} 失败: {e}")
+            logger.error(f"❌ [步骤保存] 保存步骤 {step_number} 到文件失败: {e}")
     
     def _save_steps_summary(self, trace: List[Dict[str, Any]], output_dir: Path):
         """保存所有步骤的汇总文件"""
