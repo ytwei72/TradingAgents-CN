@@ -22,10 +22,12 @@ logger = get_logger('agents')
 
 try:
     from .mongodb_storage import MongoDBStorage
+    from .model_usage_manager import ModelUsageManager
     MONGODB_AVAILABLE = True
 except ImportError:
     MONGODB_AVAILABLE = False
     MongoDBStorage = None
+    ModelUsageManager = None
 
 
 @dataclass
@@ -80,7 +82,9 @@ class ConfigManager:
 
         # 初始化MongoDB存储（如果可用）
         self.mongodb_storage = None
+        self.model_usage_manager = None
         self._init_mongodb_storage()
+        self._init_model_usage_manager()
 
         self._init_default_configs()
 
@@ -148,7 +152,7 @@ class ConfigManager:
         return True
     
     def _init_mongodb_storage(self):
-        """初始化MongoDB存储"""
+        """初始化MongoDB存储（旧版，用于兼容）"""
         if not MONGODB_AVAILABLE:
             return
         
@@ -175,6 +179,30 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"❌ MongoDB初始化失败: {e}", exc_info=True)
             self.mongodb_storage = None
+    
+    def _init_model_usage_manager(self):
+        """初始化模型使用记录管理器（数据库优先）"""
+        if not MONGODB_AVAILABLE or ModelUsageManager is None:
+            return
+        
+        try:
+            connection_string = os.getenv("MONGODB_CONNECTION_STRING")
+            database_name = os.getenv("MONGODB_DATABASE_NAME", "tradingagents")
+            
+            self.model_usage_manager = ModelUsageManager(
+                connection_string=connection_string,
+                database_name=database_name
+            )
+            
+            if self.model_usage_manager.is_connected():
+                logger.info("✅ 模型使用记录管理器已启用（数据库优先）")
+            else:
+                self.model_usage_manager = None
+                logger.warning("⚠️ 模型使用记录管理器连接失败，将使用JSON文件存储")
+
+        except Exception as e:
+            logger.error(f"❌ 模型使用记录管理器初始化失败: {e}", exc_info=True)
+            self.model_usage_manager = None
 
     def _init_default_configs(self):
         """初始化默认配置"""
@@ -425,29 +453,65 @@ class ConfigManager:
             logger.error(f"保存定价配置失败: {e}")
     
     def load_usage_records(self) -> List[UsageRecord]:
-        """加载使用记录"""
+        """
+        加载使用记录（数据库优先策略）
+        优先从 MongoDB 读取，如果数据库未连接或没有数据，则从 JSON 文件读取
+        """
+        # 优先从数据库读取
+        if self.model_usage_manager and self.model_usage_manager.is_connected():
+            try:
+                records = self.model_usage_manager.query_usage_records(limit=100000)
+                if records:
+                    logger.debug(f"✅ 从数据库加载了 {len(records)} 条使用记录")
+                    return records
+                else:
+                    logger.debug("ℹ️ 数据库中暂无使用记录，尝试从文件读取")
+            except Exception as e:
+                logger.warning(f"⚠️ 从数据库加载使用记录失败: {e}，回退到文件读取")
+        
+        # 回退到文件读取
         try:
             if not self.usage_file.exists():
                 return []
             with open(self.usage_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                return [UsageRecord(**item) for item in data]
+                records = [UsageRecord(**item) for item in data]
+                logger.debug(f"✅ 从文件加载了 {len(records)} 条使用记录")
+                return records
         except Exception as e:
-            logger.error(f"加载使用记录失败: {e}")
+            logger.error(f"❌ 从文件加载使用记录失败: {e}")
             return []
     
     def save_usage_records(self, records: List[UsageRecord]):
-        """保存使用记录"""
+        """
+        保存使用记录（数据库优先策略）
+        优先保存到 MongoDB，同时保存到 JSON 文件作为备份
+        """
+        # 优先保存到数据库
+        if self.model_usage_manager and self.model_usage_manager.is_connected():
+            try:
+                # 批量插入到数据库
+                inserted_count = self.model_usage_manager.insert_many_usage_records(records)
+                if inserted_count > 0:
+                    logger.debug(f"✅ 已保存 {inserted_count} 条使用记录到数据库")
+            except Exception as e:
+                logger.warning(f"⚠️ 保存使用记录到数据库失败: {e}，仅保存到文件")
+        
+        # 同时保存到文件作为备份
         try:
             data = [asdict(record) for record in records]
             with open(self.usage_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+            logger.debug(f"✅ 已保存 {len(records)} 条使用记录到文件")
         except Exception as e:
-            logger.error(f"保存使用记录失败: {e}")
+            logger.error(f"❌ 保存使用记录到文件失败: {e}")
     
     def add_usage_record(self, provider: str, model_name: str, input_tokens: int,
                         output_tokens: int, session_id: str, analysis_type: str = "stock_analysis"):
-        """添加使用记录"""
+        """
+        添加使用记录（数据库优先策略）
+        优先保存到 MongoDB，如果失败则保存到 JSON 文件
+        """
         # 计算成本
         cost = self.calculate_cost(provider, model_name, input_tokens, output_tokens)
         
@@ -462,13 +526,38 @@ class ConfigManager:
             analysis_type=analysis_type
         )
         
-        # 优先使用MongoDB存储
+        # 优先使用新的模型使用记录管理器
+        if self.model_usage_manager and self.model_usage_manager.is_connected():
+            record_id = self.model_usage_manager.insert_usage_record(record)
+            if record_id:
+                # 同时追加到文件作为备份
+                try:
+                    records = self.load_usage_records()
+                    # 检查是否已存在（避免重复）
+                    if not any(r.timestamp == record.timestamp and r.session_id == record.session_id for r in records):
+                        records.append(record)
+                        # 限制记录数量
+                        settings = self.load_settings()
+                        max_records = settings.get("max_usage_records", 10000)
+                        if len(records) > max_records:
+                            records = records[-max_records:]
+                        # 保存到文件
+                        data = [asdict(r) for r in records]
+                        with open(self.usage_file, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    logger.warning(f"⚠️ 保存到文件失败: {e}")
+                return record
+            else:
+                logger.warning(f"⚠️ 数据库保存失败，回退到JSON文件存储")
+        
+        # 回退到旧的 MongoDB 存储（兼容性）
         if self.mongodb_storage and self.mongodb_storage.is_connected():
             success = self.mongodb_storage.save_usage_record(record)
             if success:
                 return record
             else:
-                logger.error(f"⚠️ MongoDB保存失败，回退到JSON文件存储")
+                logger.warning(f"⚠️ 旧版MongoDB保存失败，回退到JSON文件存储")
         
         # 回退到JSON文件存储
         records = self.load_usage_records()
@@ -597,8 +686,26 @@ class ConfigManager:
         return None
     
     def get_usage_statistics(self, days: int = 30) -> Dict[str, Any]:
-        """获取使用统计"""
-        # 优先使用MongoDB获取统计
+        """
+        获取使用统计（数据库优先策略）
+        优先从 MongoDB 获取统计，如果失败则从 JSON 文件统计
+        """
+        # 优先使用新的模型使用记录管理器
+        if self.model_usage_manager and self.model_usage_manager.is_connected():
+            try:
+                # 从数据库获取基础统计
+                stats = self.model_usage_manager.get_usage_statistics(days)
+                # 获取供应商统计
+                provider_stats = self.model_usage_manager.get_provider_statistics(days)
+                
+                if stats:
+                    stats["provider_stats"] = provider_stats
+                    stats["records_count"] = stats.get("total_requests", 0)
+                    return stats
+            except Exception as e:
+                logger.warning(f"⚠️ 数据库统计获取失败，回退到JSON文件: {e}")
+        
+        # 回退到旧的 MongoDB 存储（兼容性）
         if self.mongodb_storage and self.mongodb_storage.is_connected():
             try:
                 # 从MongoDB获取基础统计
@@ -611,7 +718,7 @@ class ConfigManager:
                     stats["records_count"] = stats.get("total_requests", 0)
                     return stats
             except Exception as e:
-                logger.error(f"⚠️ MongoDB统计获取失败，回退到JSON文件: {e}")
+                logger.warning(f"⚠️ 旧版MongoDB统计获取失败，回退到JSON文件: {e}")
         
         # 回退到JSON文件统计
         records = self.load_usage_records()
