@@ -348,7 +348,9 @@ class ModelUsageManager:
     def get_usage_statistics(self, 
                             days: int = 30,
                             provider: str = None,
-                            model_name: str = None) -> Dict[str, Any]:
+                            model_name: str = None,
+                            start_date: str = None,
+                            end_date: str = None) -> Dict[str, Any]:
         """
         获取使用统计信息
         
@@ -356,6 +358,8 @@ class ModelUsageManager:
             days: 统计最近N天的数据
             provider: 按供应商过滤
             model_name: 按模型名称过滤
+            start_date: 开始日期（ISO格式字符串）
+            end_date: 结束日期（ISO格式字符串）
             
         Returns:
             统计信息字典
@@ -364,12 +368,18 @@ class ModelUsageManager:
             return {}
         
         try:
-            cutoff_date = datetime.now() - timedelta(days=days)
-            
             # 构建匹配条件
-            match_conditions = {
-                'timestamp': {'$gte': cutoff_date.isoformat()}
-            }
+            match_conditions = {}
+            
+            # 时间范围查询
+            if start_date and end_date:
+                match_conditions['timestamp'] = {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            elif days:
+                cutoff_date = datetime.now() - timedelta(days=days)
+                match_conditions['timestamp'] = {'$gte': cutoff_date.isoformat()}
             
             if provider:
                 match_conditions['provider'] = provider
@@ -425,12 +435,14 @@ class ModelUsageManager:
             logger.error(f"❌ 获取统计信息失败: {e}")
             return {}
     
-    def get_provider_statistics(self, days: int = 30) -> Dict[str, Dict[str, Any]]:
+    def get_provider_statistics(self, days: int = 30, start_date: str = None, end_date: str = None) -> Dict[str, Dict[str, Any]]:
         """
         按供应商获取统计信息
         
         Args:
             days: 统计最近N天的数据
+            start_date: 开始日期（ISO格式字符串）
+            end_date: 结束日期（ISO格式字符串）
             
         Returns:
             按供应商分组的统计信息字典
@@ -439,14 +451,23 @@ class ModelUsageManager:
             return {}
         
         try:
-            cutoff_date = datetime.now() - timedelta(days=days)
+            # 构建匹配条件
+            match_conditions = {}
+            
+            # 时间范围查询
+            if start_date and end_date:
+                match_conditions['timestamp'] = {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            elif days:
+                cutoff_date = datetime.now() - timedelta(days=days)
+                match_conditions['timestamp'] = {'$gte': cutoff_date.isoformat()}
             
             # 按供应商聚合
             pipeline = [
                 {
-                    '$match': {
-                        'timestamp': {'$gte': cutoff_date.isoformat()}
-                    }
+                    '$match': match_conditions
                 },
                 {
                     '$group': {
@@ -479,13 +500,15 @@ class ModelUsageManager:
             logger.error(f"❌ 获取供应商统计失败: {e}")
             return {}
     
-    def get_model_statistics(self, days: int = 30, provider: str = None) -> Dict[str, Dict[str, Any]]:
+    def get_model_statistics(self, days: int = 30, provider: str = None, start_date: str = None, end_date: str = None) -> Dict[str, Dict[str, Any]]:
         """
         按模型获取统计信息
         
         Args:
             days: 统计最近N天的数据
             provider: 按供应商过滤
+            start_date: 开始日期（ISO格式字符串）
+            end_date: 结束日期（ISO格式字符串）
             
         Returns:
             按模型分组的统计信息字典
@@ -494,12 +517,18 @@ class ModelUsageManager:
             return {}
         
         try:
-            cutoff_date = datetime.now() - timedelta(days=days)
-            
             # 构建匹配条件
-            match_conditions = {
-                'timestamp': {'$gte': cutoff_date.isoformat()}
-            }
+            match_conditions = {}
+            
+            # 时间范围查询
+            if start_date and end_date:
+                match_conditions['timestamp'] = {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            elif days:
+                cutoff_date = datetime.now() - timedelta(days=days)
+                match_conditions['timestamp'] = {'$gte': cutoff_date.isoformat()}
             
             if provider:
                 match_conditions['provider'] = provider
@@ -545,10 +574,129 @@ class ModelUsageManager:
             logger.error(f"❌ 获取模型统计失败: {e}")
             return {}
     
+    def get_daily_statistics(self, 
+                             days: int = 7,
+                             provider: str = None,
+                             model_name: str = None,
+                             start_date: str = None,
+                             end_date: str = None) -> Dict[str, Dict[str, Any]]:
+        """
+        按日期获取统计信息
+        
+        Args:
+            days: 统计最近N天的数据（默认7天）
+            provider: 按供应商过滤
+            model_name: 按模型名称过滤
+            start_date: 开始日期（ISO格式字符串）
+            end_date: 结束日期（ISO格式字符串）
+            
+        Returns:
+            按日期分组的统计信息字典，格式为:
+            {
+                "2025-12-15": {
+                    "dashscope/qwen-max": {
+                        "provider": "dashscope",
+                        "model_name": "qwen-max",
+                        "input_tokens": 10000,
+                        "output_tokens": 5000,
+                        "total_tokens": 15000,
+                        "cost": 0.5,
+                        "requests": 10
+                    },
+                    ...
+                },
+                ...
+            }
+        """
+        if not self._connected:
+            return {}
+        
+        try:
+            # 构建匹配条件
+            match_conditions = {}
+            
+            # 时间范围查询
+            if start_date and end_date:
+                match_conditions['timestamp'] = {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            elif days:
+                cutoff_date = datetime.now() - timedelta(days=days)
+                match_conditions['timestamp'] = {'$gte': cutoff_date.isoformat()}
+            
+            if provider:
+                match_conditions['provider'] = provider
+            if model_name:
+                match_conditions['model_name'] = model_name
+            
+            # 按日期和模型聚合
+            pipeline = [
+                {
+                    '$match': match_conditions
+                },
+                {
+                    '$addFields': {
+                        # 从ISO时间戳中提取日期部分 (YYYY-MM-DD)
+                        'date': {'$substr': ['$timestamp', 0, 10]}
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': {
+                            'date': '$date',
+                            'provider': '$provider',
+                            'model_name': '$model_name'
+                        },
+                        'input_tokens': {'$sum': '$input_tokens'},
+                        'output_tokens': {'$sum': '$output_tokens'},
+                        'cost': {'$sum': '$cost'},
+                        'requests': {'$sum': 1}
+                    }
+                },
+                {
+                    '$sort': {'_id.date': -1}  # 按日期倒序
+                }
+            ]
+            
+            results = list(self.collection.aggregate(pipeline))
+            
+            # 组织返回数据
+            daily_stats = {}
+            for result in results:
+                date = result['_id']['date']
+                provider_name = result['_id']['provider']
+                model = result['_id']['model_name']
+                model_key = f"{provider_name}/{model}"
+                
+                if date not in daily_stats:
+                    daily_stats[date] = {}
+                
+                input_tokens = result.get('input_tokens', 0)
+                output_tokens = result.get('output_tokens', 0)
+                
+                daily_stats[date][model_key] = {
+                    'provider': provider_name,
+                    'model_name': model,
+                    'input_tokens': input_tokens,
+                    'output_tokens': output_tokens,
+                    'total_tokens': input_tokens + output_tokens,
+                    'cost': round(result.get('cost', 0), 4),
+                    'requests': result.get('requests', 0)
+                }
+            
+            return daily_stats
+            
+        except Exception as e:
+            logger.error(f"❌ 获取按日期统计失败: {e}")
+            return {}
+    
     def count_records(self, 
                      days: int = None,
                      provider: str = None,
-                     model_name: str = None) -> int:
+                     model_name: str = None,
+                     start_date: str = None,
+                     end_date: str = None) -> int:
         """
         统计记录数量
         
@@ -556,6 +704,8 @@ class ModelUsageManager:
             days: 统计最近N天的记录
             provider: 按供应商过滤
             model_name: 按模型名称过滤
+            start_date: 开始日期（ISO格式字符串）
+            end_date: 结束日期（ISO格式字符串）
             
         Returns:
             记录数量
@@ -566,7 +716,13 @@ class ModelUsageManager:
         try:
             query = {}
             
-            if days:
+            # 时间范围查询
+            if start_date and end_date:
+                query['timestamp'] = {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            elif days:
                 cutoff_date = datetime.now() - timedelta(days=days)
                 query['timestamp'] = {'$gte': cutoff_date.isoformat()}
             

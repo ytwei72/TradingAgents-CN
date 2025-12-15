@@ -108,55 +108,80 @@ def render_overview_metrics(stats: Dict[str, Any], time_range: str):
     """渲染概览指标"""
     st.markdown(f"**📈 {time_range}概览**")
     
-    # 创建指标卡片
+    # 创建指标卡片：总输入、总输出、请求数和总费用
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric(
-            label="💰 总成本",
-            value=f"¥{stats['total_cost']:.4f}",
-            delta=None
+            label="📥 总输入",
+            value=f"{stats['total_input_tokens']:,}",
+            delta=f"{stats['total_input_tokens']/(stats['total_input_tokens']+stats['total_output_tokens'])*100:.1f}%" if (stats['total_input_tokens']+stats['total_output_tokens']) > 0 else None
         )
     
     with col2:
         st.metric(
-            label="🔢 总调用次数",
+            label="📤 总输出",
+            value=f"{stats['total_output_tokens']:,}",
+            delta=f"{stats['total_output_tokens']/(stats['total_input_tokens']+stats['total_output_tokens'])*100:.1f}%" if (stats['total_input_tokens']+stats['total_output_tokens']) > 0 else None
+        )
+    
+    with col3:
+        st.metric(
+            label="🔢 请求数",
             value=f"{stats['total_requests']:,}",
             delta=None
         )
     
-    with col3:
-        total_tokens = stats['total_input_tokens'] + stats['total_output_tokens']
-        st.metric(
-            label="📊 总Token数",
-            value=f"{total_tokens:,}",
-            delta=None
-        )
-    
     with col4:
-        avg_cost = stats['total_cost'] / stats['total_requests'] if stats['total_requests'] > 0 else 0
         st.metric(
-            label="📊 平均每次成本",
-            value=f"¥{avg_cost:.4f}",
+            label="💰 总费用",
+            value=f"¥{stats['total_cost']:.4f}",
             delta=None
         )
-    
-    # Token使用分布
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.metric(
-            label="📥 输入Token",
-            value=f"{stats['total_input_tokens']:,}",
-            delta=f"{stats['total_input_tokens']/(stats['total_input_tokens']+stats['total_output_tokens'])*100:.1f}%"
-        )
-    
-    with col2:
-        st.metric(
-            label="📤 输出Token",
-            value=f"{stats['total_output_tokens']:,}",
-            delta=f"{stats['total_output_tokens']/(stats['total_input_tokens']+stats['total_output_tokens'])*100:.1f}%"
-        )
+
+# 定义多种配色方案
+COLOR_SCHEMES = {
+    "经典红蓝": {
+        "colors": ['#FF6B6B', '#4ECDC4'],
+        "description": "经典对比色，清晰明了"
+    },
+    "渐变紫粉": {
+        "colors": ['#A78BFA', '#EC4899'],
+        "description": "优雅浪漫，现代感强"
+    },
+    "深邃蓝绿": {
+        "colors": ['#3B82F6', '#10B981'],
+        "description": "专业稳重，商务风格"
+    },
+    "活力橙黄": {
+        "colors": ['#F59E0B', '#EF4444'],
+        "description": "活力四射，引人注目"
+    },
+    "清新绿松": {
+        "colors": ['#34D399', '#06B6D4'],
+        "description": "清新自然，舒适护眼"
+    },
+    "典雅紫蓝": {
+        "colors": ['#8B5CF6', '#3B82F6'],
+        "description": "典雅高贵，科技感十足"
+    },
+    "温暖粉橙": {
+        "colors": ['#FB923C', '#F472B6'],
+        "description": "温暖柔和，亲和力强"
+    },
+    "稳重灰蓝": {
+        "colors": ['#64748B', '#0EA5E9'],
+        "description": "稳重大气，专业可靠"
+    },
+    "自然绿黄": {
+        "colors": ['#84CC16', '#FACC15'],
+        "description": "自然清新，充满活力"
+    },
+    "科技青紫": {
+        "colors": ['#14B8A6', '#A855F7'],
+        "description": "科技未来，富有创意"
+    }
+}
 
 def render_detailed_charts(records: List[UsageRecord], stats: Dict[str, Any]):
     """渲染详细图表"""
@@ -174,13 +199,29 @@ def render_detailed_charts(records: List[UsageRecord], stats: Dict[str, Any]):
             '数量': [stats['total_input_tokens'], stats['total_output_tokens']]
         }
         
+        # 获取当前选中的配色方案
+        selected_scheme = st.session_state.get('color_scheme', '经典红蓝')
+        colors = COLOR_SCHEMES[selected_scheme]['colors']
+        
+        # 计算总数和百分比
+        total = stats['total_input_tokens'] + stats['total_output_tokens']
+        input_percent = (stats['total_input_tokens'] / total * 100) if total > 0 else 0
+        output_percent = (stats['total_output_tokens'] / total * 100) if total > 0 else 0
+        
         fig_pie = px.pie(
             values=token_data['数量'],
             names=token_data['Token类型'],
             title="Token使用分布",
-            color_discrete_sequence=['#FF6B6B', '#4ECDC4']
+            color_discrete_sequence=colors
         )
-        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+        
+        # 自定义显示：同时显示绝对值和百分比
+        fig_pie.update_traces(
+            textposition='inside',
+            texttemplate='%{label}<br>%{value:,}<br>(%{percent})',
+            hovertemplate='<b>%{label}</b><br>数量: %{value:,}<br>占比: %{percent}<extra></extra>'
+        )
+        
         st.plotly_chart(fig_pie, use_container_width=True)
     
     with col2:
@@ -208,6 +249,81 @@ def render_detailed_charts(records: List[UsageRecord], stats: Dict[str, Any]):
                 labels={'total_tokens': 'Token总数', 'cost': '成本(¥)'}
             )
             st.plotly_chart(fig_scatter, use_container_width=True)
+    
+    # 配色方案选择器 - 放在图表下方
+    st.markdown("---")
+    st.markdown("**🎨 图表配色方案选择**")
+    
+    # 创建配色方案选择器
+    col_select, col_preview = st.columns([2, 2])
+    
+    with col_select:
+        scheme_options = list(COLOR_SCHEMES.keys())
+        current_scheme = st.session_state.get('color_scheme', '经典红蓝')
+        
+        selected = st.selectbox(
+            "选择配色方案",
+            options=scheme_options,
+            index=scheme_options.index(current_scheme),
+            format_func=lambda x: f"{x} - {COLOR_SCHEMES[x]['description']}",
+            key='color_scheme_selector'
+        )
+        
+        # 更新session state
+        if selected != current_scheme:
+            st.session_state['color_scheme'] = selected
+            st.rerun()
+    
+    with col_preview:
+        # 显示当前配色预览
+        st.markdown("**当前配色预览**")
+        preview_colors = COLOR_SCHEMES[st.session_state.get('color_scheme', '经典红蓝')]['colors']
+        preview_html = """
+        <div style='display: flex; gap: 10px; align-items: center; padding: 10px; background-color: #f8f9fa; border-radius: 8px;'>
+        """
+        for idx, color in enumerate(preview_colors):
+            preview_html += f"""
+            <div style='display: flex; flex-direction: column; align-items: center;'>
+                <div style='width: 60px; height: 60px; background-color: {color}; border-radius: 8px; border: 2px solid #dee2e6; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'></div>
+                <span style='margin-top: 5px; font-size: 11px; color: #6c757d;'>{['输入', '输出'][idx]}</span>
+            </div>
+            """
+        preview_html += "</div>"
+        st.markdown(preview_html, unsafe_allow_html=True)
+    
+    # 展示所有配色方案对比
+    with st.expander("🌈 查看所有配色方案对比", expanded=False):
+        st.markdown("**所有可用配色方案预览**")
+        
+        # 使用网格布局展示所有配色方案
+        cols_per_row = 3
+        scheme_list = list(COLOR_SCHEMES.items())
+        
+        for i in range(0, len(scheme_list), cols_per_row):
+            cols = st.columns(cols_per_row)
+            for j, col in enumerate(cols):
+                if i + j < len(scheme_list):
+                    scheme_name, scheme_data = scheme_list[i + j]
+                    with col:
+                        # 创建精美的配色卡片
+                        card_html = f"""
+                        <div style='padding: 15px; background-color: #ffffff; border-radius: 10px; border: 1px solid #e0e0e0; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);'>
+                            <h4 style='margin: 0 0 8px 0; font-size: 16px; color: #2c3e50;'>{scheme_name}</h4>
+                            <p style='margin: 0 0 10px 0; font-size: 12px; color: #7f8c8d;'>{scheme_data['description']}</p>
+                            <div style='display: flex; gap: 8px;'>
+                        """
+                        for idx, color in enumerate(scheme_data['colors']):
+                            card_html += f"""
+                            <div style='flex: 1; display: flex; flex-direction: column; align-items: center;'>
+                                <div style='width: 100%; height: 50px; background-color: {color}; border-radius: 6px; border: 1px solid #dee2e6;'></div>
+                                <span style='margin-top: 4px; font-size: 10px; color: #95a5a6;'>{color}</span>
+                            </div>
+                            """
+                        card_html += """
+                            </div>
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
 
 def render_provider_statistics(stats: Dict[str, Any]):
     """渲染供应商统计"""

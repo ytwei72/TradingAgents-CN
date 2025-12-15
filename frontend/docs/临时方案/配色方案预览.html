@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用量统计配色方案预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 50px;
+            font-size: 18px;
+        }
+        
+        .schemes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .scheme-card {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 30px;
+            border: 2px solid #334155;
+            transition: all 0.3s ease;
+        }
+        
+        .scheme-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            border-color: #667eea;
+        }
+        
+        .scheme-header {
+            margin-bottom: 20px;
+        }
+        
+        .scheme-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .scheme-description {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+        
+        .color-preview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .color-box {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .color-box:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-code {
+            margin-top: 15px;
+            padding: 12px;
+            background: #0f172a;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #94a3b8;
+            border: 1px solid #334155;
+        }
+        
+        .rating {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px dashed #334155;
+        }
+        
+        .stars {
+            color: #fbbf24;
+            font-size: 20px;
+            letter-spacing: 3px;
+        }
+        
+        .usage-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: 600;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid #334155;
+            color: #94a3b8;
+        }
+        
+        .info-box {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+            border: 2px solid #334155;
+        }
+        
+        .info-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #60a5fa;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .info-item {
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        
+        .info-item-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #e2e8f0;
+        }
+        
+        .info-item-content {
+            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 用量统计配色方案预览</h1>
+        <p class="subtitle">Frontend - 10种精心设计的配色方案</p>
+        
+        <div class="info-box">
+            <div class="info-title">📊 功能更新概览</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-item-title">📥 总输入</div>
+                    <div class="info-item-content">显示输入Token总数及占比</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-title">📤 总输出</div>
+                    <div class="info-item-content">显示输出Token总数及占比</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-title">🔢 请求数</div>
+                    <div class="info-item-content">显示API调用总次数</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-title">💰 总费用</div>
+                    <div class="info-item-content">显示总成本金额</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="schemes-grid">
+            <!-- 1. 经典红蓝 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">🔴 经典红蓝</div>
+                    <div class="scheme-description">经典对比色，清晰明了</div>
+                    <span class="usage-badge">通用推荐</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #FF6B6B;"></div>
+                    <div class="color-box" style="background: #4ECDC4;"></div>
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                    <div class="color-box" style="background: #EC4899;"></div>
+                </div>
+                <div class="color-code">#FF6B6B, #4ECDC4, #F59E0B, #EF4444, #8B5CF6, #EC4899</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 2. 渐变紫粉 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">💜 渐变紫粉</div>
+                    <div class="scheme-description">优雅浪漫，现代感强</div>
+                    <span class="usage-badge">创意展示</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #A78BFA;"></div>
+                    <div class="color-box" style="background: #EC4899;"></div>
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                    <div class="color-box" style="background: #10B981;"></div>
+                </div>
+                <div class="color-code">#A78BFA, #EC4899, #F59E0B, #EF4444, #3B82F6, #10B981</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 3. 深邃蓝绿 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">🔵 深邃蓝绿</div>
+                    <div class="scheme-description">专业稳重，商务风格</div>
+                    <span class="usage-badge">商务汇报</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                    <div class="color-box" style="background: #10B981;"></div>
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                    <div class="color-box" style="background: #EC4899;"></div>
+                </div>
+                <div class="color-code">#3B82F6, #10B981, #F59E0B, #EF4444, #8B5CF6, #EC4899</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 4. 活力橙黄 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">🧡 活力橙黄</div>
+                    <div class="scheme-description">活力四射，引人注目</div>
+                    <span class="usage-badge">营销展示</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                    <div class="color-box" style="background: #FF6B6B;"></div>
+                    <div class="color-box" style="background: #EC4899;"></div>
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                </div>
+                <div class="color-code">#F59E0B, #EF4444, #FF6B6B, #EC4899, #8B5CF6, #3B82F6</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 5. 清新绿松 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">💚 清新绿松</div>
+                    <div class="scheme-description">清新自然，舒适护眼</div>
+                    <span class="usage-badge">长时查看</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #34D399;"></div>
+                    <div class="color-box" style="background: #06B6D4;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                </div>
+                <div class="color-code">#34D399, #06B6D4, #3B82F6, #8B5CF6, #F59E0B, #EF4444</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 6. 典雅紫蓝 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">💜 典雅紫蓝</div>
+                    <div class="scheme-description">典雅高贵，科技感十足</div>
+                    <span class="usage-badge">科技产品</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                    <div class="color-box" style="background: #10B981;"></div>
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                    <div class="color-box" style="background: #EC4899;"></div>
+                </div>
+                <div class="color-code">#8B5CF6, #3B82F6, #10B981, #F59E0B, #EF4444, #EC4899</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 7. 温暖粉橙 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">🧡 温暖粉橙</div>
+                    <div class="scheme-description">温暖柔和，亲和力强</div>
+                    <span class="usage-badge">用户友好</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #FB923C;"></div>
+                    <div class="color-box" style="background: #F472B6;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                    <div class="color-box" style="background: #EC4899;"></div>
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                </div>
+                <div class="color-code">#FB923C, #F472B6, #EF4444, #EC4899, #8B5CF6, #3B82F6</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 8. 稳重灰蓝 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">🩶 稳重灰蓝</div>
+                    <div class="scheme-description">稳重大气，专业可靠</div>
+                    <span class="usage-badge">金融行业</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #64748B;"></div>
+                    <div class="color-box" style="background: #0EA5E9;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                    <div class="color-box" style="background: #10B981;"></div>
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-box" style="background: #EF4444;"></div>
+                </div>
+                <div class="color-code">#64748B, #0EA5E9, #3B82F6, #10B981, #F59E0B, #EF4444</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 9. 自然绿黄 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">💚 自然绿黄</div>
+                    <div class="scheme-description">自然清新，充满活力</div>
+                    <span class="usage-badge">环保主题</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #84CC16;"></div>
+                    <div class="color-box" style="background: #FACC15;"></div>
+                    <div class="color-box" style="background: #34D399;"></div>
+                    <div class="color-box" style="background: #10B981;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                </div>
+                <div class="color-code">#84CC16, #FACC15, #34D399, #10B981, #3B82F6, #8B5CF6</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <!-- 10. 科技青紫 -->
+            <div class="scheme-card">
+                <div class="scheme-header">
+                    <div class="scheme-name">💚 科技青紫</div>
+                    <div class="scheme-description">科技未来，富有创意</div>
+                    <span class="usage-badge">AI科技</span>
+                </div>
+                <div class="color-preview">
+                    <div class="color-box" style="background: #14B8A6;"></div>
+                    <div class="color-box" style="background: #A855F7;"></div>
+                    <div class="color-box" style="background: #3B82F6;"></div>
+                    <div class="color-box" style="background: #8B5CF6;"></div>
+                    <div class="color-box" style="background: #10B981;"></div>
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                </div>
+                <div class="color-code">#14B8A6, #A855F7, #3B82F6, #8B5CF6, #10B981, #F59E0B</div>
+                <div class="rating">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>TradingAgents Frontend</strong> - 用量统计配色方案 v1.0.0</p>
+            <p style="margin-top: 10px; font-size: 14px;">文件位置: frontend/src/views/ModelUsageStats.vue</p>
+            <p style="margin-top: 5px; font-size: 14px;">更新日期: 2025-12-15</p>
+        </div>
+    </div>
+</body>
+</html>
+

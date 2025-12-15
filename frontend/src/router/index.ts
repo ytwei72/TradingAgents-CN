@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import StockAnalyzeView from '../views/StockAnalyzeView.vue'
 import AnalysisResultsView from '../views/AnalysisResults.vue'
 import SystemConfigView from '../views/SystemConfig.vue'
+import ModelUsageStatsView from '../views/ModelUsageStats.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -18,6 +19,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/config',
     name: 'SystemConfig',
     component: SystemConfigView
+  },
+  {
+    path: '/model-usage-stats',
+    name: 'ModelUsageStats',
+    component: ModelUsageStatsView
   }
 ]
 

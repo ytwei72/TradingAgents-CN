@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>羊皮纸风格图表预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #f4e8d0;
+            margin-bottom: 20px;
+            font-size: 36px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #a0826d;
+            margin-bottom: 50px;
+            font-size: 18px;
+        }
+        
+        /* 羊皮纸图表容器 */
+        .parchment-chart-container {
+            background: linear-gradient(
+                to bottom,
+                #f4e8d0 0%,
+                #f9f0dd 20%,
+                #f4e8d0 40%,
+                #efe3c8 60%,
+                #f4e8d0 80%,
+                #f9f0dd 100%
+            );
+            padding: 2rem;
+            border-radius: 12px;
+            border: 2px solid #a0826d;
+            box-shadow: 
+                0 2px 8px rgba(101, 67, 33, 0.15),
+                inset 0 0 60px rgba(194, 154, 108, 0.1);
+            position: relative;
+            margin-bottom: 30px;
+        }
+        
+        /* 羊皮纸纹理效果 */
+        .parchment-chart-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(139, 101, 61, 0.03) 2px,
+                    rgba(139, 101, 61, 0.03) 4px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(139, 101, 61, 0.03) 2px,
+                    rgba(139, 101, 61, 0.03) 4px
+                );
+            pointer-events: none;
+            border-radius: 12px;
+        }
+        
+        .chart-title {
+            position: relative;
+            z-index: 1;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #3d2817;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid rgba(101, 67, 33, 0.2);
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+        }
+        
+        .chart-content {
+            position: relative;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.3);
+            padding: 2rem;
+            border-radius: 8px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3d2817;
+            font-size: 1.1rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .color-palette {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            border: 2px solid #334155;
+            margin-bottom: 40px;
+        }
+        
+        .color-palette h2 {
+            color: #f4e8d0;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .colors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .color-box {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .color-info {
+            flex: 1;
+        }
+        
+        .color-name {
+            color: #f4e8d0;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .color-code {
+            color: #a0826d;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .comparison-item {
+            text-align: center;
+        }
+        
+        .comparison-title {
+            color: #f4e8d0;
+            font-size: 20px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .dark-container {
+            background: #0f172a;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 2px solid #334155;
+        }
+        
+        .dark-title {
+            color: #9ca3af;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .dark-content {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            border-radius: 8px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9ca3af;
+        }
+        
+        .footer {
+            text-align: center;
+            color: #a0826d;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid #334155;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 羊皮纸风格图表预览</h1>
+        <p class="subtitle">Frontend - 用量统计页面新风格</p>
+        
+        <!-- 配色方案 -->
+        <div class="color-palette">
+            <h2>📊 羊皮纸配色方案</h2>
+            <div class="colors-grid">
+                <div class="color-item">
+                    <div class="color-box" style="background: #f4e8d0;"></div>
+                    <div class="color-info">
+                        <div class="color-name">主背景色</div>
+                        <div class="color-code">#f4e8d0</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-box" style="background: #f9f0dd;"></div>
+                    <div class="color-info">
+                        <div class="color-name">次背景色</div>
+                        <div class="color-code">#f9f0dd</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-box" style="background: #efe3c8;"></div>
+                    <div class="color-info">
+                        <div class="color-name">深背景色</div>
+                        <div class="color-code">#efe3c8</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-box" style="background: #a0826d;"></div>
+                    <div class="color-info">
+                        <div class="color-name">边框色</div>
+                        <div class="color-code">#a0826d</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-box" style="background: #8b6539;"></div>
+                    <div class="color-info">
+                        <div class="color-name">深边框色</div>
+                        <div class="color-code">#8b6539</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-box" style="background: #3d2817;"></div>
+                    <div class="color-info">
+                        <div class="color-name">标题文字</div>
+                        <div class="color-code">#3d2817</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 对比展示 -->
+        <div class="comparison">
+            <div class="comparison-item">
+                <div class="comparison-title">❌ 更新前（深色主题）</div>
+                <div class="dark-container">
+                    <div class="dark-title">厂商消耗分布 (Cost)</div>
+                    <div class="dark-content">
+                        深色背景<br>
+                        灰色文字<br>
+                        #0f172a
+                    </div>
+                </div>
+            </div>
+            
+            <div class="comparison-item">
+                <div class="comparison-title">✅ 更新后（羊皮纸风格）</div>
+                <div class="parchment-chart-container">
+                    <div class="chart-title">厂商消耗分布 (Cost)</div>
+                    <div class="chart-content">
+                        羊皮纸背景<br>
+                        渐变 + 纹理<br>
+                        深棕色文字
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 图表示例 -->
+        <h2 style="color: #f4e8d0; text-align: center; margin-bottom: 30px; font-size: 28px;">📊 图表示例</h2>
+        
+        <div class="grid">
+            <!-- 饼图1 -->
+            <div class="parchment-chart-container">
+                <div class="chart-title">厂商消耗分布 (Cost)</div>
+                <div class="chart-content">
+                    饼图区域<br>
+                    显示厂商消耗数据
+                </div>
+            </div>
+            
+            <!-- 饼图2 -->
+            <div class="parchment-chart-container">
+                <div class="chart-title">模型消耗分布 (Cost)</div>
+                <div class="chart-content">
+                    饼图区域<br>
+                    显示模型消耗数据
+                </div>
+            </div>
+            
+            <!-- 饼图3 -->
+            <div class="parchment-chart-container">
+                <div class="chart-title">输入/输出 Token 比例</div>
+                <div class="chart-content">
+                    饼图区域<br>
+                    显示Token比例
+                </div>
+            </div>
+        </div>
+        
+        <!-- 柱状图 -->
+        <div class="parchment-chart-container">
+            <div class="chart-title">每日模型使用趋势 (Tokens)</div>
+            <div class="chart-content" style="min-height: 400px;">
+                柱状图区域<br>
+                显示每日趋势数据<br>
+                <br>
+                羊皮纸风格背景<br>
+                + 渐变效果<br>
+                + 纹理效果<br>
+                + 深棕色标题<br>
+                + 浮雕文字效果
+            </div>
+        </div>
+        
+        <!-- 特性说明 -->
+        <div style="background: #1e293b; padding: 30px; border-radius: 12px; border: 2px solid #334155; margin-top: 40px;">
+            <h2 style="color: #f4e8d0; margin-bottom: 20px; font-size: 24px;">✨ 羊皮纸风格特性</h2>
+            <div style="color: #a0826d; line-height: 2; font-size: 16px;">
+                <p>✅ <strong>渐变背景：</strong> 多层次羊皮纸渐变色（#f4e8d0 → #f9f0dd → #efe3c8）</p>
+                <p>✅ <strong>纹理效果：</strong> 交叉网格纹理模拟纸张纤维</p>
+                <p>✅ <strong>边框阴影：</strong> 2px实线边框 + 内外阴影增强立体感</p>
+                <p>✅ <strong>浮雕文字：</strong> 标题使用text-shadow制造浮雕效果</p>
+                <p>✅ <strong>深色文字：</strong> 深棕色文字（#3d2817）确保良好对比度</p>
+                <p>✅ <strong>协调配色：</strong> 所有元素颜色统一为羊皮纸色系</p>
+                <p>✅ <strong>专业美观：</strong> 提升数据可视化的专业感和品质感</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>TradingAgents Frontend</strong> - 羊皮纸风格图表 v1.1.0</p>
+            <p style="margin-top: 10px; font-size: 14px;">文件位置: frontend/src/views/ModelUsageStats.vue</p>
+            <p style="margin-top: 5px; font-size: 14px;">参考样式: frontend/src/styles/markdown-render-paper.css</p>
+            <p style="margin-top: 5px; font-size: 14px;">更新日期: 2025-12-15</p>
+        </div>
+    </div>
+</body>
+</html>
+
