@@ -19,7 +19,7 @@ logger = get_logger('web')
 
 # 导入MongoDB报告管理器
 try:
-    from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
+    from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
     MONGODB_REPORT_AVAILABLE = True
 except ImportError:
     MONGODB_REPORT_AVAILABLE = False

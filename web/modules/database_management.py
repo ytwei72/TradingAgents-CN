@@ -20,7 +20,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.ui_utils import apply_hide_deploy_button_css
 
 try:
-    from tradingagents.config.database_manager import get_database_manager
+    from tradingagents.storage.manager import get_database_manager
     DB_MANAGER_AVAILABLE = True
 except ImportError as e:
     DB_MANAGER_AVAILABLE = False

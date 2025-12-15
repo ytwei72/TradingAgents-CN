@@ -77,7 +77,7 @@ def check_system_status():
     # 检查数据库管理器
     logger.info(f"\n🔧 检查数据库管理器...")
     try:
-        from tradingagents.config.database_manager import get_database_manager
+        from tradingagents.storage.manager import get_database_manager
         
         db_manager = get_database_manager()
         status = db_manager.get_status_report()

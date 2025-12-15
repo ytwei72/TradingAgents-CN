@@ -5,12 +5,12 @@ MongoDB报告管理器
 """
 
 import os
-import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('storage')
 
 try:
     from pymongo import MongoClient
@@ -25,8 +25,6 @@ class MongoDBReportManager:
     """MongoDB报告管理器"""
     
     def __init__(self):
-        self.client = None
-        self.db = None
         self.collection = None
         self.connected = False
         
@@ -34,54 +32,22 @@ class MongoDBReportManager:
             self._connect()
     
     def _connect(self):
-        """连接到MongoDB"""
+        """连接到MongoDB（只使用统一的连接管理）"""
         try:
-            # 加载环境变量
-            from dotenv import load_dotenv
-            load_dotenv()
-
-            # 从环境变量获取MongoDB配置
-            mongodb_host = os.getenv("MONGODB_HOST", "localhost")
-            mongodb_port = int(os.getenv("MONGODB_PORT", "27017"))
-            mongodb_username = os.getenv("MONGODB_USERNAME", "")
-            mongodb_password = os.getenv("MONGODB_PASSWORD", "")
-            mongodb_database = os.getenv("MONGODB_DATABASE", "tradingagents")
-            mongodb_auth_source = os.getenv("MONGODB_AUTH_SOURCE", "admin")
-
-            logger.info(f"🔧 MongoDB配置: host={mongodb_host}, port={mongodb_port}, db={mongodb_database}")
-            logger.info(f"🔧 认证信息: username={mongodb_username}, auth_source={mongodb_auth_source}")
-
-            # 构建连接参数
-            connect_kwargs = {
-                "host": mongodb_host,
-                "port": mongodb_port,
-                "serverSelectionTimeoutMS": 5000,
-                "connectTimeoutMS": 5000
-            }
-
-            # 如果有用户名和密码，添加认证信息
-            if mongodb_username and mongodb_password:
-                connect_kwargs.update({
-                    "username": mongodb_username,
-                    "password": mongodb_password,
-                    "authSource": mongodb_auth_source
-                })
-
-            # 连接MongoDB
-            self.client = MongoClient(**connect_kwargs)
+            # 只使用统一的连接管理
+            from tradingagents.storage.manager import get_mongo_collection
             
-            # 测试连接
-            self.client.admin.command('ping')
-            
-            # 选择数据库和集合
-            self.db = self.client[mongodb_database]
-            self.collection = self.db["analysis_reports"]
+            self.collection = get_mongo_collection("analysis_reports")
+            if not self.collection:
+                logger.error("❌ 统一连接管理不可用，无法连接MongoDB")
+                self.connected = False
+                return
             
             # 创建索引
             self._create_indexes()
             
             self.connected = True
-            logger.info(f"✅ MongoDB连接成功: {mongodb_database}.analysis_reports")
+            logger.info(f"✅ MongoDB连接成功（使用统一连接管理）: analysis_reports")
             
         except Exception as e:
             logger.error(f"❌ MongoDB连接失败: {e}")

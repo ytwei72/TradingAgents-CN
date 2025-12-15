@@ -14,7 +14,7 @@ from app.schemas.report import (
 )
 from app.services.report_service import report_service, get_reports_from_fs, get_reports_from_db
 from tradingagents.utils.logging_manager import get_logger
-from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
+from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
 from typing import Optional, List
 
 router = APIRouter()

@@ -17,7 +17,7 @@ import logging
 
 # MongoDB相关导入
 try:
-    from tradingagents.utils.mongodb_report_manager import MongoDBReportManager
+    from tradingagents.storage.mongodb.report_manager import MongoDBReportManager
     MONGODB_AVAILABLE = True
     print("✅ MongoDB模块导入成功")
 except ImportError as e:

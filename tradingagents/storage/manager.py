@@ -43,7 +43,7 @@ class DatabaseManager:
             self.logger.info("python-dotenv未安装，直接读取环境变量")
 
         # 使用强健的布尔值解析（兼容Python 3.13+）
-        from .env_utils import parse_bool_env
+        from tradingagents.config.env_utils import parse_bool_env
         self.mongodb_enabled = parse_bool_env("MONGODB_ENABLED", False)
         self.redis_enabled = parse_bool_env("REDIS_ENABLED", False)
 
@@ -359,3 +359,43 @@ def get_mongodb_client():
 def get_redis_client():
     """获取Redis客户端"""
     return get_database_manager().get_redis_client()
+
+def get_mongodb_db(database_name: Optional[str] = None):
+    """
+    获取MongoDB数据库对象
+    
+    Args:
+        database_name: 数据库名称，如果为None则使用配置中的数据库名
+    
+    Returns:
+        MongoDB数据库对象，如果不可用则返回None
+    """
+    db_manager = get_database_manager()
+    if not db_manager.is_mongodb_available():
+        return None
+    
+    client = db_manager.get_mongodb_client()
+    if not client:
+        return None
+    
+    if database_name is None:
+        database_name = db_manager.mongodb_config["database"]
+    
+    return client[database_name]
+
+def get_mongo_collection(collection_name: str, database_name: Optional[str] = None):
+    """
+    获取MongoDB集合对象
+    
+    Args:
+        collection_name: 集合名称
+        database_name: 数据库名称，如果为None则使用配置中的数据库名
+    
+    Returns:
+        MongoDB集合对象，如果不可用则返回None
+    """
+    db = get_mongodb_db(database_name)
+    if not db:
+        return None
+    
+    return db[collection_name]

@@ -24,8 +24,6 @@ class MongoDBStepsStatusManager:
     """MongoDB步骤状态管理器"""
     
     def __init__(self):
-        self.client = None
-        self.db = None
         self.collection = None
         self.connected = False
         
@@ -33,59 +31,25 @@ class MongoDBStepsStatusManager:
             self._connect()
     
     def _connect(self):
-        """连接到MongoDB"""
+        """连接到MongoDB（只使用统一的连接管理）"""
         try:
-            # 加载环境变量
-            from dotenv import load_dotenv
-            load_dotenv()
-
-            # 从环境变量获取MongoDB配置
-            mongodb_host = os.getenv("MONGODB_HOST", "localhost")
-            mongodb_port = int(os.getenv("MONGODB_PORT", "27017"))
-            mongodb_username = os.getenv("MONGODB_USERNAME", "")
-            mongodb_password = os.getenv("MONGODB_PASSWORD", "")
-            mongodb_database = os.getenv("MONGODB_DATABASE", "tradingagents")
-            mongodb_auth_source = os.getenv("MONGODB_AUTH_SOURCE", "admin")
-
-            logger.info(f"🔧 [MongoDB步骤状态] 配置: host={mongodb_host}, port={mongodb_port}, db={mongodb_database}")
-
-            # 构建连接参数
-            connect_kwargs = {
-                "host": mongodb_host,
-                "port": mongodb_port,
-                "serverSelectionTimeoutMS": 5000,
-                "connectTimeoutMS": 5000
-            }
-
-            # 如果有用户名和密码，添加认证信息
-            if mongodb_username and mongodb_password:
-                connect_kwargs.update({
-                    "username": mongodb_username,
-                    "password": mongodb_password,
-                    "authSource": mongodb_auth_source
-                })
-
-            # 连接MongoDB
-            self.client = MongoClient(**connect_kwargs)
+            # 只使用统一的连接管理
+            from tradingagents.storage.manager import get_mongo_collection
             
-            # 测试连接
-            self.client.admin.command('ping')
-            
-            # 选择数据库和集合
-            self.db = self.client[mongodb_database]
-            self.collection = self.db["analysis_steps_status"]
+            self.collection = get_mongo_collection("analysis_steps_status")
+            if not self.collection:
+                logger.warning("⚠️ [MongoDB步骤状态] 统一连接管理不可用，无法连接MongoDB")
+                self.connected = False
+                return
             
             # 创建索引
             self._create_indexes()
             
             self.connected = True
-            logger.info(f"✅ [MongoDB步骤状态] 连接成功: {mongodb_database}.analysis_steps_status")
+            logger.info(f"✅ [MongoDB步骤状态] 连接成功（使用统一连接管理）: analysis_steps_status")
             
-        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-            logger.warning(f"⚠️ [MongoDB步骤状态] 连接失败: {e}")
-            self.connected = False
         except Exception as e:
-            logger.warning(f"⚠️ [MongoDB步骤状态] 初始化失败: {e}")
+            logger.warning(f"⚠️ [MongoDB步骤状态] 连接失败: {e}")
             self.connected = False
     
     def _create_indexes(self):

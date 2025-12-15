@@ -20,8 +20,8 @@ from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('tools')
 
 # 导入配置管理器
-from tradingagents.config.config_manager import UsageRecord
-from tradingagents.config.model_usage_manager import ModelUsageManager
+from tradingagents.storage.mongodb.model_usage_manager import UsageRecord
+from tradingagents.storage.mongodb.model_usage_manager import ModelUsageManager
 
 
 class UsageJsonMigrator:

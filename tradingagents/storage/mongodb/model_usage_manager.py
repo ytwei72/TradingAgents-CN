@@ -7,12 +7,24 @@
 import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
-from dataclasses import asdict
-from .config_manager import UsageRecord
+from dataclasses import dataclass, asdict
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
+
+# 定义 UsageRecord 类
+@dataclass
+class UsageRecord:
+    """使用记录"""
+    timestamp: str  # 时间戳
+    provider: str  # 供应商
+    model_name: str  # 模型名称
+    input_tokens: int  # 输入token数
+    output_tokens: int  # 输出token数
+    cost: float  # 成本
+    session_id: str  # 会话ID
+    analysis_type: str  # 分析类型
 
 try:
     from pymongo import MongoClient
@@ -28,37 +40,15 @@ except ImportError:
 class ModelUsageManager:
     """模型使用记录 MongoDB 管理器"""
     
-    def __init__(self, connection_string: str = None, database_name: str = "tradingagents"):
+    def __init__(self):
         """
-        初始化 MongoDB 管理器
-        
-        Args:
-            connection_string: MongoDB 连接字符串，如果为 None 则从环境变量读取
-            database_name: 数据库名称，默认为 "tradingagents"
+        初始化 MongoDB 管理器（使用统一的连接管理）
         """
         if not MONGODB_AVAILABLE:
             raise ImportError("pymongo is not installed. Please install it with: pip install pymongo")
         
-        # 获取连接字符串
-        self.connection_string = connection_string or os.getenv("MONGODB_CONNECTION_STRING")
-        if not self.connection_string:
-            # 尝试使用环境变量构建连接字符串
-            mongodb_host = os.getenv("MONGODB_HOST", "localhost")
-            mongodb_port = int(os.getenv("MONGODB_PORT", "27017"))
-            mongodb_username = os.getenv("MONGODB_USERNAME", "")
-            mongodb_password = os.getenv("MONGODB_PASSWORD", "")
-            mongodb_auth_source = os.getenv("MONGODB_AUTH_SOURCE", "admin")
-            
-            if mongodb_username and mongodb_password:
-                self.connection_string = f"mongodb://{mongodb_username}:{mongodb_password}@{mongodb_host}:{mongodb_port}/?authSource={mongodb_auth_source}"
-            else:
-                self.connection_string = f"mongodb://{mongodb_host}:{mongodb_port}/"
-        
-        self.database_name = database_name
         self.collection_name = "model_usages"
         
-        self.client = None
-        self.db = None
         self.collection = None
         self._connected = False
         
@@ -66,57 +56,26 @@ class ModelUsageManager:
         self._connect()
     
     def _connect(self):
-        """连接到 MongoDB"""
+        """连接到 MongoDB（只使用统一的 storage 连接管理）"""
         try:
-            # 如果连接字符串是标准格式，直接使用
-            if self.connection_string.startswith("mongodb://") or self.connection_string.startswith("mongodb+srv://"):
-                self.client = MongoClient(
-                    self.connection_string,
-                    serverSelectionTimeoutMS=5000,
-                    connectTimeoutMS=5000
-                )
-            else:
-                # 否则使用环境变量构建连接
-                mongodb_host = os.getenv("MONGODB_HOST", "localhost")
-                mongodb_port = int(os.getenv("MONGODB_PORT", "27017"))
-                mongodb_username = os.getenv("MONGODB_USERNAME", "")
-                mongodb_password = os.getenv("MONGODB_PASSWORD", "")
-                mongodb_auth_source = os.getenv("MONGODB_AUTH_SOURCE", "admin")
-                
-                connect_kwargs = {
-                    "host": mongodb_host,
-                    "port": mongodb_port,
-                    "serverSelectionTimeoutMS": 5000,
-                    "connectTimeoutMS": 5000
-                }
-                
-                if mongodb_username and mongodb_password:
-                    connect_kwargs.update({
-                        "username": mongodb_username,
-                        "password": mongodb_password,
-                        "authSource": mongodb_auth_source
-                    })
-                
-                self.client = MongoClient(**connect_kwargs)
+            # 只使用统一的 storage 连接管理
+            from tradingagents.storage.manager import get_mongo_collection
             
-            # 测试连接
-            self.client.admin.command('ping')
-            
-            self.db = self.client[self.database_name]
-            self.collection = self.db[self.collection_name]
+            self.collection = get_mongo_collection(self.collection_name)
+            if not self.collection:
+                logger.error("❌ 统一连接管理不可用，无法连接MongoDB")
+                self._connected = False
+                return
             
             # 创建索引
             self._create_indexes()
             
             self._connected = True
-            logger.info(f"✅ MongoDB连接成功: {self.database_name}.{self.collection_name}")
+            logger.info(f"✅ MongoDB连接成功（使用统一连接管理）: {self.collection_name}")
             
-        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        except Exception as e:
             logger.error(f"❌ MongoDB连接失败: {e}")
             logger.info(f"将使用本地JSON文件存储")
-            self._connected = False
-        except Exception as e:
-            logger.error(f"❌ MongoDB初始化失败: {e}")
             self._connected = False
     
     def _create_indexes(self):
@@ -202,6 +161,32 @@ class ModelUsageManager:
         except Exception as e:
             logger.error(f"❌ 保存记录到MongoDB失败: {e}")
             return None
+    
+    def save_usage_record(self, record: UsageRecord) -> bool:
+        """
+        保存单个使用记录到MongoDB（兼容 MongoDBStorage 接口）
+        
+        Args:
+            record: UsageRecord 对象
+            
+        Returns:
+            是否保存成功
+        """
+        record_id = self.insert_usage_record(record)
+        return record_id is not None
+    
+    def load_usage_records(self, limit: int = 10000, days: int = None) -> List[UsageRecord]:
+        """
+        从MongoDB加载使用记录（兼容 MongoDBStorage 接口）
+        
+        Args:
+            limit: 返回记录数限制
+            days: 最近N天的记录
+            
+        Returns:
+            UsageRecord 对象列表
+        """
+        return self.query_usage_records(limit=limit, days=days)
     
     def insert_many_usage_records(self, records: List[UsageRecord]) -> int:
         """
@@ -596,9 +581,33 @@ class ModelUsageManager:
             logger.error(f"❌ 统计记录数量失败: {e}")
             return 0
     
+    def cleanup_old_records(self, days: int = 90) -> int:
+        """
+        清理旧记录（兼容 MongoDBStorage 接口）
+        
+        Args:
+            days: 删除N天前的记录
+            
+        Returns:
+            删除的记录数
+        """
+        return self._delete_old_records(days)
+    
     def delete_old_records(self, days: int = 90) -> int:
         """
         删除旧记录
+        
+        Args:
+            days: 删除N天前的记录
+            
+        Returns:
+            删除的记录数
+        """
+        return self._delete_old_records(days)
+    
+    def _delete_old_records(self, days: int = 90) -> int:
+        """
+        删除旧记录（内部实现）
         
         Args:
             days: 删除N天前的记录
@@ -627,9 +636,7 @@ class ModelUsageManager:
             return 0
     
     def close(self):
-        """关闭 MongoDB 连接"""
-        if self.client:
-            self.client.close()
-            self._connected = False
-            logger.info(f"✅ MongoDB连接已关闭")
+        """关闭 MongoDB 连接（连接由统一管理器管理，此方法仅标记状态）"""
+        self._connected = False
+        logger.info(f"✅ MongoDB连接状态已更新")
 

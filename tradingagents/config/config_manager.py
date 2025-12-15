@@ -21,12 +21,10 @@ from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
 
 try:
-    from .mongodb_storage import MongoDBStorage
-    from .model_usage_manager import ModelUsageManager
+    from tradingagents.storage.mongodb.model_usage_manager import ModelUsageManager
     MONGODB_AVAILABLE = True
 except ImportError:
     MONGODB_AVAILABLE = False
-    MongoDBStorage = None
     ModelUsageManager = None
 
 
@@ -52,17 +50,8 @@ class PricingConfig:
     currency: str = "CNY"  # 货币单位
 
 
-@dataclass
-class UsageRecord:
-    """使用记录"""
-    timestamp: str  # 时间戳
-    provider: str  # 供应商
-    model_name: str  # 模型名称
-    input_tokens: int  # 输入token数
-    output_tokens: int  # 输出token数
-    cost: float  # 成本
-    session_id: str  # 会话ID
-    analysis_type: str  # 分析类型
+# UsageRecord 已移至 tradingagents.storage.mongodb.model_usage_manager
+from tradingagents.storage.mongodb.model_usage_manager import UsageRecord
 
 
 class ConfigManager:
@@ -81,9 +70,7 @@ class ConfigManager:
         self._load_env_file()
 
         # 初始化MongoDB存储（如果可用）
-        self.mongodb_storage = None
         self.model_usage_manager = None
-        self._init_mongodb_storage()
         self._init_model_usage_manager()
 
         self._init_default_configs()
@@ -151,48 +138,13 @@ class ConfigManager:
         
         return True
     
-    def _init_mongodb_storage(self):
-        """初始化MongoDB存储（旧版，用于兼容）"""
-        if not MONGODB_AVAILABLE:
-            return
-        
-        # 检查是否启用MongoDB存储
-        use_mongodb = os.getenv("USE_MONGODB_STORAGE", "false").lower() == "true"
-        if not use_mongodb:
-            return
-        
-        try:
-            connection_string = os.getenv("MONGODB_CONNECTION_STRING")
-            database_name = os.getenv("MONGODB_DATABASE_NAME", "tradingagents")
-            
-            self.mongodb_storage = MongoDBStorage(
-                connection_string=connection_string,
-                database_name=database_name
-            )
-            
-            if self.mongodb_storage.is_connected():
-                logger.info("✅ MongoDB存储已启用")
-            else:
-                self.mongodb_storage = None
-                logger.warning("⚠️ MongoDB连接失败，将使用JSON文件存储")
-
-        except Exception as e:
-            logger.error(f"❌ MongoDB初始化失败: {e}", exc_info=True)
-            self.mongodb_storage = None
-    
     def _init_model_usage_manager(self):
         """初始化模型使用记录管理器（数据库优先）"""
         if not MONGODB_AVAILABLE or ModelUsageManager is None:
             return
         
         try:
-            connection_string = os.getenv("MONGODB_CONNECTION_STRING")
-            database_name = os.getenv("MONGODB_DATABASE_NAME", "tradingagents")
-            
-            self.model_usage_manager = ModelUsageManager(
-                connection_string=connection_string,
-                database_name=database_name
-            )
+            self.model_usage_manager = ModelUsageManager()
             
             if self.model_usage_manager.is_connected():
                 logger.info("✅ 模型使用记录管理器已启用（数据库优先）")
@@ -551,13 +503,6 @@ class ConfigManager:
             else:
                 logger.warning(f"⚠️ 数据库保存失败，回退到JSON文件存储")
         
-        # 回退到旧的 MongoDB 存储（兼容性）
-        if self.mongodb_storage and self.mongodb_storage.is_connected():
-            success = self.mongodb_storage.save_usage_record(record)
-            if success:
-                return record
-            else:
-                logger.warning(f"⚠️ 旧版MongoDB保存失败，回退到JSON文件存储")
         
         # 回退到JSON文件存储
         records = self.load_usage_records()
@@ -704,21 +649,6 @@ class ConfigManager:
                     return stats
             except Exception as e:
                 logger.warning(f"⚠️ 数据库统计获取失败，回退到JSON文件: {e}")
-        
-        # 回退到旧的 MongoDB 存储（兼容性）
-        if self.mongodb_storage and self.mongodb_storage.is_connected():
-            try:
-                # 从MongoDB获取基础统计
-                stats = self.mongodb_storage.get_usage_statistics(days)
-                # 获取供应商统计
-                provider_stats = self.mongodb_storage.get_provider_statistics(days)
-                
-                if stats:
-                    stats["provider_stats"] = provider_stats
-                    stats["records_count"] = stats.get("total_requests", 0)
-                    return stats
-            except Exception as e:
-                logger.warning(f"⚠️ 旧版MongoDB统计获取失败，回退到JSON文件: {e}")
         
         # 回退到JSON文件统计
         records = self.load_usage_records()

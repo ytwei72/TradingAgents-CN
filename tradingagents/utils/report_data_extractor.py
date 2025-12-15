@@ -495,55 +495,11 @@ class ReportDataExtractor:
         """
         
         try:
-            # 检查pymongo是否可用
-            try:
-                from pymongo import MongoClient
-                from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
-                from datetime import datetime
-            except ImportError:
-                logger.error("❌ [ReportDataExtractor] pymongo未安装，无法连接MongoDB")
-                return []
+            # 使用统一的 MongoDB 报告管理器
+            from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
             
-            # 连接MongoDB
-            mongodb_config = ReportDataExtractor._get_mongodb_config()
-            if not mongodb_config:
-                logger.warning("⚠️ [ReportDataExtractor] MongoDB配置无效")
-                return []
-            
-            try:
-                # 构建连接参数
-                connect_kwargs = {
-                    "host": mongodb_config["host"],
-                    "port": mongodb_config["port"],
-                    "serverSelectionTimeoutMS": 5000,
-                    "connectTimeoutMS": 5000
-                }
-                
-                # 如果有用户名和密码，添加认证信息
-                if mongodb_config.get("username") and mongodb_config.get("password"):
-                    connect_kwargs.update({
-                        "username": mongodb_config["username"],
-                        "password": mongodb_config["password"],
-                        "authSource": mongodb_config.get("auth_source", "admin")
-                    })
-                
-                # 连接MongoDB
-                client = MongoClient(**connect_kwargs)
-                
-                # 测试连接
-                client.admin.command('ping')
-                
-                # 选择数据库和集合
-                db = client[mongodb_config["database"]]
-                collection = db["analysis_reports"]
-                
-                logger.info(f"✅ [ReportDataExtractor] MongoDB连接成功")
-                
-            except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-                logger.error(f"❌ [ReportDataExtractor] MongoDB连接失败: {e}")
-                return []
-            except Exception as e:
-                logger.error(f"❌ [ReportDataExtractor] MongoDB初始化失败: {e}")
+            if not mongodb_report_manager.connected or not mongodb_report_manager.collection:
+                logger.warning("⚠️ [ReportDataExtractor] MongoDB未连接")
                 return []
             
             # 构建查询条件
@@ -554,7 +510,7 @@ class ReportDataExtractor:
                 query["stock_symbol"] = stock_symbol
                 logger.debug(f"🔍 [ReportDataExtractor] 筛选股票代码: {stock_symbol}")
             
-            # 时间范围筛选
+            # 时间范围筛选（使用 timestamp 字段）
             time_query = {}
             if start_time is not None:
                 start_dt = ReportDataExtractor._parse_time(start_time)
@@ -573,9 +529,9 @@ class ReportDataExtractor:
             
             logger.info(f"🔍 [ReportDataExtractor] 查询条件: {query}")
             
-            # 执行查询
+            # 执行查询（获取原始 MongoDB 文档）
             try:
-                cursor = collection.find(query).sort("timestamp", -1)
+                cursor = mongodb_report_manager.collection.find(query).sort("timestamp", -1)
                 all_results = list(cursor)
                 
                 logger.info(f"📊 [ReportDataExtractor] 查询到 {len(all_results)} 条记录")
@@ -588,53 +544,22 @@ class ReportDataExtractor:
                             filtered_results.append(record)
                     
                     logger.info(f"✅ [ReportDataExtractor] 有效报告数量: {len(filtered_results)}/{len(all_results)}")
-                    
-                    # 关闭连接
-                    client.close()
                     return filtered_results
                 else:
-                    # 关闭连接
-                    client.close()
                     return all_results
                     
             except Exception as e:
                 logger.error(f"❌ [ReportDataExtractor] 查询失败: {e}")
-                client.close()
                 return []
                 
+        except ImportError:
+            logger.error("❌ [ReportDataExtractor] MongoDB报告管理器不可用")
+            return []
         except Exception as e:
             logger.error(f"❌ [ReportDataExtractor] 读取MongoDB记录失败: {e}")
             import traceback
             logger.error(f"❌ [ReportDataExtractor] 详细错误: {traceback.format_exc()}")
             return []
-    
-    @staticmethod
-    def _get_mongodb_config() -> Optional[Dict[str, Any]]:
-        """
-        获取MongoDB配置
-        
-        Returns:
-            MongoDB配置字典，如果配置无效则返回None
-        """
-        try:
-            mongodb_host = os.getenv("MONGODB_HOST", "localhost")
-            mongodb_port = int(os.getenv("MONGODB_PORT", "27017"))
-            mongodb_username = os.getenv("MONGODB_USERNAME", "")
-            mongodb_password = os.getenv("MONGODB_PASSWORD", "")
-            mongodb_database = os.getenv("MONGODB_DATABASE", "tradingagents")
-            mongodb_auth_source = os.getenv("MONGODB_AUTH_SOURCE", "admin")
-            
-            return {
-                "host": mongodb_host,
-                "port": mongodb_port,
-                "username": mongodb_username,
-                "password": mongodb_password,
-                "database": mongodb_database,
-                "auth_source": mongodb_auth_source
-            }
-        except Exception as e:
-            logger.error(f"❌ [ReportDataExtractor] 获取MongoDB配置失败: {e}")
-            return None
     
     @staticmethod
     def _parse_time(time_input: Any) -> Optional[Any]:

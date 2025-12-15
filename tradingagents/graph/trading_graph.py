@@ -299,7 +299,7 @@ class TradingAgentsGraph:
         self.mock_sleep_max = float(os.getenv('MOCK_SLEEP_MAX', '10'))  # 默认10秒
         
         # MongoDB步骤状态管理器（用于存储和读取步骤状态）
-        from tradingagents.utils.mongodb_steps_status_manager import mongodb_steps_status_manager
+        from tradingagents.storage.mongodb.steps_manager import mongodb_steps_status_manager
         self.steps_status_manager = mongodb_steps_status_manager
 
         # Set up the graph

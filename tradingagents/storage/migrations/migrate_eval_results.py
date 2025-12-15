@@ -53,57 +53,22 @@ class EvalResultsMigrator:
         self._connect()
     
     def _connect(self):
-        """连接到 MongoDB"""
+        """连接到 MongoDB（只使用统一的连接管理）"""
         try:
-            # 加载环境变量
-            from dotenv import load_dotenv
-            load_dotenv()
+            # 只使用统一的连接管理
+            from tradingagents.storage.manager import get_mongo_collection
             
-            # 从环境变量获取 MongoDB 配置
-            mongodb_host = os.getenv("MONGODB_HOST", "localhost")
-            mongodb_port = int(os.getenv("MONGODB_PORT", "27017"))
-            mongodb_username = os.getenv("MONGODB_USERNAME", "")
-            mongodb_password = os.getenv("MONGODB_PASSWORD", "")
-            mongodb_database = os.getenv("MONGODB_DATABASE", "tradingagents")
-            mongodb_auth_source = os.getenv("MONGODB_AUTH_SOURCE", "admin")
-            
-            logger.info(f"🔧 MongoDB配置: host={mongodb_host}, port={mongodb_port}, db={mongodb_database}")
-            
-            # 构建连接参数
-            connect_kwargs = {
-                "host": mongodb_host,
-                "port": mongodb_port,
-                "serverSelectionTimeoutMS": 10000,
-                "connectTimeoutMS": 10000
-            }
-            
-            # 如果有用户名和密码，添加认证信息
-            if mongodb_username and mongodb_password:
-                connect_kwargs.update({
-                    "username": mongodb_username,
-                    "password": mongodb_password,
-                    "authSource": mongodb_auth_source
-                })
-            
-            # 连接 MongoDB
-            self.client = MongoClient(**connect_kwargs)
-            
-            # 测试连接
-            self.client.admin.command('ping')
-            
-            # 选择数据库和集合
-            self.db = self.client[mongodb_database]
-            self.collection = self.db["analysis_steps_status"]
+            self.collection = get_mongo_collection("analysis_steps_status")
+            if not self.collection:
+                logger.error("❌ 统一连接管理不可用，无法连接MongoDB")
+                self.connected = False
+                raise ConnectionError("统一连接管理不可用")
             
             self.connected = True
-            logger.info(f"✅ MongoDB连接成功: {mongodb_database}.analysis_steps_status")
+            logger.info(f"✅ MongoDB连接成功（使用统一连接管理）: analysis_steps_status")
             
-        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-            logger.error(f"❌ MongoDB连接失败: {e}")
-            self.connected = False
-            raise
         except Exception as e:
-            logger.error(f"❌ MongoDB初始化失败: {e}")
+            logger.error(f"❌ MongoDB连接失败: {e}")
             self.connected = False
             raise
     

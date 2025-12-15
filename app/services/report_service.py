@@ -11,7 +11,7 @@ import time
 
 from app.schemas.report import AnalysisReport, REPORT_DISPLAY_NAMES
 from tradingagents.tasks import get_task_manager
-from tradingagents.utils.mongodb_report_manager import mongodb_report_manager
+from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
 
 logger = logging.getLogger(__name__)
 

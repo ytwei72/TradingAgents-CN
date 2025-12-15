@@ -15,7 +15,7 @@ from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
 
 try:
-    from tradingagents.config.database_manager import get_database_manager
+    from tradingagents.storage.manager import get_database_manager
     DATABASE_MANAGER_AVAILABLE = True
 except ImportError:
     DATABASE_MANAGER_AVAILABLE = False

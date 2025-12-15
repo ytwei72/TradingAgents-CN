@@ -166,7 +166,7 @@ def initialize_system():
     logger.info(f"\n🧪 测试系统初始化...")
     try:
         # 测试数据库管理器
-        from tradingagents.config.database_manager import get_database_manager
+        from tradingagents.storage.manager import get_database_manager
         
         db_manager = get_database_manager()
         status = db_manager.get_status_report()

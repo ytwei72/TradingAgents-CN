@@ -21,7 +21,7 @@ def init_mongodb():
     logger.info(f"📊 初始化MongoDB数据库...")
     
     try:
-        from tradingagents.config.database_manager import get_database_manager
+        from tradingagents.storage.manager import get_database_manager
 
         db_manager = get_database_manager()
 
@@ -138,7 +138,7 @@ def init_redis():
     logger.info(f"\n📦 初始化Redis缓存...")
     
     try:
-        from tradingagents.config.database_manager import get_database_manager
+        from tradingagents.storage.manager import get_database_manager
 
         db_manager = get_database_manager()
 
@@ -216,7 +216,7 @@ def test_database_connection():
     logger.info(f"\n🔗 测试数据库连接...")
     
     try:
-        from tradingagents.dataflows.database_manager import get_database_manager
+        from tradingagents.storage.manager import get_database_manager
 
         
         db_manager = get_database_manager()
