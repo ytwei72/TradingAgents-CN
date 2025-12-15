@@ -7,6 +7,7 @@ from .connection import MongoDBConnection, get_mongodb_client
 from .report_manager import MongoDBReportManager, mongodb_report_manager
 from .steps_manager import MongoDBStepsStatusManager, mongodb_steps_status_manager
 from .model_usage_manager import ModelUsageManager, UsageRecord
+from .stock_dict_manager import StockDictManager, stock_dict_manager
 
 __all__ = [
     'MongoDBConnection',
@@ -17,5 +18,7 @@ __all__ = [
     'mongodb_steps_status_manager',
     'ModelUsageManager',
     'UsageRecord',
+    'StockDictManager',
+    'stock_dict_manager',
 ]
 
