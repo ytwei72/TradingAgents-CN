@@ -25,11 +25,7 @@ class RedisPubSubEngine(MessageEngine):
         """初始化Redis引擎
         
         Args:
-            config: 配置字典，包含：
-                - host: Redis服务器地址（默认'localhost'）
-                - port: 端口（默认6379）
-                - password: 密码（可选）
-                - db: 数据库编号（默认0）
+            config: 配置字典（已弃用，现在使用统一的连接管理）
         """
         if not REDIS_AVAILABLE:
             raise ImportError("redis 未安装，请运行: pip install redis")
@@ -44,20 +40,27 @@ class RedisPubSubEngine(MessageEngine):
         self._lock = threading.Lock()
     
     def connect(self) -> bool:
-        """连接Redis服务器"""
+        """连接Redis服务器（使用统一连接管理）"""
         try:
-            self.client = redis.Redis(
-                host=self.config.get('host', 'localhost'),
-                port=self.config.get('port', 6379),
-                password=self.config.get('password'),
-                db=self.config.get('db', 0),
-                decode_responses=True
-            )
+            from tradingagents.storage.redis.connection import get_redis_client, REDIS_AVAILABLE
+            
+            if not REDIS_AVAILABLE:
+                logger.error("Redis不可用，请检查Redis服务是否启动")
+                self._connected = False
+                return False
+            
+            self.client = get_redis_client()
+            if not self.client:
+                logger.error("无法获取Redis客户端，请检查Redis连接配置")
+                self._connected = False
+                return False
+            
+            # 测试连接
             self.client.ping()
             self.pubsub = self.client.pubsub()
             self.running = True
             self._connected = True
-            logger.info(f"Redis连接成功: {self.config.get('host', 'localhost')}:{self.config.get('port', 6379)}")
+            logger.info("Redis连接成功（使用统一连接管理）")
             return True
         except Exception as e:
             logger.error(f"Redis连接失败: {e}")
@@ -65,7 +68,7 @@ class RedisPubSubEngine(MessageEngine):
             return False
     
     def disconnect(self):
-        """断开连接"""
+        """断开连接（使用统一连接管理，只关闭PubSub，不关闭共享连接）"""
         self.running = False
         if self.subscribe_thread and self.subscribe_thread.is_alive():
             self.subscribe_thread.join(timeout=2.0)
@@ -76,11 +79,8 @@ class RedisPubSubEngine(MessageEngine):
             except Exception as e:
                 logger.error(f"关闭Redis PubSub失败: {e}")
         
-        if self.client:
-            try:
-                self.client.close()
-            except Exception as e:
-                logger.error(f"关闭Redis连接失败: {e}")
+        # 注意：使用统一连接管理时，不应该关闭共享的client连接
+        # 只关闭pubsub即可，client由统一管理器管理
         
         self._connected = False
         logger.info("Redis连接已断开")

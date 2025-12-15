@@ -161,35 +161,21 @@ class AsyncProgressTracker:
                 logger.info(f"📊 [异步进度] Redis已禁用，使用文件存储")
                 return False
 
-            import redis
+            # 使用统一的 Redis 连接管理
+            from tradingagents.storage.redis.connection import get_redis_client, REDIS_AVAILABLE
+            
+            if not REDIS_AVAILABLE:
+                return False
 
-            # 从环境变量获取Redis配置
-            redis_host = os.getenv('REDIS_HOST', 'localhost')
-            redis_port = int(os.getenv('REDIS_PORT', 6379))
-            redis_password = os.getenv('REDIS_PASSWORD', None)
-            redis_db = int(os.getenv('REDIS_DB', 0))
+            self.redis_client = get_redis_client()
 
-            # 创建Redis连接
-            if redis_password:
-                self.redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    password=redis_password,
-                    db=redis_db,
-                    decode_responses=True
-                )
+            if self.redis_client:
+                # 测试连接
+                self.redis_client.ping()
+                logger.info(f"📊 [异步进度] Redis连接成功（使用统一连接管理）")
+                return True
             else:
-                self.redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    db=redis_db,
-                    decode_responses=True
-                )
-
-            # 测试连接
-            self.redis_client.ping()
-            logger.info(f"📊 [异步进度] Redis连接成功: {redis_host}:{redis_port}")
-            return True
+                return False
         except Exception as e:
             logger.warning(f"📊 [异步进度] Redis连接失败，使用文件存储: {e}")
             return False
@@ -1077,35 +1063,16 @@ def get_progress_by_id(analysis_id: str) -> Optional[Dict[str, Any]]:
         # 如果Redis启用，先尝试Redis
         if redis_enabled:
             try:
-                import redis
-
-                # 从环境变量获取Redis配置
-                redis_host = os.getenv('REDIS_HOST', 'localhost')
-                redis_port = int(os.getenv('REDIS_PORT', 6379))
-                redis_password = os.getenv('REDIS_PASSWORD', None)
-                redis_db = int(os.getenv('REDIS_DB', 0))
-
-                # 创建Redis连接
-                if redis_password:
-                    redis_client = redis.Redis(
-                        host=redis_host,
-                        port=redis_port,
-                        password=redis_password,
-                        db=redis_db,
-                        decode_responses=True
-                    )
-                else:
-                    redis_client = redis.Redis(
-                        host=redis_host,
-                        port=redis_port,
-                        db=redis_db,
-                        decode_responses=True
-                    )
-
-                key = f"progress:{analysis_id}"
-                data = redis_client.get(key)
-                if data:
-                    return json.loads(data)
+                # 使用统一的 Redis 连接管理
+                from tradingagents.storage.redis.connection import get_redis_client, REDIS_AVAILABLE
+                
+                if REDIS_AVAILABLE:
+                    redis_client = get_redis_client()
+                    if redis_client:
+                        key = f"progress:{analysis_id}"
+                        data = redis_client.get(key)
+                        if data:
+                            return json.loads(data)
             except Exception as e:
                 logger.debug(f"📊 [异步进度] Redis读取失败: {e}")
 
@@ -1141,33 +1108,14 @@ def get_latest_analysis_id() -> Optional[str]:
         # 如果Redis启用，先尝试从Redis获取
         if redis_enabled:
             try:
-                import redis
-
-                # 从环境变量获取Redis配置
-                redis_host = os.getenv('REDIS_HOST', 'localhost')
-                redis_port = int(os.getenv('REDIS_PORT', 6379))
-                redis_password = os.getenv('REDIS_PASSWORD', None)
-                redis_db = int(os.getenv('REDIS_DB', 0))
-
-                # 创建Redis连接
-                if redis_password:
-                    redis_client = redis.Redis(
-                        host=redis_host,
-                        port=redis_port,
-                        password=redis_password,
-                        db=redis_db,
-                        decode_responses=True
-                    )
-                else:
-                    redis_client = redis.Redis(
-                        host=redis_host,
-                        port=redis_port,
-                        db=redis_db,
-                        decode_responses=True
-                    )
-
-                # 获取所有progress键
-                keys = redis_client.keys("progress:*")
+                # 使用统一的 Redis 连接管理
+                from tradingagents.storage.redis.connection import get_redis_client, REDIS_AVAILABLE
+                
+                if REDIS_AVAILABLE:
+                    redis_client = get_redis_client()
+                    if redis_client:
+                        # 获取所有progress键
+                        keys = redis_client.keys("progress:*")
                 if not keys:
                     return None
 

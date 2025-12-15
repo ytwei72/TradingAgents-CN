@@ -19,35 +19,27 @@ class RedisSessionManager:
         self.max_age_hours = 24  # 会话有效期24小时
         
     def _init_redis(self) -> bool:
-        """初始化Redis连接"""
+        """初始化Redis连接（使用统一的连接管理）"""
         try:
             # 首先检查REDIS_ENABLED环境变量
             redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower()
             if redis_enabled != 'true':
                 return False
 
-            import redis
-
-            # 从环境变量获取Redis配置
-            redis_host = os.getenv('REDIS_HOST', 'localhost')
-            redis_port = int(os.getenv('REDIS_PORT', 6379))
-            redis_password = os.getenv('REDIS_PASSWORD', None)
-            redis_db = int(os.getenv('REDIS_DB', 0))
+            # 使用统一的 Redis 连接管理
+            from tradingagents.storage.redis.connection import get_redis_client, REDIS_AVAILABLE
             
-            # 创建Redis连接
-            self.redis_client = redis.Redis(
-                host=redis_host,
-                port=redis_port,
-                password=redis_password,
-                db=redis_db,
-                decode_responses=True,
-                socket_timeout=5,
-                socket_connect_timeout=5
-            )
+            if not REDIS_AVAILABLE:
+                return False
             
-            # 测试连接
-            self.redis_client.ping()
-            return True
+            self.redis_client = get_redis_client()
+            
+            if self.redis_client:
+                # 测试连接
+                self.redis_client.ping()
+                return True
+            else:
+                return False
             
         except Exception as e:
             # 只有在Redis启用时才显示连接失败警告

@@ -216,25 +216,16 @@ class DatabaseManager:
                 self.logger.error(f"MongoDB客户端初始化失败: {e}")
                 self.mongodb_available = False
 
-        # 初始化Redis连接
+        # 初始化Redis连接（使用统一的连接管理）
         if self.redis_available:
             try:
-                import redis
-
-                # 构建连接参数
-                connect_kwargs = {
-                    "host": self.redis_config["host"],
-                    "port": self.redis_config["port"],
-                    "db": self.redis_config["db"],
-                    "socket_timeout": self.redis_config["timeout"]
-                }
-
-                # 如果有密码，添加密码
-                if self.redis_config["password"]:
-                    connect_kwargs["password"] = self.redis_config["password"]
-
-                self.redis_client = redis.Redis(**connect_kwargs)
-                self.logger.info("Redis客户端初始化成功")
+                from .redis.connection import get_redis_client
+                self.redis_client = get_redis_client()
+                if self.redis_client:
+                    self.logger.info("Redis客户端初始化成功（使用统一连接管理）")
+                else:
+                    self.logger.warning("Redis客户端获取失败")
+                    self.redis_available = False
             except Exception as e:
                 self.logger.error(f"Redis客户端初始化失败: {e}")
                 self.redis_available = False
@@ -328,6 +319,93 @@ class DatabaseManager:
                 self.logger.error(f"Redis缓存清理失败: {e}")
 
         return cleared_count
+    
+    def cache_set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+        """
+        设置缓存（使用统一的缓存管理器）
+        
+        Args:
+            key: 缓存键
+            value: 缓存值
+            ttl: 过期时间（秒），None 表示不过期
+        
+        Returns:
+            bool: 是否设置成功
+        """
+        if not self.redis_available:
+            return False
+        
+        try:
+            from .redis.cache_manager import redis_cache_manager
+            cache_mgr = redis_cache_manager()
+            return cache_mgr.cache_set(key, value, ttl)
+        except Exception as e:
+            self.logger.error(f"缓存设置失败: {e}")
+            return False
+    
+    def cache_get(self, key: str, default: Any = None) -> Any:
+        """
+        获取缓存（使用统一的缓存管理器）
+        
+        Args:
+            key: 缓存键
+            default: 默认值
+        
+        Returns:
+            缓存值或默认值
+        """
+        if not self.redis_available:
+            return default
+        
+        try:
+            from .redis.cache_manager import redis_cache_manager
+            cache_mgr = redis_cache_manager()
+            return cache_mgr.cache_get(key, default)
+        except Exception as e:
+            self.logger.error(f"缓存获取失败: {e}")
+            return default
+    
+    def cache_delete(self, key: str) -> bool:
+        """
+        删除缓存（使用统一的缓存管理器）
+        
+        Args:
+            key: 缓存键
+        
+        Returns:
+            bool: 是否删除成功
+        """
+        if not self.redis_available:
+            return False
+        
+        try:
+            from .redis.cache_manager import redis_cache_manager
+            cache_mgr = redis_cache_manager()
+            return cache_mgr.cache_delete(key)
+        except Exception as e:
+            self.logger.error(f"缓存删除失败: {e}")
+            return False
+    
+    def cache_exists(self, key: str) -> bool:
+        """
+        检查缓存是否存在（使用统一的缓存管理器）
+        
+        Args:
+            key: 缓存键
+        
+        Returns:
+            bool: 是否存在
+        """
+        if not self.redis_available:
+            return False
+        
+        try:
+            from .redis.cache_manager import redis_cache_manager
+            cache_mgr = redis_cache_manager()
+            return cache_mgr.cache_exists(key)
+        except Exception as e:
+            self.logger.error(f"缓存检查失败: {e}")
+            return False
 
 
 # 全局数据库管理器实例
@@ -357,8 +435,34 @@ def get_mongodb_client():
     return get_database_manager().get_mongodb_client()
 
 def get_redis_client():
-    """获取Redis客户端"""
+    """获取Redis客户端（优先使用统一连接管理）"""
+    # 优先使用统一的连接管理
+    try:
+        from .redis.connection import get_redis_client as get_redis_client_unified
+        client = get_redis_client_unified()
+        if client:
+            return client
+    except Exception:
+        pass
+    
+    # 降级到 DatabaseManager 的连接
     return get_database_manager().get_redis_client()
+
+def cache_set(key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    """设置缓存（统一接口）"""
+    return get_database_manager().cache_set(key, value, ttl)
+
+def cache_get(key: str, default: Any = None) -> Any:
+    """获取缓存（统一接口）"""
+    return get_database_manager().cache_get(key, default)
+
+def cache_delete(key: str) -> bool:
+    """删除缓存（统一接口）"""
+    return get_database_manager().cache_delete(key)
+
+def cache_exists(key: str) -> bool:
+    """检查缓存是否存在（统一接口）"""
+    return get_database_manager().cache_exists(key)
 
 def get_mongodb_db(database_name: Optional[str] = None):
     """

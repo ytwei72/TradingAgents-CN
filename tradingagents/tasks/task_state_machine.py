@@ -76,38 +76,26 @@ class TaskStateMachine:
         logger.debug(f"📊 [任务状态机] 初始化完成: {task_id}, 存储方式: {'Redis' if self.use_redis else '文件'}")
     
     def _init_redis(self) -> bool:
-        """初始化 Redis 连接"""
+        """初始化 Redis 连接（使用统一的连接管理）"""
         try:
             redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower() == 'true'
             if not redis_enabled:
                 return False
             
-            import redis
+            # 使用统一的 Redis 连接管理
+            from tradingagents.storage.redis.connection import get_redis_client, REDIS_AVAILABLE
             
-            redis_host = os.getenv('REDIS_HOST', 'localhost')
-            redis_port = int(os.getenv('REDIS_PORT', 6379))
-            redis_password = os.getenv('REDIS_PASSWORD', None)
-            redis_db = int(os.getenv('REDIS_DB', 0))
+            if not REDIS_AVAILABLE:
+                return False
             
-            if redis_password:
-                self.redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    password=redis_password,
-                    db=redis_db,
-                    decode_responses=True
-                )
+            self.redis_client = get_redis_client()
+            
+            if self.redis_client:
+                self.redis_client.ping()
+                logger.info(f"📊 [任务状态机] Redis 连接成功（使用统一连接管理）")
+                return True
             else:
-                self.redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    db=redis_db,
-                    decode_responses=True
-                )
-            
-            self.redis_client.ping()
-            logger.info(f"📊 [任务状态机] Redis 连接成功: {redis_host}:{redis_port}")
-            return True
+                return False
         except Exception as e:
             logger.warning(f"📊 [任务状态机] Redis 连接失败，使用文件存储: {e}")
             return False

@@ -25,11 +25,10 @@ except ImportError:
     MONGODB_AVAILABLE = False
     logger.warning(f"⚠️ pymongo 未安装，MongoDB功能不可用")
 
-# Redis
+# Redis - 使用统一的连接管理
 try:
-    import redis
-    from redis.exceptions import ConnectionError as RedisConnectionError
-    REDIS_AVAILABLE = True
+    from tradingagents.storage.redis.connection import get_redis_client, REDIS_AVAILABLE
+    REDIS_AVAILABLE = REDIS_AVAILABLE
 except ImportError:
     REDIS_AVAILABLE = False
     logger.warning(f"⚠️ redis 未安装，Redis功能不可用")
@@ -45,17 +44,10 @@ class DatabaseCacheManager:
         初始化数据库缓存管理器
 
         Args:
-            redis_url: Redis连接URL，默认使用配置文件端口
-            redis_db: Redis数据库编号
+            redis_url: Redis连接URL（已弃用，使用统一连接管理）
+            redis_db: Redis数据库编号（已弃用，使用统一连接管理）
         """
-        # 从配置文件获取正确的端口
-        redis_port = os.getenv("REDIS_PORT", "6380")
-        redis_password = os.getenv("REDIS_PASSWORD", "tradingagents123")
-
-        self.redis_url = redis_url or os.getenv("REDIS_URL", f"redis://:{redis_password}@localhost:{redis_port}")
-        self.redis_db = redis_db
-        
-        # 初始化连接
+        # 使用统一的 Redis 连接管理
         self.redis_client = None
         
         # 初始化 MongoDB 索引（如果可用）
@@ -67,22 +59,18 @@ class DatabaseCacheManager:
         logger.info(f"   Redis: {'✅ 已连接' if self.redis_client else '❌ 未连接'}")
     
     def _init_redis(self):
-        """初始化Redis连接"""
+        """初始化Redis连接（使用统一的连接管理）"""
         if not REDIS_AVAILABLE:
             return
         
         try:
-            self.redis_client = redis.from_url(
-                self.redis_url,
-                db=self.redis_db,
-                socket_timeout=5,
-                socket_connect_timeout=5,
-                decode_responses=True
-            )
-            # 测试连接
-            self.redis_client.ping()
+            # 使用统一的 Redis 连接管理
+            self.redis_client = get_redis_client()
             
-            logger.info(f"✅ Redis连接成功: {self.redis_url}")
+            if self.redis_client:
+                logger.info(f"✅ Redis连接成功（使用统一连接管理）")
+            else:
+                logger.warning(f"⚠️ Redis连接不可用")
             
         except Exception as e:
             logger.error(f"❌ Redis连接失败: {e}")
@@ -501,10 +489,9 @@ class DatabaseCacheManager:
         return cleared_count
 
     def close(self):
-        """关闭数据库连接（MongoDB连接由统一管理器管理，只关闭Redis）"""
-        if self.redis_client:
-            self.redis_client.close()
-            logger.info(f"🔒 Redis连接已关闭")
+        """关闭数据库连接（MongoDB和Redis连接由统一管理器管理，无需手动关闭）"""
+        # Redis 连接由统一管理器管理，不需要手动关闭
+        logger.info(f"🔒 数据库缓存管理器已关闭（连接由统一管理器管理）")
 
 
 # 全局数据库缓存实例
