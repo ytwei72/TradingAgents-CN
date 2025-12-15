@@ -1,0 +1,48 @@
+{
+	"info": {
+		"_postman_id": "websocket-collection",
+		"name": "TradingAgents API - WebSocket",
+		"description": "WebSocket 相关接口",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "WebSocket",
+			"item": [
+				{
+					"name": "实时通知连接",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{ws_url}}/ws/notifications",
+							"host": [
+								"{{ws_url}}"
+							],
+							"path": [
+								"ws",
+								"notifications"
+							]
+						},
+						"description": "WebSocket 连接，用于接收实时通知（如分析进度、系统消息）"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "ws_url",
+			"value": "ws://localhost:8000",
+			"type": "string"
+		}
+	]
+}
+
+

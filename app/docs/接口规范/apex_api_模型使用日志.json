@@ -1,0 +1,709 @@
+{
+	"info": {
+		"_postman_id": "model-usage-logs-collection",
+		"name": "TradingAgents API - 模型使用日志",
+		"description": "模型使用日志相关接口",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "模型使用日志",
+			"item": [
+				{
+					"name": "服务健康检查",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"health"
+							]
+						},
+						"description": "检查模型使用记录服务的健康状态，返回 MongoDB 连接状态和总记录数"
+					},
+					"response": []
+				},
+				{
+					"name": "查询使用记录（days模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records?limit=100&days=7",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "返回记录数限制（默认100，最大10000）"
+								},
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】最近N天的记录"
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								},
+								{
+									"key": "session_id",
+									"value": "",
+									"description": "按会话ID过滤",
+									"disabled": true
+								},
+								{
+									"key": "analysis_type",
+									"value": "",
+									"description": "按分析类型过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "查询模型使用记录。支持两种时间模式（二选一）：1) days: 最近N天；2) start_date+end_date: 日期区间。如同时提供，优先使用days。"
+					},
+					"response": []
+				},
+				{
+					"name": "查询使用记录（日期区间模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records?limit=100&start_date=2025-12-01T00:00:00&end_date=2025-12-15T23:59:59",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "返回记录数限制（默认100，最大10000）"
+								},
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】最近N天的记录",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-15T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用"
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								},
+								{
+									"key": "session_id",
+									"value": "",
+									"description": "按会话ID过滤",
+									"disabled": true
+								},
+								{
+									"key": "analysis_type",
+									"value": "",
+									"description": "按分析类型过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "查询模型使用记录（使用日期区间模式）。需要同时提供 start_date 和 end_date。"
+					},
+					"response": []
+				},
+				{
+					"name": "获取使用统计（days模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认30）"
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "获取模型使用的总体统计信息。支持两种时间模式（二选一，默认最近30天）：1) days；2) start_date+end_date。"
+					},
+					"response": []
+				},
+				{
+					"name": "获取使用统计（日期区间模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics?start_date=2025-12-01T00:00:00&end_date=2025-12-31T23:59:59",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认30）",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用"
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "获取模型使用的总体统计信息（使用日期区间模式）。"
+					},
+					"response": []
+				},
+				{
+					"name": "按供应商统计（days模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/providers?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"providers"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认30）"
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用",
+									"disabled": true
+								}
+							]
+						},
+						"description": "按供应商分组获取统计信息。支持两种时间模式（二选一，默认最近30天）。"
+					},
+					"response": []
+				},
+				{
+					"name": "按供应商统计（日期区间模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/providers?start_date=2025-12-01T00:00:00&end_date=2025-12-31T23:59:59",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"providers"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认30）",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用"
+								}
+							]
+						},
+						"description": "按供应商分组获取统计信息（使用日期区间模式）。"
+					},
+					"response": []
+				},
+				{
+					"name": "按模型统计（days模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/models?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"models"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认30）"
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "按模型分组获取统计信息。支持两种时间模式（二选一，默认最近30天）。"
+					},
+					"response": []
+				},
+				{
+					"name": "按模型统计（日期区间模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/models?start_date=2025-12-01T00:00:00&end_date=2025-12-31T23:59:59",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"models"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认30）",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用"
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "按模型分组获取统计信息（使用日期区间模式）。"
+					},
+					"response": []
+				},
+				{
+					"name": "统计记录数量",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"count"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】统计最近N天的记录",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-15T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "统计符合条件的记录总数。支持两种时间模式（二选一，可选）。"
+					},
+					"response": []
+				},
+				{
+					"name": "按日期统计（days模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/daily?days=7",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"daily"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认7）"
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-15T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "按日期（每天）统计模型使用情况，返回每天的每种模型的输入、输出、总量等详细统计数据。支持两种时间模式（二选一，默认最近7天）。"
+					},
+					"response": []
+				},
+				{
+					"name": "按日期统计（日期区间模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/daily?start_date=2025-12-01T00:00:00&end_date=2025-12-15T23:59:59",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"daily"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】统计最近N天的数据（范围1-365，默认7）",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "【时间模式2】开始日期（ISO格式），与end_date配合使用"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-15T23:59:59",
+									"description": "【时间模式2】结束日期（ISO格式），与start_date配合使用"
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "按日期（每天）统计模型使用情况（使用日期区间模式）。返回指定日期区间内，每天的每种模型的详细统计数据。"
+					},
+					"response": []
+				},
+				{
+					"name": "添加使用记录",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"provider\": \"dashscope\",\n    \"model_name\": \"qwen-max\",\n    \"input_tokens\": 1000,\n    \"output_tokens\": 500,\n    \"cost\": 0.05,\n    \"session_id\": \"test-session-001\",\n    \"analysis_type\": \"stock_analysis\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records"
+							]
+						},
+						"description": "添加单条模型使用记录。timestamp 可选，不传则使用当前时间"
+					},
+					"response": []
+				},
+				{
+					"name": "批量添加使用记录",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n    {\n        \"provider\": \"dashscope\",\n        \"model_name\": \"qwen-max\",\n        \"input_tokens\": 1000,\n        \"output_tokens\": 500,\n        \"cost\": 0.05,\n        \"session_id\": \"batch-test-001\",\n        \"analysis_type\": \"stock_analysis\"\n    },\n    {\n        \"provider\": \"dashscope\",\n        \"model_name\": \"qwen-plus\",\n        \"input_tokens\": 800,\n        \"output_tokens\": 400,\n        \"cost\": 0.02,\n        \"session_id\": \"batch-test-001\",\n        \"analysis_type\": \"stock_analysis\"\n    }\n]"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records/batch",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records",
+								"batch"
+							]
+						},
+						"description": "批量添加多条模型使用记录"
+					},
+					"response": []
+				},
+				{
+					"name": "清理旧记录",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records/cleanup?days=90",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records",
+								"cleanup"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "90",
+									"description": "删除N天前的记录（默认90，范围1-365）"
+								}
+							]
+						},
+						"description": "删除指定天数之前的历史记录。⚠️ 此操作不可逆，请谨慎使用"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}
+
+

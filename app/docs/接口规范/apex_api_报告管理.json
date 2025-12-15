@@ -1,0 +1,102 @@
+{
+	"info": {
+		"_postman_id": "report-management-collection",
+		"name": "TradingAgents API - 报告管理",
+		"description": "报告管理相关接口",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "报告管理",
+			"item": [
+				{
+					"name": "生成报告",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"analysis_id\": \"{{analysis_id}}\",\n    \"format\": \"markdown\",\n    \"include_charts\": true,\n    \"language\": \"zh-CN\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/reports/generate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"reports",
+								"generate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "下载报告",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/reports/{{report_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"reports",
+								"{{report_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "获取分析任务的报告",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/reports/{{analysis_id}}/reports",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"reports",
+								"{{analysis_id}}",
+								"reports"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "analysis_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "report_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
+
