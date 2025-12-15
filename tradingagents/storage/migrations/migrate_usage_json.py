@@ -176,8 +176,8 @@ class UsageJsonMigrator:
         inserted_count = self.usage_manager.insert_many_usage_records(records_to_migrate)
         
         # 备份原文件
-        if backup and inserted_count > 0:
-            self._backup_file()
+        # if backup and inserted_count > 0:
+        #     self._backup_file()
         
         result = {
             'success': True,
@@ -264,10 +264,12 @@ class UsageJsonMigrator:
 def main():
     """主函数"""
     import argparse
+    # default_usage_file = 'config/usage.json'
+    default_usage_file = 'config/usage.json.backup_20251215_143236'
     
     parser = argparse.ArgumentParser(description='将 usage.json 迁移到 MongoDB')
-    parser.add_argument('--json-path', type=str, default='config/usage.json',
-                       help='usage.json 文件路径（默认: config/usage.json）')
+    parser.add_argument('--json-path', type=str, default=default_usage_file,
+                       help=f'usage.json 文件路径（默认: {default_usage_file}）')
     parser.add_argument('--no-skip-existing', action='store_true',
                        help='不跳过已存在的记录（默认跳过）')
     parser.add_argument('--no-backup', action='store_true',

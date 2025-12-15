@@ -59,7 +59,7 @@ class EvalResultsMigrator:
             from tradingagents.storage.manager import get_mongo_collection
             
             self.collection = get_mongo_collection("analysis_steps_status")
-            if not self.collection:
+            if self.collection is None:
                 logger.error("❌ 统一连接管理不可用，无法连接MongoDB")
                 self.connected = False
                 raise ConnectionError("统一连接管理不可用")

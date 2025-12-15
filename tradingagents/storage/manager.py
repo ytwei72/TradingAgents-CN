@@ -464,7 +464,7 @@ def cache_exists(key: str) -> bool:
     """检查缓存是否存在（统一接口）"""
     return get_database_manager().cache_exists(key)
 
-def get_mongodb_db(database_name: Optional[str] = None):
+def get_mongodb_db(database_name: Optional[str] = 'tradingagents'):
     """
     获取MongoDB数据库对象
     
@@ -487,7 +487,7 @@ def get_mongodb_db(database_name: Optional[str] = None):
     
     return client[database_name]
 
-def get_mongo_collection(collection_name: str, database_name: Optional[str] = None):
+def get_mongo_collection(collection_name: str, database_name: Optional[str] = 'tradingagents'):
     """
     获取MongoDB集合对象
     
@@ -499,7 +499,8 @@ def get_mongo_collection(collection_name: str, database_name: Optional[str] = No
         MongoDB集合对象，如果不可用则返回None
     """
     db = get_mongodb_db(database_name)
-    if not db:
+    # pymongo Database 不支持布尔判断，这里显式与 None 比较
+    if db is None:
         return None
     
     return db[collection_name]
