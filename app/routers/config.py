@@ -67,11 +67,10 @@ class SystemConfigResponse(BaseModel):
 class UpdateSystemConfigRequest(BaseModel):
     """
     更新系统配置请求
-    可以包含 'models', 'pricing', 'usage', 'settings' 中的任意几个键
+    可以包含 'models', 'pricing', 'settings' 中的任意几个键
     """
     models: Optional[List[Dict[str, Any]]] = Field(None, description="模型配置列表")
     pricing: Optional[List[Dict[str, Any]]] = Field(None, description="定价配置列表")
-    usage: Optional[List[Dict[str, Any]]] = Field(None, description="使用记录列表")
     settings: Optional[Dict[str, Any]] = Field(None, description="设置字典")
     
     model_config = ConfigDict(extra="forbid")  # 禁止额外字段
@@ -90,7 +89,7 @@ def _deep_merge(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, An
 
 def _normalize_config_types(config_types: Optional[Any]) -> List[str]:
     """将传入的 config_types 规范化为去重有序列表"""
-    valid_types = ['models', 'pricing', 'usage', 'settings']
+    valid_types = ['models', 'pricing', 'settings']
 
     def _split_str(val: str) -> List[str]:
         return [t.strip() for t in val.split(',') if t.strip()]
@@ -129,14 +128,14 @@ def _normalize_config_types(config_types: Optional[Any]) -> List[str]:
 async def get_system_config(
     config_types: Optional[str] = Query(
         None,
-        description="逗号分隔的配置类型，可选值：'models', 'pricing', 'usage', 'settings'。不传默认只返回 'settings'"
+        description="逗号分隔的配置类型，可选值：'models', 'pricing', 'settings'。不传默认只返回 'settings'"
     )
 ):
     """
     获取系统配置（持久化覆盖项）
     
     Args:
-        config_types: 要获取的配置类型列表，可选值：'models', 'pricing', 'usage', 'settings'
+        config_types: 要获取的配置类型列表，可选值：'models', 'pricing', 'settings'
                      如果不指定，默认只返回 'settings'
     """
     try:
@@ -145,13 +144,6 @@ async def get_system_config(
         
         # 获取指定类型的配置
         config = config_manager.fetch_system_config(config_types=config_type_list)
-
-        # usage 只返回最后 10 条，并附带 usage_size
-        if 'usage' in config:
-            usage_list = config.get('usage') or []
-            usage_size = len(usage_list)
-            config['usage'] = usage_list[-10:]
-            config['usage_size'] = usage_size
 
         # 始终返回包含键名的对象（即使只请求单一类型）
         return SystemConfigResponse(success=True, data=config, message="系统配置获取成功")
@@ -170,7 +162,6 @@ async def update_system_config(request: UpdateSystemConfigRequest):
     请求体应该是一个 JSON 对象，可以包含以下键的任意几个：
     - 'models': List[Dict] - 模型配置列表
     - 'pricing': List[Dict] - 定价配置列表
-    - 'usage': List[Dict] - 使用记录列表
     - 'settings': Dict - 设置字典
     
     根据请求中包含的键来更新对应的配置。
@@ -181,7 +172,7 @@ async def update_system_config(request: UpdateSystemConfigRequest):
         incoming = request.model_dump(exclude_none=True)
         
         # 验证至少包含一个配置类型
-        valid_keys = ['models', 'pricing', 'usage', 'settings']
+        valid_keys = ['models', 'pricing', 'settings']
         provided_keys = [key for key in incoming.keys() if key in valid_keys]
         
         if not provided_keys:

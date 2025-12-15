@@ -29,7 +29,7 @@ import asyncio
 
 from app.core.config import settings
 from app.core.startup_validator import validate_startup_config
-from app.routers import health, analysis, reports, notifications, websocket
+from app.routers import health, analysis, reports, notifications, websocket, model_usage
 from app.routers import config as config_router
 from app.services.websocket_manager import manager as ws_manager
 
@@ -99,6 +99,7 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(config_router.router, prefix="/api/config", tags=["config"])
+app.include_router(model_usage.router, prefix="/api/logs/model_usage", tags=["model_usage"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 app.include_router(websocket.router, tags=["websocket"])
 

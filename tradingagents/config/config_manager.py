@@ -263,17 +263,17 @@ class ConfigManager:
 
     def fetch_system_config(self, config_types: Optional[List[str]] = None) -> Dict[str, Any]:
         """
-        获取系统配置（models、pricing、usage、settings的组合）
+        获取系统配置（models、pricing、settings的组合）
         
         Args:
-            config_types: 要获取的配置类型列表，可选值：'models', 'pricing', 'usage', 'settings'
+            config_types: 要获取的配置类型列表，可选值：'models', 'pricing', 'settings'
                          如果为 None，则返回所有配置
         
         Returns:
             包含指定配置类型的字典
         """
         if config_types is None:
-            config_types = ['models', 'pricing', 'usage', 'settings']
+            config_types = ['models', 'pricing', 'settings']
         
         result = {}
         
@@ -283,9 +283,6 @@ class ConfigManager:
             
             if 'pricing' in config_types:
                 result['pricing'] = [asdict(price) for price in self.load_pricing()]
-            
-            if 'usage' in config_types:
-                result['usage'] = [asdict(record) for record in self.load_usage_records()]
             
             if 'settings' in config_types:
                 result['settings'] = self.load_settings()
@@ -298,14 +295,13 @@ class ConfigManager:
     def save_system_config(self, config: Dict[str, Any]):
         """
         保存系统配置（用于Web端配置管理）
-        config 中可以包含 'models', 'pricing', 'usage', 'settings' 键
+        config 中可以包含 'models', 'pricing', 'settings' 键
         根据包含的键来更新对应的配置
         
         Args:
             config: 包含配置的字典，可以包含以下键：
                    - 'models': List[Dict] - 模型配置列表
                    - 'pricing': List[Dict] - 定价配置列表
-                   - 'usage': List[Dict] - 使用记录列表
                    - 'settings': Dict - 设置字典
         """
         try:
@@ -322,13 +318,6 @@ class ConfigManager:
                     pricing = [PricingConfig(**item) for item in pricing_data]
                     self.save_pricing(pricing)
                     logger.info("✅ 定价配置已更新")
-            
-            if 'usage' in config:
-                usage_data = config['usage']
-                if isinstance(usage_data, list):
-                    records = [UsageRecord(**item) for item in usage_data]
-                    self.save_usage_records(records)
-                    logger.info("✅ 使用记录已更新")
             
             if 'settings' in config:
                 settings_data = config['settings']

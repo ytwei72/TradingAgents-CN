@@ -265,7 +265,7 @@ def main():
     """主函数"""
     import argparse
     # default_usage_file = 'config/usage.json'
-    default_usage_file = 'config/usage.json.backup_20251215_143236'
+    default_usage_file = 'config/usage-1204.json'
     
     parser = argparse.ArgumentParser(description='将 usage.json 迁移到 MongoDB')
     parser.add_argument('--json-path', type=str, default=default_usage_file,

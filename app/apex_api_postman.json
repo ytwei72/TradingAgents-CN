@@ -628,6 +628,338 @@
 			]
 		},
 		{
+			"name": "模型使用日志",
+			"item": [
+				{
+					"name": "服务健康检查",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"health"
+							]
+						},
+						"description": "检查模型使用记录服务的健康状态，返回 MongoDB 连接状态和总记录数"
+					},
+					"response": []
+				},
+				{
+					"name": "查询使用记录",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records?limit=100&days=7",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "返回记录数限制（默认100，最大10000）"
+								},
+								{
+									"key": "days",
+									"value": "7",
+									"description": "最近N天的记录"
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								},
+								{
+									"key": "session_id",
+									"value": "",
+									"description": "按会话ID过滤",
+									"disabled": true
+								},
+								{
+									"key": "analysis_type",
+									"value": "",
+									"description": "按分析类型过滤",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01T00:00:00",
+									"description": "开始日期（ISO格式）",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31T23:59:59",
+									"description": "结束日期（ISO格式）",
+									"disabled": true
+								}
+							]
+						},
+						"description": "查询模型使用记录，支持多种过滤条件"
+					},
+					"response": []
+				},
+				{
+					"name": "获取使用统计",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "统计最近N天的数据（默认30，范围1-365）"
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "获取模型使用的总体统计信息，包括总成本、总tokens、请求数等"
+					},
+					"response": []
+				},
+				{
+					"name": "按供应商统计",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/providers?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"providers"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "统计最近N天的数据（默认30，范围1-365）"
+								}
+							]
+						},
+						"description": "按供应商分组获取统计信息"
+					},
+					"response": []
+				},
+				{
+					"name": "按模型统计",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/statistics/models?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"statistics",
+								"models"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "统计最近N天的数据（默认30，范围1-365）"
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "按模型分组获取统计信息"
+					},
+					"response": []
+				},
+				{
+					"name": "统计记录数量",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"count"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "7",
+									"description": "统计最近N天的记录",
+									"disabled": true
+								},
+								{
+									"key": "provider",
+									"value": "dashscope",
+									"description": "按供应商过滤",
+									"disabled": true
+								},
+								{
+									"key": "model_name",
+									"value": "qwen-max",
+									"description": "按模型名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "统计符合条件的记录总数"
+					},
+					"response": []
+				},
+				{
+					"name": "添加使用记录",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"provider\": \"dashscope\",\n    \"model_name\": \"qwen-max\",\n    \"input_tokens\": 1000,\n    \"output_tokens\": 500,\n    \"cost\": 0.05,\n    \"session_id\": \"test-session-001\",\n    \"analysis_type\": \"stock_analysis\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records"
+							]
+						},
+						"description": "添加单条模型使用记录。timestamp 可选，不传则使用当前时间"
+					},
+					"response": []
+				},
+				{
+					"name": "批量添加使用记录",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n    {\n        \"provider\": \"dashscope\",\n        \"model_name\": \"qwen-max\",\n        \"input_tokens\": 1000,\n        \"output_tokens\": 500,\n        \"cost\": 0.05,\n        \"session_id\": \"batch-test-001\",\n        \"analysis_type\": \"stock_analysis\"\n    },\n    {\n        \"provider\": \"dashscope\",\n        \"model_name\": \"qwen-plus\",\n        \"input_tokens\": 800,\n        \"output_tokens\": 400,\n        \"cost\": 0.02,\n        \"session_id\": \"batch-test-001\",\n        \"analysis_type\": \"stock_analysis\"\n    }\n]"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records/batch",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records",
+								"batch"
+							]
+						},
+						"description": "批量添加多条模型使用记录"
+					},
+					"response": []
+				},
+				{
+					"name": "清理旧记录",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/model_usage/records/cleanup?days=90",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"model_usage",
+								"records",
+								"cleanup"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "90",
+									"description": "删除N天前的记录（默认90，范围1-365）"
+								}
+							]
+						},
+						"description": "删除指定天数之前的历史记录。⚠️ 此操作不可逆，请谨慎使用"
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "WebSocket",
 			"item": [
 				{
