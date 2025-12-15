@@ -41,7 +41,24 @@
     <!-- Time Range Stats Section -->
     <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6">
       <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h2 class="text-lg font-semibold text-white">区间统计详情</h2>
+        <div class="flex items-center gap-4">
+          <h2 class="text-lg font-semibold text-white">区间统计详情</h2>
+          
+          <!-- Toggle for Color Scheme -->
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-400">配色方案</span>
+            <button
+              @click="showColorScheme = !showColorScheme"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+              :class="showColorScheme ? 'bg-blue-600' : 'bg-gray-600'"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                :class="showColorScheme ? 'translate-x-6' : 'translate-x-1'"
+              ></span>
+            </button>
+          </div>
+        </div>
         
         <!-- Date Range Picker -->
         <div class="flex items-center space-x-2 bg-[#0f172a] p-1 rounded-lg border border-gray-700">
@@ -59,17 +76,20 @@
             <input 
               type="date" 
               v-model="customDate.start"
-              class="bg-transparent text-white text-sm focus:outline-none w-32"
+              class="bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 border border-gray-600 cursor-pointer"
+              :max="customDate.end || undefined"
             >
             <span class="text-gray-500">-</span>
             <input 
               type="date" 
               v-model="customDate.end"
-              class="bg-transparent text-white text-sm focus:outline-none w-32"
+              class="bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 border border-gray-600 cursor-pointer"
+              :min="customDate.start || undefined"
             >
             <button 
               @click="applyCustomDate"
-              class="ml-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+              class="ml-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="!customDate.start || !customDate.end"
             >
               应用
             </button>
@@ -78,7 +98,7 @@
       </div>
 
       <!-- Color Scheme Selector -->
-      <div class="parchment-chart-container mb-6">
+      <div v-show="showColorScheme" class="parchment-chart-container mb-6">
         <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
           <div class="flex-1 relative z-10">
             <label class="text-sm font-medium text-[#3d2817] mb-2 block font-semibold">🎨 图表配色方案</label>
@@ -227,6 +247,7 @@ const colorSchemes: Record<string, { colors: string[], description: string }> = 
 
 // State
 const selectedColorScheme = ref('彩绘古卷')
+const showColorScheme = ref(false) // 配色方案默认隐藏
 const lastUpdated = ref(new Date().toLocaleString())
 const overallStats = ref({
   total_cost: 0,
@@ -253,6 +274,14 @@ const charts = reactive({
 const pieOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  layout: {
+    padding: {
+      left: 20,
+      right: 20,
+      top: 20,
+      bottom: 20
+    }
+  },
   plugins: {
     legend: {
       position: 'right' as const,
@@ -387,7 +416,7 @@ const getApiParams = () => {
 // Data Fetching
 const fetchOverallStats = async () => {
   try {
-    const res = await axios.get('/api/logs/model_usage/statistics?days=3650') // Get all time roughly
+    const res = await axios.get('/api/logs/model_usage/statistics') // 获取所有历史统计数据
     if (res.data.success) {
       overallStats.value = res.data.data
     }
@@ -520,8 +549,15 @@ const updateCharts = () => {
 
 const setDaysRange = (days: number) => {
   selectedRange.value = { type: 'days', value: days }
-  customDate.start = ''
-  customDate.end = ''
+  
+  // 计算起止日期并填充到日期选择器
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - days + 1) // 包含今天
+  
+  customDate.start = start.toISOString().split('T')[0]
+  customDate.end = end.toISOString().split('T')[0]
+  
   refreshCharts()
 }
 
@@ -618,5 +654,21 @@ onMounted(() => {
   padding-bottom: 0.5rem;
   border-bottom: 2px solid rgba(101, 67, 33, 0.2);
   text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+/* 日期选择器日历弹出框样式优化 */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(1);
+  opacity: 0.8;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* 针对 date input 的悬停效果 */
+input[type="date"]:hover {
+  border-color: #3b82f6 !important;
 }
 </style>
