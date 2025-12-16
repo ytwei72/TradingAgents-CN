@@ -824,6 +824,9 @@ class TradingAgentsGraph:
             "timestamp": datetime.now().isoformat(),
             "company_of_interest": chunk.get("company_of_interest", ""),
             "trade_date": chunk.get("trade_date", ""),
+            # 将分析相关标识一起保存，便于在analysis_steps_status集合中按任务维度追踪
+            "analysis_id": chunk.get("analysis_id", ""),
+            "session_id": chunk.get("session_id", ""),
         }
         
         # 序列化消息列表
