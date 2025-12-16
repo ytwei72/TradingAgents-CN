@@ -278,60 +278,41 @@ async def get_stock_historical_data(
         df = df[df['date'].notna()].reset_index(drop=True)
         df = df.sort_values('date').reset_index(drop=True)
         
-        # 检查数据量，如果不足expected_points，尝试扩展日期范围（向前扩展）
+        # 检查数据量，如果不足 expected_points，尝试扩展日期范围（向前扩展）
+        #
+        # 注意：根据业务需求，expected_points 表示**期望的最少数据量**，
+        # 如果区间内数据量多于 expected_points，不做截断，直接返回完整区间数据。
+        # 这样可以保证：
+        # 1. 一定包含「分析日期前一个月 ~ 页面设置的结束日期」这个区间；
+        # 2. 当分析日期之后的交易日较少时，尽量向前补足到 ~expected_points 条。
         if len(df) < expected_points:
-            # 计算需要向前扩展多少天
-            days_needed = (expected_points - len(df)) * 2  # 乘以2是为了考虑非交易日
+            # 计算需要向前扩展多少天（乘以 2 以覆盖非交易日）
+            days_needed = (expected_points - len(df)) * 2
             extended_start_date = (start_dt - timedelta(days=days_needed)).strftime('%Y-%m-%d')
-            
-            # 从MongoDB获取扩展的数据（分析日期之前）
+
+            # 从 MongoDB 获取扩展的数据（主要是分析日期之前的数据）
             extended_df = stock_history_manager.get_stock_history(stock_code, extended_start_date, start_date)
             if not extended_df.empty:
-                # MongoDB返回的数据已经标准化了列名，只需确保date列存在
+                # MongoDB 返回的数据已经基本标准化，这里只确保有 date 列
                 if 'date' not in extended_df.columns:
                     extended_df = _normalize_date_column(extended_df)
-                
+
                 extended_df = _normalize_column_names(extended_df)
-                
+
                 if 'date' in extended_df.columns and 'date' in df.columns:
-                    # 确保date列是datetime类型
+                    # 确保 date 列为 datetime 类型
                     extended_df['date'] = pd.to_datetime(extended_df['date'], errors='coerce')
                     df['date'] = pd.to_datetime(df['date'], errors='coerce')
-                    
+
                     # 过滤无效日期
                     extended_df = extended_df[extended_df['date'].notna()]
                     df = df[df['date'].notna()]
-                    
-                    # 移除扩展数据中与原始数据重复的日期
+
+                    # 去重并合并：扩展数据在前，原始数据在后
                     extended_df = extended_df[~extended_df['date'].isin(df['date'])]
-                    # 合并：扩展数据在前，原始数据在后
                     df = pd.concat([extended_df, df], ignore_index=True)
                     df = df.sort_values('date').reset_index(drop=True)
                     df = df.drop_duplicates(subset=['date']).reset_index(drop=True)
-        
-        # 如果数据量超过expected_points，需要智能裁剪
-        if len(df) > expected_points and analysis_dt is not None:
-            # 优先保留分析日期之后的数据
-            df_after = df[df['date'] >= analysis_dt]
-            df_before = df[df['date'] < analysis_dt]
-            
-            if len(df_after) > 0:
-                # 保留所有分析日期之后的数据，然后从分析日期之前的数据中取剩余的
-                remaining_slots = expected_points - len(df_after)
-                if remaining_slots > 0 and len(df_before) > 0:
-                    # 从分析日期之前的数据中取最近的remaining_slots条
-                    df_before_selected = df_before.tail(remaining_slots)
-                    df = pd.concat([df_before_selected, df_after], ignore_index=True)
-                    df = df.sort_values('date').reset_index(drop=True)
-                elif remaining_slots <= 0:
-                    # 如果分析日期之后的数据已经够多，只保留最近的expected_points条
-                    df = df_after.tail(expected_points).reset_index(drop=True)
-            else:
-                # 如果没有分析日期之后的数据，取最后的expected_points条
-                df = df.tail(expected_points).reset_index(drop=True)
-        elif len(df) > expected_points:
-            # 如果没有提供分析日期，简单取最后的expected_points条
-            df = df.tail(expected_points).reset_index(drop=True)
         
         # 转换为字典列表（日期格式化为字符串）
         df['date'] = df['date'].dt.strftime('%Y-%m-%d')

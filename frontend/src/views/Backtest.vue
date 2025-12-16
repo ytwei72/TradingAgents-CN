@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   getStockHistoricalData, 
   getAnalysisReportsByStock,
@@ -52,6 +52,36 @@ const loadingReports = ref(false)
 const historicalData = ref<StockHistoricalData[]>([])
 const loadingData = ref(false)
 const stockInfo = ref<any>(null)
+
+// 分析日期对应的收盘价（用于计算预期获利）
+const analysisClosePrice = computed(() => {
+  if (!historicalData.value.length || !analysisDate.value) {
+    return null
+  }
+
+  const dates = historicalData.value.map(d => d.date)
+  // 先尝试精确匹配分析日期
+  let index = dates.findIndex(d => d === analysisDate.value)
+
+  // 如果没有精确匹配，则取「分析日期之前最近的一个交易日」
+  if (index < 0) {
+    const analysisDateObj = new Date(analysisDate.value)
+    for (let i = dates.length - 1; i >= 0; i--) {
+      const dateObj = new Date(dates[i])
+      if (dateObj <= analysisDateObj) {
+        index = i
+        break
+      }
+    }
+  }
+
+  if (index < 0) {
+    return null
+  }
+
+  const item = historicalData.value[index]
+  return typeof item.close === 'number' ? item.close : null
+})
 
 // 计算标签颜色（0% 绿色 → 100% 红色）
 const getGradientColor = (value: number) => {
@@ -120,7 +150,7 @@ const chartData = computed(() => {
   // 目标价格线（仅在分析日期之后）
   const targetPriceLine: (number | null)[] = []
   if (targetPrice.value !== null && analysisDateIndex >= 0) {
-    dates.forEach((date, index) => {
+    dates.forEach((_date, index) => {
       if (index >= analysisDateIndex) {
         targetPriceLine.push(targetPrice.value!)
       } else {
@@ -304,12 +334,25 @@ const getDefaultEndDate = () => {
   return today.toISOString().split('T')[0]
 }
 
+// 根据分析日期计算默认结束日期（分析日期后 3 个月）
+const getEndDateByAnalysis = (analysisDateStr: string) => {
+  if (!analysisDateStr) {
+    return getDefaultEndDate()
+  }
+  const d = new Date(analysisDateStr)
+  if (Number.isNaN(d.getTime())) {
+    return getDefaultEndDate()
+  }
+  d.setMonth(d.getMonth() + 3)
+  return d.toISOString().split('T')[0]
+}
+
 // 初始化日期
 onMounted(() => {
-  endDate.value = getDefaultEndDate()
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-  analysisDate.value = oneMonthAgo.toISOString().split('T')[0]
+  // 默认分析日期为今天，区间为：分析日前 1 个月 ~ 分析日后 3 个月
+  const todayStr = getDefaultEndDate()
+  analysisDate.value = todayStr
+  endDate.value = getEndDateByAnalysis(todayStr)
 })
 
 // 查询分析结果
@@ -336,6 +379,8 @@ const selectReport = (report: AnalysisReport) => {
   selectedReport.value = report
   stockCode.value = report.stock_symbol
   analysisDate.value = report.analysis_date
+  // 使用分析日期后 3 个月作为默认结束日期（用户仍可手动修改）
+  endDate.value = getEndDateByAnalysis(report.analysis_date)
   targetPrice.value = report.formatted_decision?.target_price || null
   
   // 自动加载数据
@@ -395,6 +440,30 @@ const formatDate = (dateString: string) => {
     month: '2-digit', 
     day: '2-digit' 
   })
+}
+
+// 数据区间文本（用于价格对比标题后展示）
+const dataRangeLabel = computed(() => {
+  if (!historicalData.value.length) {
+    return ''
+  }
+  const first = historicalData.value[0].date
+  const last = historicalData.value[historicalData.value.length - 1].date
+  return `${formatDate(first)} ~ ${formatDate(last)}`
+})
+
+// 打开日期选择器（参考 TaskRunLogsOld.vue）
+const openDatePicker = (inputId: string) => {
+  const input = document.getElementById(inputId) as HTMLInputElement | null
+  if (!input) return
+
+  // 支持原生 showPicker 的浏览器
+  if ('showPicker' in input && typeof (input as any).showPicker === 'function') {
+    ;(input as any).showPicker()
+  } else {
+    input.focus()
+    input.click()
+  }
 }
 </script>
 
@@ -608,11 +677,56 @@ const formatDate = (dateString: string) => {
 
       <!-- 价格图表 -->
       <div class="bg-[#1e293b] rounded-lg p-6 border border-gray-700">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold text-white">价格对比</h2>
-          <div class="text-sm text-gray-400">
-            <span class="inline-block w-3 h-3 bg-orange-500 rounded mr-1"></span>
-            分析日期：{{ formatDate(analysisDate) }}
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-bold text-white">价格对比</h2>
+            <div class="text-sm text-gray-400 flex items-center">
+              <span class="inline-block w-3 h-3 bg-orange-500 rounded mr-1"></span>
+              分析日期：{{ formatDate(analysisDate) }}
+              <span v-if="dataRangeLabel" class="ml-4">
+                数据区间：{{ dataRangeLabel }}
+              </span>
+            </div>
+          </div>
+          <!-- 分析日期后的可编辑区间（仅编辑分析日后的结束日期） -->
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-gray-300">📅 分析后区间</span>
+            <div class="flex items-center space-x-2">
+              <div class="flex-1 min-w-[140px] relative">
+                <input
+                  type="date"
+                  :value="analysisDate"
+                  disabled
+                  class="date-input w-full bg-[#020617] text-gray-400 text-xs md:text-sm rounded px-3 py-1.5 pr-8 border border-gray-700 cursor-not-allowed"
+                />
+              </div>
+              <span class="text-gray-400">至</span>
+              <div class="flex-1 min-w-[140px] relative">
+                <input
+                  type="date"
+                  v-model="endDate"
+                  class="date-input w-full bg-[#020617] text-white text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-1.5 pr-8 border border-gray-700 hover:border-blue-500 transition-colors"
+                  placeholder="结束日期"
+                  id="backtest-end-date-input"
+                />
+                <label
+                  for="backtest-end-date-input"
+                  class="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-blue-400 hover:text-blue-300 transition-colors z-10"
+                  @click="openDatePicker('backtest-end-date-input')"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                </label>
+              </div>
+              <button
+                @click="loadBacktestData"
+                :disabled="loadingData || !stockCode || !analysisDate"
+                class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs md:text-sm"
+              >
+                应用
+              </button>
+            </div>
           </div>
         </div>
         <div class="h-96">
@@ -641,8 +755,8 @@ const formatDate = (dateString: string) => {
                 <th class="text-right py-2 px-4 text-gray-300">最高价</th>
                 <th class="text-right py-2 px-4 text-gray-300">最低价</th>
                 <th class="text-right py-2 px-4 text-gray-300">成交量</th>
-                <th v-if="targetPrice !== null" class="text-right py-2 px-4 text-gray-300">目标价</th>
-                <th v-if="targetPrice !== null" class="text-right py-2 px-4 text-gray-300">误差</th>
+                <th class="text-right py-2 px-4 text-gray-300">预期获利(元)</th>
+                <th class="text-right py-2 px-4 text-gray-300">预期获利(%)</th>
               </tr>
             </thead>
             <tbody>
@@ -664,13 +778,23 @@ const formatDate = (dateString: string) => {
                 <td class="py-2 px-4 text-right text-gray-400">{{ item.high?.toFixed(2) }}</td>
                 <td class="py-2 px-4 text-right text-gray-400">{{ item.low?.toFixed(2) }}</td>
                 <td class="py-2 px-4 text-right text-gray-400">{{ item.volume?.toLocaleString() }}</td>
-                <td v-if="targetPrice !== null" class="py-2 px-4 text-right text-red-400">
-                  {{ item.date >= analysisDate ? targetPrice.toFixed(2) : '-' }}
+                <td class="py-2 px-4 text-right text-gray-400">
+                  {{
+                    analysisClosePrice !== null &&
+                    item.close !== undefined &&
+                    item.date >= analysisDate
+                      ? (item.close - analysisClosePrice).toFixed(2)
+                      : '--'
+                  }}
                 </td>
-                <td v-if="targetPrice !== null" class="py-2 px-4 text-right text-gray-400">
-                  {{ item.date >= analysisDate && item.close 
-                    ? Math.abs(item.close - targetPrice).toFixed(2) 
-                    : '-' }}
+                <td class="py-2 px-4 text-right text-gray-400">
+                  {{
+                    analysisClosePrice !== null &&
+                    item.close !== undefined &&
+                    item.date >= analysisDate
+                      ? (((item.close - analysisClosePrice) / analysisClosePrice) * 100).toFixed(2) + '%'
+                      : '--'
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -699,6 +823,21 @@ const formatDate = (dateString: string) => {
 
 .tag-value {
   font-size: 1.8em;
+}
+
+/* 日期选择器样式（复用 TaskRunLogsOld.vue 的体验） */
+.date-input {
+  color-scheme: dark;
+  position: relative;
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+  display: none;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+  pointer-events: none;
 }
 </style>
 
