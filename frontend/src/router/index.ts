@@ -3,6 +3,7 @@ import StockAnalyzeView from '../views/StockAnalyzeView.vue'
 import AnalysisResultsView from '../views/AnalysisResults.vue'
 import SystemConfigView from '../views/SystemConfig.vue'
 import ModelUsageStatsView from '../views/ModelUsageStats.vue'
+import AnalysisProcessView from '../views/AnalysisProcess.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -24,6 +25,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/model-usage-stats',
     name: 'ModelUsageStats',
     component: ModelUsageStatsView
+  },
+  {
+    path: '/analysis-process',
+    name: 'AnalysisProcess',
+    component: AnalysisProcessView
   }
 ]
 

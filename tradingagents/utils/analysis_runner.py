@@ -241,8 +241,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         results = post_process_analysis_steps(
             state=state,
             decision=decision,
-            analysis_id=analysis_id,
-            analysis_start_time=analysis_start_time
+            analysis_id=analysis_id
         )
 
         update_progress("✅ 分析成功完成！")
