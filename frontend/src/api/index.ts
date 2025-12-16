@@ -182,4 +182,95 @@ export const getLogsStats = async (): Promise<LogsStatsResponse> => {
   return response.data;
 };
 
+// Stock Data API
+export interface StockBasicInfo {
+  code: string;
+  name: string;
+  market?: string;
+  category?: string;
+  [key: string]: any;
+}
+
+export interface StockBasicInfoResponse {
+  success: boolean;
+  data: StockBasicInfo | null;
+  message: string;
+}
+
+export interface StockHistoricalData {
+  date: string;
+  open?: number;
+  high?: number;
+  low?: number;
+  close: number;
+  volume?: number;
+  [key: string]: any;
+}
+
+export interface StockHistoricalDataResponse {
+  success: boolean;
+  data: StockHistoricalData[] | null;
+  total: number;
+  message: string;
+}
+
+export interface AnalysisReport {
+  analysis_id: string;
+  stock_symbol: string;
+  analysis_date: string;
+  formatted_decision?: {
+    action?: string;
+    target_price?: number;
+    confidence?: number;
+    risk_score?: number;
+    reasoning?: string;
+  };
+  timestamp?: number;
+  [key: string]: any;
+}
+
+export interface AnalysisReportsResponse {
+  success: boolean;
+  data: AnalysisReport[];
+  total: number;
+  message: string;
+}
+
+export const getStockBasicInfo = async (stockCode: string): Promise<StockBasicInfoResponse> => {
+  const response = await api.get<StockBasicInfoResponse>(`/stock-data/basic-info/${stockCode}`);
+  return response.data;
+};
+
+export const getStockHistoricalData = async (
+  stockCode: string,
+  startDate: string,
+  endDate: string,
+  expectedPoints: number = 60,
+  analysisDate?: string
+): Promise<StockHistoricalDataResponse> => {
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+    expected_points: expectedPoints.toString()
+  });
+  if (analysisDate) {
+    params.append('analysis_date', analysisDate);
+  }
+  const response = await api.get<StockHistoricalDataResponse>(
+    `/stock-data/historical-data/${stockCode}?${params.toString()}`
+  );
+  return response.data;
+};
+
+export const getAnalysisReportsByStock = async (
+  stockCode: string,
+  limit: number = 100
+): Promise<AnalysisReportsResponse> => {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  const response = await api.get<AnalysisReportsResponse>(
+    `/stock-data/analysis-reports/${stockCode}?${params.toString()}`
+  );
+  return response.data;
+};
+
 export default api;

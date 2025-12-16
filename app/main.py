@@ -31,7 +31,7 @@ from app.core.config import settings
 from app.core.startup_validator import validate_startup_config
 from app.routers import health, analysis, reports, notifications, websocket, model_usage
 from app.routers import config as config_router
-from app.routers import operation_logs
+from app.routers import operation_logs, stock_data
 from app.services.websocket_manager import manager as ws_manager
 
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -104,6 +104,7 @@ app.include_router(model_usage.router, prefix="/api/logs/model_usage", tags=["mo
 app.include_router(operation_logs.router, prefix="/api/logs/operation", tags=["operation_logs"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 app.include_router(websocket.router, tags=["websocket"])
+app.include_router(stock_data.router, prefix="/api/stock-data", tags=["stock_data"])
 
 @app.get("/")
 async def root():

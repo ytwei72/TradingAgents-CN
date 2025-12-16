@@ -462,6 +462,47 @@ class TaskStateMachine:
         logger.debug(f"📊 [事件追加] {event_type}: {message}" + 
                     (f" (耗时: {duration:.2f}s)" if duration > 0 else ""))
     
+    def _make_json_safe(self, obj: Any) -> Any:
+        """
+        将对象转换为可被 JSON 序列化的结构
+        - 支持递归处理 dict / list / tuple
+        - 专门处理 LangChain 的消息对象（HumanMessage / AIMessage / SystemMessage / ToolMessage）
+        - 其他无法识别的对象统一转为字符串
+        """
+        # 基本类型直接返回
+        if obj is None or isinstance(obj, (str, int, float, bool)):
+            return obj
+
+        # datetime 转为字符串
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+
+        # dict 递归处理
+        if isinstance(obj, dict):
+            return {self._make_json_safe(k): self._make_json_safe(v) for k, v in obj.items()}
+
+        # list / tuple 递归处理
+        if isinstance(obj, (list, tuple)):
+            return [self._make_json_safe(v) for v in obj]
+
+        # LangChain 消息对象（避免直接依赖库，可以通过类名+content属性识别）
+        try:
+            cls_name = obj.__class__.__name__
+            if hasattr(obj, "content") and cls_name in {"HumanMessage", "AIMessage", "SystemMessage", "ToolMessage"}:
+                return {
+                    "_type": cls_name,
+                    "content": self._make_json_safe(getattr(obj, "content", None)),
+                }
+        except Exception:
+            # 识别失败就走通用分支
+            pass
+
+        # 兜底：转成字符串，保证不抛 JSON 序列化异常
+        try:
+            return str(obj)
+        except Exception:
+            return repr(obj)
+
     def _save_all(self):
         """保存所有数据"""
         self._save_data("props", self.task_props)
@@ -469,18 +510,19 @@ class TaskStateMachine:
         self._save_data("history", self.history)
         
     def _save_data(self, key_suffix: str, data: Any):
-        """保存数据通用方法"""
+        """保存数据通用方法（会自动清洗为可 JSON 序列化的结构）"""
+        safe_data = self._make_json_safe(data)
         if self.use_redis:
             try:
                 key = f"task:{self.task_id}:{key_suffix}"
-                self.redis_client.set(key, json.dumps(data))
+                self.redis_client.set(key, json.dumps(safe_data, ensure_ascii=False))
             except Exception as e:
                 logger.error(f"📊 [存储错误] Redis保存失败 ({key_suffix}): {e}")
         else:
             try:
                 file_path = self.storage_dir / f"{self.task_id}_{key_suffix}.json"
                 with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
+                    json.dump(safe_data, f, ensure_ascii=False, indent=2)
             except Exception as e:
                 logger.error(f"📊 [存储错误] 文件保存失败 ({key_suffix}): {e}")
 

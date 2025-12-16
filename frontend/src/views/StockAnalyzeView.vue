@@ -142,6 +142,7 @@ const start = async () => {
   // Map form to API request
   const apiRequest: AnalysisRequest = {
     stock_symbol: form.stock_symbol,
+    analysis_date: form.analysis_date,
     market_type: form.market_type,
     analysts: form.analysts,
     research_depth: Number(form.research_depth),

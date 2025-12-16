@@ -6,6 +6,7 @@ import ModelUsageStatsView from '../views/ModelUsageStats.vue'
 import AnalysisProcessView from '../views/AnalysisProcess.vue'
 import OperationLogsView from '../views/TaskRunLogsOld.vue'
 import TaskRunLogsView from '../views/TaskRunLogs.vue'
+import BacktestView from '../views/Backtest.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -42,6 +43,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/task-run-logs',
     name: 'TaskRunLogs',
     component: TaskRunLogsView
+  },
+  {
+    path: '/backtest',
+    name: 'Backtest',
+    component: BacktestView
   }
 ]
 
