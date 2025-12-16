@@ -239,9 +239,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         
         # ========== 后处理步骤1-3: 处理结果、记录日志、保存结果 ==========
         results = post_process_analysis_steps(
+            analysis_id=analysis_id,
             state=state,
-            decision=decision,
-            analysis_id=analysis_id
+            decision=decision
         )
 
         update_progress("✅ 分析成功完成！")

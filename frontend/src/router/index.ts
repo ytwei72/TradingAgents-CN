@@ -4,6 +4,7 @@ import AnalysisResultsView from '../views/AnalysisResults.vue'
 import SystemConfigView from '../views/SystemConfig.vue'
 import ModelUsageStatsView from '../views/ModelUsageStats.vue'
 import AnalysisProcessView from '../views/AnalysisProcess.vue'
+import OperationLogsView from '../views/OperationLogs.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -30,6 +31,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/analysis-process',
     name: 'AnalysisProcess',
     component: AnalysisProcessView
+  },
+  {
+    path: '/operation-logs',
+    name: 'OperationLogs',
+    component: OperationLogsView
   }
 ]
 

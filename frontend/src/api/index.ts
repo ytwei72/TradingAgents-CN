@@ -122,4 +122,64 @@ export const updateSystemConfig = async (payload: Record<string, any>): Promise<
   return response.data;
 };
 
+// Operation Logs API
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  logger: string;
+  message: string;
+  module?: string;
+  function?: string;
+  line?: number;
+}
+
+export interface LogsResponse {
+  success: boolean;
+  data: LogEntry[];
+  total: number;
+  filtered_total: number;
+  message: string;
+}
+
+export interface LogsStatsResponse {
+  success: boolean;
+  data: {
+    total_files: number;
+    files: Array<{
+      filename: string;
+      size: number;
+      modified_time: string;
+      exists: boolean;
+      error?: string;
+    }>;
+  };
+}
+
+export const getOperationLogs = async (
+  startDate?: string,
+  endDate?: string,
+  days?: number,
+  keyword?: string,
+  level?: string,
+  logger?: string,
+  limit: number = 1000
+): Promise<LogsResponse> => {
+  const params = new URLSearchParams();
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+  if (days) params.append('days', days.toString());
+  if (keyword) params.append('keyword', keyword);
+  if (level) params.append('level', level);
+  if (logger) params.append('logger', logger);
+  params.append('limit', limit.toString());
+  
+  const response = await api.get<LogsResponse>(`/logs/operation/query?${params.toString()}`);
+  return response.data;
+};
+
+export const getLogsStats = async (): Promise<LogsStatsResponse> => {
+  const response = await api.get<LogsStatsResponse>('/logs/operation/stats');
+  return response.data;
+};
+
 export default api;

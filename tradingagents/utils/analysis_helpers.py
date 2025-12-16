@@ -456,8 +456,8 @@ def prepare_analysis_steps(
 
 
 def save_analysis_results(
-    results: Dict[str, Any],
-    analysis_id: str
+    analysis_id: str,
+    results: Dict[str, Any]
 ) -> tuple[bool, Dict[str, str]]:
     """
     后处理步骤3: 保存分析结果
@@ -790,9 +790,9 @@ def log_analysis_completion(
 
 
 def post_process_analysis_steps(
+    analysis_id: str,
     state: Dict[str, Any],
-    decision: Any,
-    analysis_id: Optional[str] = None
+    decision: Any
 ) -> Dict[str, Any]:
     """
     后处理步骤：执行所有分析后的处理工作
@@ -803,9 +803,9 @@ def post_process_analysis_steps(
     - 后处理步骤3: 💾 保存分析结果 (save_analysis_results)
     
     Args:
+        analysis_id: 分析ID
         state: 分析状态
         decision: 分析决策
-        analysis_id: 分析ID
 
     Returns:
         最终的分析结果字典
@@ -855,7 +855,7 @@ def post_process_analysis_steps(
     step_name = "save_results"
     _update_step_start("💾 开始保存分析结果...")
     try:
-        save_analysis_results(results, analysis_id)
+        save_analysis_results(analysis_id, results)
         _update_step_success("✅ 分析结果保存完成")
     except Exception as e:
         error_msg = f"⚠️ 分析结果保存失败：{str(e)}"

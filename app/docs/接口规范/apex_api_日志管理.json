@@ -695,6 +695,257 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "操作日志",
+			"item": [
+				{
+					"name": "查询操作日志（days模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/operation/query?limit=1000&days=7",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"operation",
+								"query"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "1000",
+									"description": "返回结果数量限制（默认1000，范围1-10000）"
+								},
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】最近N天的记录"
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01",
+									"description": "【时间模式2】开始日期（YYYY-MM-DD格式），与end_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31",
+									"description": "【时间模式2】结束日期（YYYY-MM-DD格式），与start_date配合使用",
+									"disabled": true
+								},
+								{
+									"key": "keyword",
+									"value": "",
+									"description": "关键字搜索（在message、module、function、logger字段中搜索）",
+									"disabled": true
+								},
+								{
+									"key": "level",
+									"value": "",
+									"description": "日志级别过滤（INFO、WARNING、ERROR）",
+									"disabled": true
+								},
+								{
+									"key": "logger",
+									"value": "",
+									"description": "Logger名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "查询结构化日志文件中的日志记录。支持两种时间模式（二选一）：1) days: 最近N天；2) start_date+end_date: 日期区间。如同时提供，优先使用days。还支持关键字搜索、日志级别过滤和Logger名称过滤。"
+					},
+					"response": []
+				},
+				{
+					"name": "查询操作日志（日期区间模式）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/operation/query?limit=1000&start_date=2025-12-01&end_date=2025-12-31",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"operation",
+								"query"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "1000",
+									"description": "返回结果数量限制（默认1000，范围1-10000）"
+								},
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】最近N天的记录",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-12-01",
+									"description": "【时间模式2】开始日期（YYYY-MM-DD格式），与end_date配合使用"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31",
+									"description": "【时间模式2】结束日期（YYYY-MM-DD格式），与start_date配合使用"
+								},
+								{
+									"key": "keyword",
+									"value": "",
+									"description": "关键字搜索（在message、module、function、logger字段中搜索）",
+									"disabled": true
+								},
+								{
+									"key": "level",
+									"value": "",
+									"description": "日志级别过滤（INFO、WARNING、ERROR）",
+									"disabled": true
+								},
+								{
+									"key": "logger",
+									"value": "",
+									"description": "Logger名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "查询结构化日志文件中的日志记录（使用日期区间模式）。"
+					},
+					"response": []
+				},
+				{
+					"name": "查询操作日志（关键字搜索）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/operation/query?days=7&keyword=AKShare&limit=100",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"operation",
+								"query"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "返回结果数量限制（默认1000，范围1-10000）"
+								},
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】最近N天的记录"
+								},
+								{
+									"key": "keyword",
+									"value": "AKShare",
+									"description": "关键字搜索（在message、module、function、logger字段中搜索）"
+								},
+								{
+									"key": "level",
+									"value": "",
+									"description": "日志级别过滤（INFO、WARNING、ERROR）",
+									"disabled": true
+								},
+								{
+									"key": "logger",
+									"value": "",
+									"description": "Logger名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "查询包含特定关键字的日志记录（示例：搜索包含'AKShare'的日志）。"
+					},
+					"response": []
+				},
+				{
+					"name": "查询操作日志（按级别过滤）",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/operation/query?days=7&level=ERROR&limit=100",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"operation",
+								"query"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "返回结果数量限制（默认1000，范围1-10000）"
+								},
+								{
+									"key": "days",
+									"value": "7",
+									"description": "【时间模式1】最近N天的记录"
+								},
+								{
+									"key": "keyword",
+									"value": "",
+									"description": "关键字搜索（在message、module、function、logger字段中搜索）",
+									"disabled": true
+								},
+								{
+									"key": "level",
+									"value": "ERROR",
+									"description": "日志级别过滤（INFO、WARNING、ERROR）"
+								},
+								{
+									"key": "logger",
+									"value": "",
+									"description": "Logger名称过滤",
+									"disabled": true
+								}
+							]
+						},
+						"description": "查询指定级别的日志记录（示例：查询ERROR级别的日志）。"
+					},
+					"response": []
+				},
+				{
+					"name": "获取日志统计信息",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logs/operation/stats",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logs",
+								"operation",
+								"stats"
+							]
+						},
+						"description": "获取日志文件的基本统计信息，包括文件列表、大小、修改时间等。"
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
