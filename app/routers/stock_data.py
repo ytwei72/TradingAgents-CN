@@ -338,44 +338,61 @@ async def get_stock_historical_data(
 @router.get("/analysis-reports/{stock_code}")
 async def get_analysis_reports_by_stock(
     stock_code: str,
-    limit: int = Query(100, ge=1, le=1000, description="最大返回数量")
+    limit: int = Query(100, ge=1, le=1000, description="最大返回数量"),
+    start_date: Optional[str] = Query(
+        default=None, description="分析开始日期（可选，格式：YYYY-MM-DD）"
+    ),
+    end_date: Optional[str] = Query(
+        default=None, description="分析结束日期（可选，格式：YYYY-MM-DD）"
+    ),
 ):
     """
     根据股票代码获取分析结果列表
     
-    - **stock_code**: 股票代码（如：000001）
+    - **stock_code**: 股票代码（如：000001），特殊值 `all` 表示不过滤股票代码
     - **limit**: 最大返回数量
+    - **start_date**: 分析开始日期，可选
+    - **end_date**: 分析结束日期，可选
     """
     try:
         from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
-        
+
         if not mongodb_report_manager or not mongodb_report_manager.connected:
             raise HTTPException(
                 status_code=500,
                 detail="报告数据库未连接"
             )
-        
-        # 查询分析结果
+
+        # 处理特殊股票代码：all / * 表示不过滤股票代码
+        stock_symbol: Optional[str]
+        if stock_code and stock_code.lower() not in {"all", "*"}:
+            stock_symbol = stock_code
+        else:
+            stock_symbol = None
+
+        # 查询分析结果（底层会根据是否提供 stock_symbol / start_date / end_date 构建查询条件）
         reports = mongodb_report_manager.get_analysis_reports(
             limit=limit,
-            stock_symbol=stock_code
+            stock_symbol=stock_symbol,
+            start_date=start_date,
+            end_date=end_date,
         )
-        
+
         # 按时间倒序排列
         reports = sorted(reports, key=lambda x: x.get('timestamp', 0), reverse=True)
-        
+
         # 处理ObjectId
         for report in reports:
             if '_id' in report:
                 report['_id'] = str(report['_id'])
-        
+
         return {
             "success": True,
             "data": reports,
             "total": len(reports),
             "message": "获取成功"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

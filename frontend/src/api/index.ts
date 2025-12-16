@@ -264,11 +264,23 @@ export const getStockHistoricalData = async (
 
 export const getAnalysisReportsByStock = async (
   stockCode: string,
-  limit: number = 100
+  limit: number = 100,
+  startDate?: string,
+  endDate?: string
 ): Promise<AnalysisReportsResponse> => {
   const params = new URLSearchParams({ limit: limit.toString() });
+  if (startDate) {
+    params.append('start_date', startDate);
+  }
+  if (endDate) {
+    params.append('end_date', endDate);
+  }
+
+  // 当未指定股票代码时，使用特殊值 all，表示后端不过滤股票代码
+  const codeForRequest = stockCode && stockCode.trim() !== '' ? stockCode.trim() : 'all';
+
   const response = await api.get<AnalysisReportsResponse>(
-    `/stock-data/analysis-reports/${stockCode}?${params.toString()}`
+    `/stock-data/analysis-reports/${codeForRequest}?${params.toString()}`
   );
   return response.data;
 };

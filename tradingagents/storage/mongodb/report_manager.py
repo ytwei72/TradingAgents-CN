@@ -436,6 +436,39 @@ class MongoDBReportManager:
             
             cursor = self.collection.find({}).sort("updated_at", -1).skip(skip).limit(page_size)
             reports = list(cursor)
+
+            # 关联 stock_dict 字典表，补充上市公司名称 stock_name
+            try:
+                if reports:
+                    # 从当前分页结果中收集所有股票代码
+                    symbols = {
+                        r.get("stock_symbol")
+                        for r in reports
+                        if isinstance(r, dict) and r.get("stock_symbol")
+                    }
+
+                    if symbols:
+                        # 通过当前数据库对象获取 stock_dict 集合
+                        stock_dict_collection = self.collection.database.get_collection("stock_dict")
+                        stock_docs = stock_dict_collection.find(
+                            {"symbol": {"$in": list(symbols)}},
+                            {"symbol": 1, "name": 1}
+                        )
+
+                        symbol_name_map = {
+                            doc.get("symbol"): doc.get("name")
+                            for doc in stock_docs
+                        }
+
+                        # 将上市公司名称映射到报告对象上
+                        for report in reports:
+                            symbol = report.get("stock_symbol")
+                            if symbol:
+                                report["stock_name"] = symbol_name_map.get(symbol)
+
+            except Exception as e:
+                # 关联失败不影响主流程，只记录日志
+                logger.error(f"❌ 关联 stock_dict 获取上市公司名称失败: {e}")
             
             # 转换ObjectId为字符串
             for report in reports:

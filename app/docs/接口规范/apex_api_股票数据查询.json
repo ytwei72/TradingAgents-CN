@@ -1,0 +1,185 @@
+{
+	"info": {
+		"_postman_id": "stock-data-collection",
+		"name": "TradingAgents API - 股票数据查询",
+		"description": "股票基础信息、历史数据和分析报告查询相关接口",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "股票基础信息",
+			"item": [
+				{
+					"name": "获取单只股票基础信息",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/basic-info/000001",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"basic-info",
+								"000001"
+							]
+						},
+						"description": "从 MongoDB 的 stock_dict 集合中获取指定股票的基础信息"
+					},
+					"response": []
+				},
+				{
+					"name": "获取全部股票列表",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/list",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"list"
+							]
+						},
+						"description": "获取系统中所有可用股票的基础信息列表"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "历史交易数据",
+			"item": [
+				{
+					"name": "获取股票历史交易数据",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/historical-data/000001.SZ?start_date=2025-01-01&end_date=2025-03-31&expected_points=60",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"historical-data",
+								"000001.SZ"
+							],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "2025-01-01"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-03-31"
+								},
+								{
+									"key": "analysis_date",
+									"value": ""
+								},
+								{
+									"key": "expected_points",
+									"value": "60"
+								}
+							]
+						},
+						"description": "获取指定股票在给定日期区间内的历史交易数据；当数据量不足时，会自动向前扩展日期范围以补足到期望的数据点数量。"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "分析报告查询",
+			"item": [
+				{
+					"name": "按股票查询分析报告列表",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/analysis-reports/600519?limit=50",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"analysis-reports",
+								"600519"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50"
+								},
+								{
+									"key": "start_date",
+									"value": ""
+								},
+								{
+									"key": "end_date",
+									"value": ""
+								}
+							]
+						},
+						"description": "根据股票代码查询分析报告列表，可选按时间区间过滤；结果按时间倒序返回。"
+					},
+					"response": []
+				},
+				{
+					"name": "查询所有股票的最新分析报告",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/analysis-reports/all?limit=100",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"analysis-reports",
+								"all"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100"
+								},
+								{
+									"key": "start_date",
+									"value": ""
+								},
+								{
+									"key": "end_date",
+									"value": ""
+								}
+							]
+						},
+						"description": "使用特殊代码 all，获取所有股票的最新分析报告列表。"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}
+
+
+
