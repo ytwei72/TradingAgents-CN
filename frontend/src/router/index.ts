@@ -4,7 +4,8 @@ import AnalysisResultsView from '../views/AnalysisResults.vue'
 import SystemConfigView from '../views/SystemConfig.vue'
 import ModelUsageStatsView from '../views/ModelUsageStats.vue'
 import AnalysisProcessView from '../views/AnalysisProcess.vue'
-import OperationLogsView from '../views/OperationLogs.vue'
+import OperationLogsView from '../views/TaskRunLogsOld.vue'
+import TaskRunLogsView from '../views/TaskRunLogs.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -36,6 +37,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/operation-logs',
     name: 'OperationLogs',
     component: OperationLogsView
+  },
+  {
+    path: '/task-run-logs',
+    name: 'TaskRunLogs',
+    component: TaskRunLogsView
   }
 ]
 
