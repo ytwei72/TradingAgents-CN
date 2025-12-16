@@ -686,15 +686,20 @@ def process_analysis_results(
     Returns:
         处理后的完整结果字典，包含所有需要的属性
     """
-    # 获取并验证 task_manager、task_status、params、extra_config，如果无效则抛出异常
+    # 获取并验证 task_manager、task_status、params
     task_manager = get_task_manager()
-    
-    task_status = task_manager.get_task_status(analysis_id)
-    params = task_status.get('params') if task_status else None
-    extra_config = params.get('extra_config') if params else None
-    
-    if not task_status or not params or not extra_config:
-        raise ValueError(f"Task status data is abnormal for analysis_id: {analysis_id}")
+    task_status = task_manager.get_task_status(analysis_id) if task_manager else None
+
+    # task_status / params 视为「硬性依赖」，缺失则抛异常
+    if not task_status:
+        raise ValueError(f"Task status not found for analysis_id: {analysis_id}")
+
+    params = task_status.get('params') or {}
+    if not params:
+        raise ValueError(f"Task params not found for analysis_id: {analysis_id}")
+
+    # extra_config 视为「可选」，缺失时使用空字典 + 字段级默认值
+    extra_config = params.get('extra_config') or {}
 
     # 延迟导入以避免循环依赖
     def extract_risk_assessment(state):
