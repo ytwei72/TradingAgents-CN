@@ -12,66 +12,21 @@
     <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6">
       <div class="space-y-6">
         <!-- First Row: Date Range and Quick Filters -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <!-- Date Range Filter -->
-          <div class="space-y-3">
-            <label class="text-sm font-medium text-gray-300 block">📅 时间范围</label>
-            <div class="flex items-center space-x-2 bg-[#0f172a] p-1 rounded-lg border border-gray-600">
-              <button
-                v-for="dayOption in [1, 3, 7, 30]"
-                :key="dayOption"
-                @click="selectDays(dayOption)"
-                class="px-3 py-1.5 text-sm rounded-md transition-colors flex-1"
-                :class="filters.days === dayOption ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'"
-              >
-                近{{ dayOption }}天
-              </button>
-            </div>
-            <div class="flex items-center space-x-2">
-              <div class="flex-1 relative">
-                <input
-                  type="date"
-                  v-model="filters.startDate"
-                  class="date-input w-full bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-2.5 pr-10 border border-gray-600 hover:border-blue-500 transition-colors"
-                  placeholder="开始日期"
-                  @change="filters.days = null"
-                  id="start-date-input"
-                />
-                <label
-                  for="start-date-input"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-blue-400 hover:text-blue-300 transition-colors z-10"
-                  @click="openDatePicker('start-date-input')"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                  </svg>
-                </label>
-              </div>
-              <span class="text-gray-400 font-medium">至</span>
-              <div class="flex-1 relative">
-                <input
-                  type="date"
-                  v-model="filters.endDate"
-                  class="date-input w-full bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-2.5 pr-10 border border-gray-600 hover:border-blue-500 transition-colors"
-                  placeholder="结束日期"
-                  @change="filters.days = null"
-                  id="end-date-input"
-                />
-                <label
-                  for="end-date-input"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-blue-400 hover:text-blue-300 transition-colors z-10"
-                  @click="openDatePicker('end-date-input')"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                  </svg>
-                </label>
-              </div>
-            </div>
+          <div class="space-y-3 w-full lg:col-span-3">
+            <DateRangePicker
+              label="📅 时间范围"
+              :quick-days="[1, 3, 7, 30]"
+              v-model:modelStartDate="filters.startDate"
+              v-model:modelEndDate="filters.endDate"
+              v-model:modelDays="filters.days"
+              @change="loadLogs"
+            />
           </div>
 
           <!-- Keyword Search -->
-          <div class="space-y-3">
+          <div class="space-y-3 lg:col-span-2">
             <label class="text-sm font-medium text-gray-300 block">🔍 关键字搜索</label>
             <input
               type="text"
@@ -85,7 +40,7 @@
 
         <!-- Second Row: Level and Logger Filters -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Level Filter -->
+        <!-- Level Filter -->
           <div class="space-y-3">
             <label class="text-sm font-medium text-gray-300 block">📊 日志级别</label>
             <select
@@ -301,6 +256,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import DateRangePicker from '../components/DateRangePicker.vue'
 import { getOperationLogs, getLogsStats, type LogsResponse, type LogsStatsResponse } from '../api'
 
 // State
@@ -335,12 +291,6 @@ const totalPages = computed(() => {
 })
 
 // Methods
-const selectDays = (days: number) => {
-  filters.value.days = days
-  filters.value.startDate = ''
-  filters.value.endDate = ''
-  loadLogs()
-}
 
 const resetFilters = () => {
   filters.value = {
@@ -440,18 +390,6 @@ const getLevelClass = (level: string) => {
   if (levelUpper.includes('INFO')) return 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
   if (levelUpper.includes('DEBUG')) return 'bg-gray-600/20 text-gray-400 border border-gray-600/30'
   return 'bg-gray-600/20 text-gray-400 border border-gray-600/30'
-}
-
-const openDatePicker = (inputId: string) => {
-  const input = document.getElementById(inputId) as HTMLInputElement | null
-  if (!input) return
-  
-  if ('showPicker' in input && typeof input.showPicker === 'function') {
-    input.showPicker()
-  } else {
-    input.focus()
-    input.click()
-  }
 }
 
 // Lifecycle

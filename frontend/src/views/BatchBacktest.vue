@@ -19,20 +19,14 @@
             <span class="text-sm font-medium text-gray-200">研究分析时间段</span>
             <span class="text-xs text-gray-500">用于生成研判/分析结果</span>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-3 items-center">
-            <input
-              v-model="researchStart"
-              type="date"
-              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-gray-700 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <span class="hidden sm:inline text-gray-500 text-xs text-center">至</span>
-            <span class="sm:hidden text-gray-500 text-xs text-center">~</span>
-            <input
-              v-model="researchEnd"
-              type="date"
-              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-gray-700 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          <DateRangePicker
+            class="w-full"
+            :quick-days="[]"
+            label=""
+            v-model:modelStartDate="researchStart"
+            v-model:modelEndDate="researchEnd"
+            v-model:modelDays="researchDays"
+          />
         </div>
 
         <!-- 回测历史数据时间段 -->
@@ -41,20 +35,14 @@
             <span class="text-sm font-medium text-gray-200">回测历史数据时间段</span>
             <span class="text-xs text-gray-500">用于生成净值曲线等回测指标</span>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-3 items-center">
-            <input
-              v-model="backtestStart"
-              type="date"
-              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-gray-700 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <span class="hidden sm:inline text-gray-500 text-xs text-center">至</span>
-            <span class="sm:hidden text-gray-500 text-xs text-center">~</span>
-            <input
-              v-model="backtestEnd"
-              type="date"
-              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-gray-700 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          <DateRangePicker
+            class="w-full"
+            :quick-days="[]"
+            label=""
+            v-model:modelStartDate="backtestStart"
+            v-model:modelEndDate="backtestEnd"
+            v-model:modelDays="backtestDays"
+          />
         </div>
       </div>
 
@@ -107,11 +95,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import DateRangePicker from '../components/DateRangePicker.vue'
 
 const researchStart = ref('')
 const researchEnd = ref('')
+const researchDays = ref<number | null>(null)
 const backtestStart = ref('')
 const backtestEnd = ref('')
+const backtestDays = ref<number | null>(null)
 
 const starting = ref(false)
 

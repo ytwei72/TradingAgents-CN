@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import DateRangePicker from '../components/DateRangePicker.vue'
 import { 
   getStockHistoricalData, 
   getAnalysisReportsByStock,
@@ -52,25 +53,24 @@ const getEndDateByAnalysis = (analysisDateStr: string) => {
   return d.toISOString().split('T')[0]
 }
 
-// 数据源选择：'manual' 手动输入股票和时间，'report' 选择分析结果
-// 默认选择「分析结果」
-const dataSource = ref<'manual' | 'report'>('report')
-
-// 手动输入模式
-const stockCode = ref('')
-const analysisDate = ref('')
-const startDate = ref('')  // 数据区间开始日期
-const endDate = ref('')    // 数据区间结束日期
+// 选择分析结果模式
+const stockCode = ref('')           // 当前用于回测的股票代码（从分析结果中选择）
+const analysisDate = ref('')        // 分析日期（从分析结果中选择）
+const startDate = ref('')           // 数据区间开始日期
+const endDate = ref('')             // 数据区间结束日期
+const rangeDays = ref<number | null>(null)
 const targetPrice = ref<number | null>(null)
 
-// 分析结果选择模式
+// 分析结果列表与筛选
 const selectedStockCode = ref('')
 const analysisReports = ref<AnalysisReport[]>([])
 const selectedReport = ref<AnalysisReport | null>(null)
 const loadingReports = ref(false)
 
-// 分析结果筛选的结束日期（仅用于报告筛选，不影响价格对比中的结束时间）
+// 分析结果筛选的起止日期（仅用于报告筛选，不影响价格对比中的价格数据区间）
+const reportsStartDate = ref('') // 默认在 onMounted 中设置为结束日期往前 1 个月
 const reportsEndDate = ref(getDefaultEndDate())
+const reportsDays = ref<number | null>(null)
 
 // 图表数据
 const historicalData = ref<StockHistoricalData[]>([])
@@ -389,19 +389,23 @@ const volumeChartOptions = computed(() => ({
 
 // 初始化日期
 onMounted(() => {
-  // 默认分析日期为今天，区间为：分析日前 1 个月 ~ 分析日后 3 个月
+  // 默认分析日期为今天，数据区间为：今天往前推 6 个月 ~ 今天
   const todayStr = getDefaultEndDate()
   analysisDate.value = todayStr
   
-  // 计算默认开始日期（分析日前 1 个月）
+  // 计算默认开始日期（今天往前推 6 个月）
   const startDateObj = new Date(todayStr)
-  startDateObj.setMonth(startDateObj.getMonth() - 1)
+  startDateObj.setMonth(startDateObj.getMonth() - 6)
   startDate.value = startDateObj.toISOString().split('T')[0]
   
-  endDate.value = getEndDateByAnalysis(todayStr)
+  // 默认结束日期为今天（而不是分析日后 3 个月），即最近一个月
+  endDate.value = todayStr
 
-  // 选择分析结果模式：首次初始化时就查询一次研究报告（无股票代码，结束日期为当天）
-  // 此时 selectedStockCode 为空，前端会传递特殊代码 all，后端不过滤股票代码
+  // 报告筛选区间同样使用「近一个月」：起始日期为今天往前推 1 个月，结束日期为今天
+  reportsStartDate.value = startDate.value
+  reportsEndDate.value = todayStr
+
+  // 首次初始化时就查询一次研究报告（无股票代码，结束日期为当天）
   queryAnalysisReports()
 })
 
@@ -409,11 +413,22 @@ onMounted(() => {
 const queryAnalysisReports = async () => {
   loadingReports.value = true
   try {
+    // 当股票代码未填写时，传递空字符串，具体是否使用 all 由 API 层处理
+    const stockSymbol = selectedStockCode.value || ''
+
+    // 报告筛选起始日期：优先使用用户选择的起始日期，否则使用「结束日期往前 1 个月」
+    const actualReportsEndDate = reportsEndDate.value || getDefaultEndDate()
+    const actualReportsStartDate = reportsStartDate.value || (() => {
+      const endObj = new Date(actualReportsEndDate)
+      endObj.setMonth(endObj.getMonth() - 1)
+      return endObj.toISOString().split('T')[0]
+    })()
+
     const response = await getAnalysisReportsByStock(
-      selectedStockCode.value,
+      stockSymbol,
       100,
-      undefined,
-      reportsEndDate.value || undefined
+      actualReportsStartDate || undefined,
+      actualReportsEndDate || undefined
     )
     if (response.success) {
       analysisReports.value = response.data
@@ -446,8 +461,17 @@ const selectReport = (report: AnalysisReport) => {
 
 // 加载回测数据
 const loadBacktestData = async () => {
-  if (!stockCode.value || !analysisDate.value) {
+  if (!stockCode.value) {
     return
+  }
+
+  // 如果尚未设置分析日期，则在当前数据区间内自动选用「结束日期」（若无结束日期则使用开始日期）
+  if (!analysisDate.value) {
+    if (endDate.value) {
+      analysisDate.value = endDate.value
+    } else if (startDate.value) {
+      analysisDate.value = startDate.value
+    }
   }
 
   loadingData.value = true
@@ -501,7 +525,7 @@ const formatDate = (dateString: string) => {
 }
 
 
-// 打开日期选择器（参考 TaskRunLogsOld.vue）
+// 打开日期选择器
 const openDatePicker = (inputId: string) => {
   const input = document.getElementById(inputId) as HTMLInputElement | null
   if (!input) return
@@ -524,106 +548,8 @@ const openDatePicker = (inputId: string) => {
 
     <!-- 数据源选择 -->
     <div class="bg-[#1e293b] rounded-lg p-6 border border-gray-700">
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-300 mb-2">数据源选择</label>
-        <div class="flex space-x-4">
-          <label class="flex items-center">
-            <input 
-              type="radio" 
-              value="report" 
-              v-model="dataSource"
-              class="mr-2"
-            />
-            <span class="text-gray-300">选择分析结果</span>
-          </label>
-          <label class="flex items-center">
-            <input 
-              type="radio" 
-              value="manual" 
-              v-model="dataSource"
-              class="mr-2"
-            />
-            <span class="text-gray-300">手动输入</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- 手动输入模式 -->
-      <div v-if="dataSource === 'manual'" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">股票代码</label>
-            <input
-              v-model="stockCode"
-              type="text"
-              placeholder="如：000001"
-              class="w-full px-4 py-2 bg-[#0f172a] border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">分析日期</label>
-            <div class="relative">
-              <input
-                v-model="analysisDate"
-                type="date"
-                class="date-input w-full bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-2.5 pr-10 border border-gray-600 hover:border-blue-500 transition-colors"
-                placeholder="分析日期"
-                id="manual-analysis-date-input"
-              />
-              <label
-                for="manual-analysis-date-input"
-                class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-blue-400 hover:text-blue-300 transition-colors z-10"
-                @click="openDatePicker('manual-analysis-date-input')"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-              </label>
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">结束日期</label>
-            <div class="relative">
-              <input
-                v-model="endDate"
-                type="date"
-                class="date-input w-full bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-2.5 pr-10 border border-gray-600 hover:border-blue-500 transition-colors"
-                placeholder="结束日期"
-                id="manual-end-date-input"
-              />
-              <label
-                for="manual-end-date-input"
-                class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-blue-400 hover:text-blue-300 transition-colors z-10"
-                @click="openDatePicker('manual-end-date-input')"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z"></path>
-                </svg>
-              </label>
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">目标价格（可选）</label>
-            <input
-              v-model.number="targetPrice"
-              type="number"
-              step="0.01"
-              placeholder="输入目标价格"
-              class="w-full px-4 py-2 bg-[#0f172a] border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        <button
-          @click="loadBacktestData"
-          :disabled="loadingData || !stockCode || !analysisDate"
-          class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition"
-        >
-          {{ loadingData ? '加载中...' : '开始回测' }}
-        </button>
-      </div>
-
-      <!-- 分析结果选择模式 -->
-      <div v-if="dataSource === 'report'" class="space-y-4">
+      <!-- 分析结果选择 -->
+      <div class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">股票代码</label>
@@ -636,7 +562,7 @@ const openDatePicker = (inputId: string) => {
               />
               <button
                 @click="queryAnalysisReports"
-                :disabled="loadingReports || !selectedStockCode"
+                :disabled="loadingReports"
                 class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition"
               >
                 查询
@@ -646,12 +572,17 @@ const openDatePicker = (inputId: string) => {
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">结束日期（报告筛选）</label>
             <div class="relative">
-              <input
-                v-model="reportsEndDate"
-                type="date"
-                class="date-input w-full bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-2.5 pr-10 border border-gray-600 hover:border-blue-500 transition-colors"
-                placeholder="结束日期"
-                id="report-end-date-input"
+              <DateRangePicker
+                :quick-days="[]"
+                label=""
+                v-model:modelStartDate="reportsStartDate"
+                v-model:modelEndDate="reportsEndDate"
+                v-model:modelDays="reportsDays"
+                :range-separator="'到'"
+                :start-placeholder="'开始日期'"
+                :end-placeholder="'结束日期'"
+                :end-input-id="'report-end-date-input'"
+                :start-input-id="'report-end-date-input'"
               />
               <label
                 for="report-end-date-input"
@@ -740,14 +671,14 @@ const openDatePicker = (inputId: string) => {
     <!-- 图表展示 -->
     <div v-if="historicalData.length > 0" class="space-y-6">
       <!-- 股票信息 -->
-      <div v-if="stockInfo" class="bg-[#1e293b] rounded-lg p-4 border border-gray-700">
+          <div v-if="stockInfo" class="bg-[#1e293b] rounded-lg p-4 border border-gray-700">
         <div class="flex flex-wrap items-center gap-3">
           <div class="text-white font-bold text-lg">{{ stockInfo.name || stockCode }}</div>
           <div class="text-gray-400 text-sm">{{ stockCode }}</div>
           <div v-if="targetPrice !== null" class="flex flex-wrap items-center gap-2 ml-auto">
             <!-- 操作 Action Tag -->
             <span
-              v-if="dataSource === 'report' && selectedReport?.formatted_decision?.action"
+              v-if="selectedReport?.formatted_decision?.action"
               class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-900/70 text-emerald-100 border border-emerald-500/60"
             >
               <span class="mr-1 text-emerald-300/90 tag-key">建议操作</span>
@@ -764,7 +695,7 @@ const openDatePicker = (inputId: string) => {
             </span>
             <!-- 置信度 Tag -->
             <span
-              v-if="dataSource === 'report' && selectedReport?.formatted_decision"
+              v-if="selectedReport?.formatted_decision"
               class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border border-slate-700/70"
               :style="getConfidenceTagStyle(selectedReport!.formatted_decision!.confidence)"
             >
@@ -784,7 +715,7 @@ const openDatePicker = (inputId: string) => {
             </span>
             <!-- 风险度 Tag -->
             <span
-              v-if="dataSource === 'report' && selectedReport?.formatted_decision"
+              v-if="selectedReport?.formatted_decision"
               class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border border-slate-700/70"
               :style="getRiskTagStyle(selectedReport!.formatted_decision!.risk_score)"
             >
@@ -821,45 +752,22 @@ const openDatePicker = (inputId: string) => {
             <span class="text-gray-300">📅 数据区间</span>
             <div class="flex items-center space-x-2">
               <div class="flex-1 min-w-[140px] relative">
-                <input
-                  type="date"
-                  v-model="startDate"
-                  class="date-input w-full bg-[#020617] text-white text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-1.5 pr-8 border border-gray-700 hover:border-blue-500 transition-colors"
-                  placeholder="开始日期"
-                  id="backtest-start-date-input"
+                <DateRangePicker
+                  :quick-days="[]"
+                  label=""
+                  v-model:modelStartDate="startDate"
+                  v-model:modelEndDate="endDate"
+                  v-model:modelDays="rangeDays"
+                  :range-separator="'至'"
+                  :start-placeholder="'开始日期'"
+                  :end-placeholder="'结束日期'"
+                  :start-input-id="'backtest-start-date-input'"
+                  :end-input-id="'backtest-end-date-input'"
                 />
-                <label
-                  for="backtest-start-date-input"
-                  class="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-blue-400 hover:text-blue-300 transition-colors z-10"
-                  @click="openDatePicker('backtest-start-date-input')"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                  </svg>
-                </label>
-              </div>
-              <span class="text-gray-400">至</span>
-              <div class="flex-1 min-w-[140px] relative">
-                <input
-                  type="date"
-                  v-model="endDate"
-                  class="date-input w-full bg-[#020617] text-white text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-3 py-1.5 pr-8 border border-gray-700 hover:border-blue-500 transition-colors"
-                  placeholder="结束日期"
-                  id="backtest-end-date-input"
-                />
-                <label
-                  for="backtest-end-date-input"
-                  class="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-blue-400 hover:text-blue-300 transition-colors z-10"
-                  @click="openDatePicker('backtest-end-date-input')"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                  </svg>
-                </label>
               </div>
               <button
                 @click="loadBacktestData"
-                :disabled="loadingData || !stockCode || !analysisDate"
+                :disabled="loadingData || !stockCode"
                 class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs md:text-sm"
               >
                 应用
@@ -943,7 +851,7 @@ const openDatePicker = (inputId: string) => {
 
     <!-- 空状态 -->
     <div v-else-if="!loadingData" class="text-center py-12 text-gray-400">
-      <p>请选择数据源并加载回测数据</p>
+      <p>请选择分析结果并加载回测数据</p>
     </div>
   </div>
 </template>
@@ -963,7 +871,7 @@ const openDatePicker = (inputId: string) => {
   font-size: 1.8em;
 }
 
-/* 日期选择器样式（复用 TaskRunLogsOld.vue 的体验） */
+/* 日期选择器样式 */
 .date-input {
   color-scheme: dark;
   position: relative;

@@ -72,20 +72,17 @@
             近{{ days }}天
           </button>
           <div class="w-px h-4 bg-gray-700 mx-2"></div>
-          <div class="flex items-center space-x-2 px-2">
-            <input 
-              type="date" 
-              v-model="customDate.start"
-              class="bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 border border-gray-600 cursor-pointer"
-              :max="customDate.end || undefined"
-            >
-            <span class="text-gray-500">-</span>
-            <input 
-              type="date" 
-              v-model="customDate.end"
-              class="bg-[#0f172a] text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 border border-gray-600 cursor-pointer"
-              :min="customDate.start || undefined"
-            >
+          <div class="flex items-center space-x-2 px-2 flex-1">
+            <DateRangePicker
+              class="flex-1"
+              :quick-days="[]"
+              label=""
+              v-model:modelStartDate="customDate.start"
+              v-model:modelEndDate="customDate.end"
+              v-model:modelDays="rangeDays"
+              :start-placeholder="'开始日期'"
+              :end-placeholder="'结束日期'"
+            />
             <button 
               @click="applyCustomDate"
               class="ml-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -184,6 +181,7 @@ import {
 } from 'chart.js'
 import ChartDataLabels from 'chartjs-plugin-datalabels'
 import { Pie, Bar } from 'vue-chartjs'
+import DateRangePicker from '../components/DateRangePicker.vue'
 
 // Register ChartJS components
 ChartJS.register(
@@ -258,6 +256,7 @@ const overallStats = ref({
 })
 
 const selectedRange = ref({ type: 'days', value: 30 })
+const rangeDays = ref<number | null>(null)
 const customDate = reactive({
   start: '',
   end: ''

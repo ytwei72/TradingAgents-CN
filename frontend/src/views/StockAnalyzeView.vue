@@ -3,6 +3,7 @@ import { ref, reactive, computed, onUnmounted, watch } from 'vue';
 import { startAnalysis, getAnalysisStatus, getAnalysisResult, pauseAnalysis, resumeAnalysis, stopAnalysis, getPlannedSteps, getAnalysisHistory, type AnalysisRequest } from '../api';
 import MarkdownIt from 'markdown-it';
 import ReportComponent from '../components/ReportComponent.vue';
+import DateRangePicker from '../components/DateRangePicker.vue';
 
 const md = new MarkdownIt();
 
@@ -36,6 +37,7 @@ const taskProgress = ref<any>(null); // Store detailed progress info
 const result = ref<any>(null);
 const error = ref<string | null>(null);
 const showAdvanced = ref(false);
+const analysisDays = ref<number | null>(null);
 
 const plannedSteps = ref<any[]>([]);
 const historySteps = ref<any[]>([]);
@@ -466,10 +468,18 @@ const getStatusText = (status: string) => {
               <label class="block text-sm text-gray-400 mb-2">股票代码 <span class="text-gray-600 text-xs ml-1">?</span></label>
               <input v-model="form.stock_symbol" type="text" placeholder="输入A股代码，如000001, 600519" class="w-full bg-[#0f172a] border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition" />
             </div>
-            <div>
-              <label class="block text-sm text-gray-400 mb-2">分析日期 <span class="text-gray-600 text-xs ml-1">?</span></label>
-              <input v-model="form.analysis_date" type="date" class="w-full bg-[#0f172a] border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition" />
-            </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">分析日期 <span class="text-gray-600 text-xs ml-1">?</span></label>
+            <DateRangePicker
+              :quick-days="[]"
+              label=""
+              singleMode="start"
+              v-model:modelStartDate="form.analysis_date"
+              v-model:modelEndDate="form.analysis_date"
+              v-model:modelDays="analysisDays"
+              :start-placeholder="'分析日期'"
+            />
+          </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
