@@ -80,8 +80,6 @@ def format_stock_symbol(stock_symbol: str, market_type: str) -> str:
 
 
 def estimate_analysis_cost(
-    llm_provider: str,
-    llm_model: str,
     analysts: list,
     research_depth: int,
     analysis_id: Optional[str] = None,
@@ -91,8 +89,6 @@ def estimate_analysis_cost(
     估算分析成本
     
     Args:
-        llm_provider: LLM提供商
-        llm_model: 模型名称
         analysts: 分析师列表
         research_depth: 研究深度
         analysis_id: 分析ID（用于消息发布）
@@ -101,6 +97,13 @@ def estimate_analysis_cost(
     Returns:
         估算的成本（元），如果无法估算则返回None
     """
+    # 从系统配置获取 llm_provider 和 llm_model
+    from .analysis_config import AnalysisConfigBuilder
+    config_builder = AnalysisConfigBuilder()
+    system_overrides = config_builder._load_system_overrides()
+    llm_provider = system_overrides.get("llm_provider", "dashscope")
+    llm_model = system_overrides.get("deep_think_llm", "qwen-max")
+    
     # 获取消息生产者（如果消息模式启用）
     message_producer = None
     if analysis_id:
@@ -292,8 +295,6 @@ def prepare_analysis_steps(
     market_type: str,
     analysts: list,
     research_depth: int,
-    llm_provider: str,
-    llm_model: str,
     analysis_id: Optional[str],
     async_tracker: Optional[Any]
 ) -> tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
@@ -316,8 +317,6 @@ def prepare_analysis_steps(
         market_type: 市场类型
         analysts: 分析师列表
         research_depth: 研究深度
-        llm_provider: LLM提供商
-        llm_model: 模型名称
         analysis_id: 分析任务ID
         async_tracker: 异步进度跟踪器
         
@@ -355,7 +354,7 @@ def prepare_analysis_steps(
     step_name = "cost_estimation"
     _update_step_start("💰 开始成本估算...")
     success, estimated_cost, exec_msg = estimate_analysis_cost(
-        llm_provider, llm_model, analysts, research_depth, 
+        analysts, research_depth, 
         analysis_id, async_tracker
     )
     if not success:
@@ -389,8 +388,6 @@ def prepare_analysis_steps(
     try:
         config_builder = AnalysisConfigBuilder()
         config = config_builder.build_config(
-            llm_provider=llm_provider,
-            llm_model=llm_model,
             research_depth=research_depth,
             market_type=market_type
         )
@@ -724,14 +721,12 @@ def process_analysis_results(
     except ImportError:
         pass
     
-    # 直接对 results 进行赋值，从 params 和 extra_config 中获取所有需要的值
+    # 直接对 results 进行赋值，从 params 中获取所有需要的值
     results = {}
     results['stock_symbol'] = params.get('stock_symbol', 'UNKNOWN')
     results['analysis_date'] = params.get('analysis_date') or params.get('date', '')
     results['analysts'] = params.get('analysts', [])
     results['research_depth'] = params.get('research_depth', 2)
-    results['llm_provider'] = extra_config.get('llm_provider', 'dashscope')
-    results['llm_model'] = extra_config.get('llm_model', 'qwen-max')
     results['state'] = state
     results['decision'] = decision
     results['success'] = True

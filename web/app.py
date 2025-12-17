@@ -439,12 +439,18 @@ def main():
                     form_config=form_config
                 )
 
+                # 从系统配置获取 llm_provider（用于进度跟踪器）
+                from tradingagents.utils.analysis_config import AnalysisConfigBuilder
+                config_builder = AnalysisConfigBuilder()
+                system_overrides = config_builder._load_system_overrides()
+                llm_provider_for_tracker = system_overrides.get('llm_provider', 'dashscope')
+                
                 # 创建异步进度跟踪器
                 async_tracker = AsyncProgressTracker(
                     analysis_id=analysis_id,
                     analysts=form_data['analysts'],
                     research_depth=form_data['research_depth'],
-                    llm_provider=config['llm_provider']
+                    llm_provider=llm_provider_for_tracker
                 )
                 
                 # 确保消息订阅已注册（AsyncProgressTracker会自动注册，这里作为双重保障）
@@ -509,9 +515,7 @@ def main():
                             analysis_date=form_data['analysis_date'],
                             analysts=form_data['analysts'],
                             research_depth=form_data['research_depth'],
-                            llm_provider=config['llm_provider'],
                             market_type=form_data.get('market_type', '美股'),
-                            llm_model=config['llm_model'],
                             progress_callback=progress_callback,
                             analysis_id=analysis_id,
                             async_tracker=async_tracker

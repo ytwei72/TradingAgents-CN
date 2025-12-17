@@ -301,10 +301,6 @@ class AnalysisTask(threading.Thread):
             analysis_date = self.params.get('analysis_date')
             analysts = self.params.get('analysts', [])
             research_depth = self.params.get('research_depth', 3)
-            extra_config = self.params.get('extra_config') or {}
-            
-            llm_provider = extra_config.get('llm_provider', "dashscope")
-            llm_model = extra_config.get('llm_model', "qwen-max")
 
             if not analysis_date:
                 analysis_date = datetime.now().strftime('%Y-%m-%d')
@@ -315,8 +311,6 @@ class AnalysisTask(threading.Thread):
                 analysis_date=analysis_date,
                 analysts=analysts,
                 research_depth=research_depth,
-                llm_provider=llm_provider,
-                llm_model=llm_model,
                 market_type=market_type,
                 progress_callback=progress_callback,
                 analysis_id=self.task_id

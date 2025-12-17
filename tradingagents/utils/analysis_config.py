@@ -25,8 +25,6 @@ class AnalysisConfigBuilder:
     
     def build_config(
         self,
-        llm_provider: str,
-        llm_model: str,
         research_depth: int,
         market_type: str = "美股"
     ) -> Dict[str, Any]:
@@ -34,8 +32,6 @@ class AnalysisConfigBuilder:
         构建分析配置
         
         Args:
-            llm_provider: LLM提供商
-            llm_model: 模型名称
             research_depth: 研究深度（1-5）
             market_type: 市场类型
             
@@ -52,9 +48,10 @@ class AnalysisConfigBuilder:
         # 计算有效的参数（优先使用持久化配置）
         effective_market_type = system_overrides.get("market_type_default", market_type)
         effective_research_depth = system_overrides.get("research_depth_default", research_depth)
-        effective_llm_provider = system_overrides.get("llm_provider", llm_provider)
-        effective_llm_model = system_overrides.get("deep_think_llm", llm_model)
-        effective_quick_model = system_overrides.get("quick_think_llm", llm_model)
+        # 目前仅使用系统配置，以后进行扩展：优先使用系统配置，其次使用默认值
+        effective_llm_provider = system_overrides.get("llm_provider")
+        effective_llm_model = system_overrides.get("deep_think_llm")
+        effective_quick_model = system_overrides.get("quick_think_llm")
         
         # 设置基础LLM配置
         config["llm_provider"] = effective_llm_provider

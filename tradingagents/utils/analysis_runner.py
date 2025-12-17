@@ -102,7 +102,7 @@ def extract_risk_assessment(state):
         return None
 
 
-def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None, analysis_id=None, async_tracker=None):
+def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, market_type="美股", progress_callback=None, analysis_id=None, async_tracker=None):
     """执行股票分析
     
     主函数结构：
@@ -126,8 +126,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         analysis_date: 分析日期
         analysts: 分析师列表
         research_depth: 研究深度
-        llm_provider: LLM提供商 (dashscope/deepseek/google)
-        llm_model: 大模型名称
+        market_type: 市场类型
         progress_callback: 进度回调函数，用于更新UI状态
         analysis_id: 分析任务ID（用于任务控制）
         async_tracker: AsyncProgressTracker实例（用于任务控制）
@@ -178,8 +177,6 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         market_type=market_type,
         analysts=analysts,
         research_depth=research_depth,
-        llm_provider=llm_provider,
-        llm_model=llm_model,
         analysis_id=analysis_id,
         async_tracker=async_tracker
     )
@@ -209,8 +206,6 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                    'analysis_date': analysis_date,
                    'analysts': analysts,
                    'research_depth': research_depth,
-                   'llm_provider': llm_provider,
-                   'llm_model': llm_model,
                    'market_type': market_type,
                    'session_id': session_id,
                    'event_type': 'web_analysis_start'
@@ -265,8 +260,6 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             'analysis_date': analysis_date,
             'analysts': analysts,
             'research_depth': research_depth,
-            'llm_provider': llm_provider,
-            'llm_model': llm_model,
             'state': {},
             'decision': {},
             'success': False,
@@ -304,8 +297,6 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             'analysis_date': analysis_date,
             'analysts': analysts,
             'research_depth': research_depth,
-            'llm_provider': llm_provider,
-            'llm_model': llm_model,
             'state': {},  # 空状态，将显示占位符
             'decision': {},  # 空决策
             'success': False,
