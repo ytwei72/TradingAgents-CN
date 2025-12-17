@@ -8,6 +8,12 @@ const message = ref('')
 const error = ref('')
 const activeTab = ref<'models' | 'pricing' | 'settings'>('models')
 
+// 确认对话框状态
+const showConfirmDialog = ref(false)
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+const confirmResolve = ref<((value: boolean) => void) | null>(null)
+
 // 配置数据
 const models = ref<ModelConfig[]>([])
 const pricing = ref<PricingConfig[]>([])
@@ -28,13 +34,37 @@ const settings = reactive<SystemSettings>({
   log_level: 'INFO'
 })
 
-// 编辑状态
-const editingModelIndex = ref<number | null>(null)
-const editingPricingIndex = ref<number | null>(null)
-const newModel = ref<Partial<ModelConfig>>({})
-const newPricing = ref<Partial<PricingConfig>>({})
+// 当前暂不需要单独的编辑状态，定价配置增删改均直接作用于列表
 
 const providerOptions = ['dashscope', 'openai', 'deepseek', 'google', 'qianfan', 'openrouter', 'siliconflow']
+
+// 显示确认对话框
+const showConfirm = (title: string, message: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    confirmTitle.value = title
+    confirmMessage.value = message
+    confirmResolve.value = resolve
+    showConfirmDialog.value = true
+  })
+}
+
+// 确认对话框 - 确认
+const handleConfirm = () => {
+  showConfirmDialog.value = false
+  if (confirmResolve.value) {
+    confirmResolve.value(true)
+    confirmResolve.value = null
+  }
+}
+
+// 确认对话框 - 取消
+const handleCancel = () => {
+  showConfirmDialog.value = false
+  if (confirmResolve.value) {
+    confirmResolve.value(false)
+    confirmResolve.value = null
+  }
+}
 const currencyOptions = ['CNY', 'USD', 'EUR']
 const logLevelOptions = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
 
@@ -46,7 +76,19 @@ const loadConfig = async () => {
     const res = await getSystemConfig(['models', 'pricing', 'settings'])
     if (res.success && res.data) {
       if (res.data.models) {
-        models.value = res.data.models
+        // 兼容后端字典表中 enabled 可能为 bool / 数字 / 字符串 的情况，统一归一化为 boolean
+        models.value = res.data.models.map((m: any) => {
+          const raw = m.enabled
+          const enabled =
+            raw === true ||
+            raw === 'true' ||
+            raw === 1 ||
+            raw === '1'
+          return {
+            ...m,
+            enabled
+          }
+        })
       }
       if (res.data.pricing) {
         pricing.value = res.data.pricing
@@ -66,6 +108,20 @@ const loadConfig = async () => {
 
 // 保存配置
 const saveConfig = async () => {
+  let confirmText = ''
+  if (activeTab.value === 'models') {
+    confirmText = '确定要保存模型配置吗？'
+  } else if (activeTab.value === 'pricing') {
+    confirmText = '确定要保存定价配置吗？'
+  } else if (activeTab.value === 'settings') {
+    confirmText = '确定要保存系统设置吗？'
+  }
+  
+  const confirmed = await showConfirm('确认保存', confirmText)
+  if (!confirmed) {
+    return
+  }
+  
   saving.value = true
   message.value = ''
   error.value = ''
@@ -97,6 +153,11 @@ const saveConfig = async () => {
 
 // 保存所有配置
 const saveAllConfig = async () => {
+  const confirmed = await showConfirm('确认保存', '确定要保存所有配置吗？这将更新模型配置、定价配置和系统设置。')
+  if (!confirmed) {
+    return
+  }
+  
   saving.value = true
   message.value = ''
   error.value = ''
@@ -121,45 +182,16 @@ const saveAllConfig = async () => {
   }
 }
 
-// 模型配置操作
-const startEditModel = (index: number) => {
-  editingModelIndex.value = index
-}
-
-const cancelEditModel = () => {
-  editingModelIndex.value = null
-  newModel.value = {}
-}
-
-const saveModel = (index: number) => {
-  if (index < 0) {
-    // 新增
-    if (newModel.value.provider && newModel.value.model_name) {
-      models.value.push({
-        provider: newModel.value.provider!,
-        model_name: newModel.value.model_name!,
-        api_key: newModel.value.api_key || '',
-        base_url: newModel.value.base_url || null,
-        max_tokens: newModel.value.max_tokens || 4000,
-        temperature: newModel.value.temperature || 0.7,
-        enabled: newModel.value.enabled ?? true
-      })
-      newModel.value = {}
-    }
-  } else {
-    // 编辑现有
-    editingModelIndex.value = null
-  }
-}
-
-const deleteModel = (index: number) => {
-  if (confirm('确定要删除此模型配置吗？')) {
+const deleteModel = async (index: number) => {
+  const confirmed = await showConfirm('确认删除', '确定要删除此模型配置吗？')
+  if (confirmed) {
     models.value.splice(index, 1)
   }
 }
 
 const addNewModel = () => {
-  newModel.value = {
+  // 在模型列表第一行插入一条新记录，操作列仍然只保留「删除」按钮
+  models.value.unshift({
     provider: 'dashscope',
     model_name: '',
     api_key: '',
@@ -167,52 +199,26 @@ const addNewModel = () => {
     max_tokens: 4000,
     temperature: 0.7,
     enabled: true
-  }
+  })
 }
 
 // 定价配置操作
-const startEditPricing = (index: number) => {
-  editingPricingIndex.value = index
-}
-
-const cancelEditPricing = () => {
-  editingPricingIndex.value = null
-  newPricing.value = {}
-}
-
-const savePricing = (index: number) => {
-  if (index < 0) {
-    // 新增
-    if (newPricing.value.provider && newPricing.value.model_name) {
-      pricing.value.push({
-        provider: newPricing.value.provider!,
-        model_name: newPricing.value.model_name!,
-        input_price_per_1k: newPricing.value.input_price_per_1k || 0,
-        output_price_per_1k: newPricing.value.output_price_per_1k || 0,
-        currency: newPricing.value.currency || 'CNY'
-      })
-      newPricing.value = {}
-    }
-  } else {
-    // 编辑现有
-    editingPricingIndex.value = null
-  }
-}
-
-const deletePricing = (index: number) => {
-  if (confirm('确定要删除此定价配置吗？')) {
+const deletePricing = async (index: number) => {
+  const confirmed = await showConfirm('确认删除', '确定要删除此定价配置吗？')
+  if (confirmed) {
     pricing.value.splice(index, 1)
   }
 }
 
 const addNewPricing = () => {
-  newPricing.value = {
+  // 在定价列表第一行插入一条新记录，操作列仍然只保留「删除」按钮
+  pricing.value.unshift({
     provider: 'dashscope',
     model_name: '',
     input_price_per_1k: 0,
     output_price_per_1k: 0,
     currency: 'CNY'
-  }
+  })
 }
 
 onMounted(() => {
@@ -221,7 +227,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6 text-gray-100">
+  <div class="space-y-6 text-gray-100" autocomplete="off">
     <header class="flex justify-between items-center">
       <div>
         <h1 class="text-2xl font-bold">系统配置管理</h1>
@@ -229,14 +235,14 @@ onMounted(() => {
       </div>
       <div class="flex gap-2">
         <button
-          class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-semibold disabled:opacity-60 transition-colors"
+          class="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 transition-colors text-white save-all-btn"
           :disabled="saving || loading"
           @click="saveAllConfig"
         >
           {{ saving ? '保存中...' : '保存所有配置' }}
         </button>
         <button
-          class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-semibold disabled:opacity-60 transition-colors"
+          class="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 transition-colors text-white save-tab-btn"
           :disabled="saving || loading"
           @click="saveConfig"
         >
@@ -293,7 +299,7 @@ onMounted(() => {
           <h2 class="text-lg font-semibold">模型配置</h2>
           <button
             @click="addNewModel"
-            class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-white add-model-btn"
           >
             新增模型
           </button>
@@ -314,52 +320,18 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody>
-              <!-- 新增行 -->
-              <tr v-if="newModel.provider" class="border-b border-gray-700 hover:bg-[#0f172a]">
-                <td class="p-3">
-                  <select v-model="newModel.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
-                    <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
-                </td>
-                <td class="p-3">
-                  <input v-model="newModel.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="模型名称" />
-                </td>
-                <td class="p-3">
-                  <input v-model="newModel.api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="API密钥" />
-                </td>
-                <td class="p-3">
-                  <input v-model="newModel.base_url" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="Base URL (可选)" />
-                </td>
-                <td class="p-3">
-                  <input v-model.number="newModel.max_tokens" type="number" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
-                </td>
-                <td class="p-3">
-                  <input v-model.number="newModel.temperature" type="number" step="0.1" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
-                </td>
-                <td class="p-3">
-                  <div class="flex justify-center">
-                    <input v-model="newModel.enabled" type="checkbox" class="form-checkbox text-blue-500" />
-                  </div>
-                </td>
-                <td class="p-3">
-                  <div class="flex gap-2">
-                    <button @click="saveModel(-1)" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded text-xs whitespace-nowrap transition-colors">保存</button>
-                    <button @click="cancelEditModel" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 rounded text-xs whitespace-nowrap transition-colors">取消</button>
-                  </div>
-                </td>
-              </tr>
-              <!-- 数据行 -->
+              <!-- 数据行（包含已存在和新增的模型，统一通过保存按钮提交到后端） -->
               <tr v-for="(model, index) in models" :key="index" class="border-b border-gray-700 hover:bg-[#0f172a]">
                 <td class="p-3">
-                  <select v-model="model.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
+                  <select v-model="model.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" autocomplete="off">
                     <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
                   </select>
                 </td>
                 <td class="p-3">
-                  <input v-model="model.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                  <input v-model="model.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" autocomplete="off" />
                 </td>
                 <td class="p-3">
-                  <input v-model="model.api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                  <input v-model="model.api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" autocomplete="new-password" />
                 </td>
                 <td class="p-3">
                   <input v-model="model.base_url" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="可选" />
@@ -372,11 +344,11 @@ onMounted(() => {
                 </td>
                 <td class="p-3">
                   <div class="flex justify-center">
-                    <input v-model="model.enabled" type="checkbox" class="form-checkbox text-blue-500" />
+                    <input v-model="model.enabled" type="checkbox" class="form-checkbox" />
                   </div>
                 </td>
                 <td class="p-3">
-                  <button @click="deleteModel(index)" class="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 rounded text-xs whitespace-nowrap transition-colors">删除</button>
+                  <button @click="deleteModel(index)" class="px-3 py-1.5 rounded text-xs whitespace-nowrap transition-colors text-white delete-btn">删除</button>
                 </td>
               </tr>
             </tbody>
@@ -390,7 +362,7 @@ onMounted(() => {
           <h2 class="text-lg font-semibold">定价配置</h2>
           <button
             @click="addNewPricing"
-            class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-white add-pricing-btn"
           >
             新增定价
           </button>
@@ -409,35 +381,7 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody>
-              <!-- 新增行 -->
-              <tr v-if="newPricing.provider" class="border-b border-gray-700 hover:bg-[#0f172a]">
-                <td class="p-3">
-                  <select v-model="newPricing.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
-                    <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
-                </td>
-                <td class="p-3">
-                  <input v-model="newPricing.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="模型名称" />
-                </td>
-                <td class="p-3">
-                  <input v-model.number="newPricing.input_price_per_1k" type="number" step="0.0001" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
-                </td>
-                <td class="p-3">
-                  <input v-model.number="newPricing.output_price_per_1k" type="number" step="0.0001" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
-                </td>
-                <td class="p-3">
-                  <select v-model="newPricing.currency" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
-                    <option v-for="opt in currencyOptions" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
-                </td>
-                <td class="p-3">
-                  <div class="flex gap-2">
-                    <button @click="savePricing(-1)" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded text-xs whitespace-nowrap transition-colors">保存</button>
-                    <button @click="cancelEditPricing" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 rounded text-xs whitespace-nowrap transition-colors">取消</button>
-                  </div>
-                </td>
-              </tr>
-              <!-- 数据行 -->
+              <!-- 数据行（包含已存在和新增的定价配置，统一通过保存按钮提交到后端） -->
               <tr v-for="(price, index) in pricing" :key="index" class="border-b border-gray-700 hover:bg-[#0f172a]">
                 <td class="p-3">
                   <select v-model="price.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
@@ -459,7 +403,7 @@ onMounted(() => {
                   </select>
                 </td>
                 <td class="p-3">
-                  <button @click="deletePricing(index)" class="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 rounded text-xs whitespace-nowrap transition-colors">删除</button>
+                  <button @click="deletePricing(index)" class="px-3 py-1.5 rounded text-xs whitespace-nowrap transition-colors text-white delete-btn">删除</button>
                 </td>
               </tr>
             </tbody>
@@ -503,22 +447,22 @@ onMounted(() => {
             </div>
 
             <div class="flex items-center space-x-2">
-              <input id="enable_cost_tracking" v-model="settings.enable_cost_tracking" type="checkbox" class="form-checkbox text-blue-500" />
+              <input id="enable_cost_tracking" v-model="settings.enable_cost_tracking" type="checkbox" class="form-checkbox" />
               <label for="enable_cost_tracking" class="text-sm text-gray-300">启用成本跟踪 (enable_cost_tracking)</label>
             </div>
 
             <div class="flex items-center space-x-2">
-              <input id="auto_save_usage" v-model="settings.auto_save_usage" type="checkbox" class="form-checkbox text-blue-500" />
+              <input id="auto_save_usage" v-model="settings.auto_save_usage" type="checkbox" class="form-checkbox" />
               <label for="auto_save_usage" class="text-sm text-gray-300">自动保存使用记录 (auto_save_usage)</label>
             </div>
 
             <div class="flex items-center space-x-2">
-              <input id="auto_create_dirs" v-model="settings.auto_create_dirs" type="checkbox" class="form-checkbox text-blue-500" />
+              <input id="auto_create_dirs" v-model="settings.auto_create_dirs" type="checkbox" class="form-checkbox" />
               <label for="auto_create_dirs" class="text-sm text-gray-300">自动创建目录 (auto_create_dirs)</label>
             </div>
 
             <div class="flex items-center space-x-2">
-              <input id="openai_enabled" v-model="settings.openai_enabled" type="checkbox" class="form-checkbox text-blue-500" />
+              <input id="openai_enabled" v-model="settings.openai_enabled" type="checkbox" class="form-checkbox" />
               <label for="openai_enabled" class="text-sm text-gray-300">启用 OpenAI (openai_enabled)</label>
             </div>
           </section>
@@ -559,12 +503,12 @@ onMounted(() => {
           </section>
 
           <!-- API密钥设置 -->
-          <section class="space-y-4">
+          <section class="space-y-4" autocomplete="off">
             <h3 class="text-md font-semibold text-gray-300 border-b border-gray-700 pb-2">API密钥设置</h3>
 
             <div>
               <label class="block text-sm text-gray-300 mb-1">FinnHub API密钥 (finnhub_api_key)</label>
-              <input v-model="settings.finnhub_api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+              <input v-model="settings.finnhub_api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" autocomplete="off" />
             </div>
           </section>
         </div>
@@ -576,6 +520,28 @@ onMounted(() => {
       <p v-if="message" class="text-green-400 text-sm">{{ message }}</p>
       <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
     </div>
+
+    <!-- 确认对话框 -->
+    <div v-if="showConfirmDialog" class="fixed inset-0 flex items-center justify-center z-50 confirm-dialog-overlay" @click.self="handleCancel">
+      <div class="bg-[#1e293b] border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl confirm-dialog-content">
+        <h3 class="text-lg font-semibold text-white mb-4">{{ confirmTitle }}</h3>
+        <p class="text-gray-300 mb-6">{{ confirmMessage }}</p>
+        <div class="flex justify-end gap-3">
+          <button
+            @click="handleCancel"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-600 text-white hover:bg-gray-500"
+          >
+            取消
+          </button>
+          <button
+            @click="handleConfirm"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-500"
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -583,5 +549,78 @@ onMounted(() => {
 .form-checkbox {
   width: 16px;
   height: 16px;
+}
+
+/* 启用列复选框颜色，和“保存当前标签页”保持一致 */
+.form-checkbox {
+  accent-color: #0891B2;
+}
+
+/* 保存所有配置按钮 - 绿色 */
+.save-all-btn {
+  background-color: #15803D;
+}
+
+.save-all-btn:hover:not(:disabled) {
+  background-color: #16A34A;
+}
+
+/* 保存当前标签页按钮 - 蓝色 */
+.save-tab-btn {
+  background-color: #0891B2;
+}
+
+.save-tab-btn:hover:not(:disabled) {
+  background-color: #06B6D4;
+}
+
+/* 新增模型/定价按钮 - 绿色 */
+.add-model-btn,
+.add-pricing-btn {
+  background-color: #15803D;
+}
+
+.add-model-btn:hover,
+.add-pricing-btn:hover {
+  background-color: #16A34A;
+}
+
+/* 保存按钮 - 蓝色 */
+.save-btn {
+  background-color: #0891B2;
+}
+
+.save-btn:hover {
+  background-color: #06B6D4;
+}
+
+/* 删除按钮 - 红色 */
+.delete-btn {
+  background-color: #D35400;
+}
+
+.delete-btn:hover {
+  background-color: #E67E22;
+}
+
+/* 确认对话框样式 */
+.confirm-dialog-overlay {
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.confirm-dialog-content {
+  animation: dialog-fade-in 0.2s ease-out;
+}
+
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 </style>

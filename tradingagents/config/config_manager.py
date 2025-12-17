@@ -307,17 +307,27 @@ class ConfigManager:
         if config_types is None:
             config_types = ['models', 'pricing', 'settings']
         
-        result = {}
+        result: Dict[str, Any] = {}
         
         try:
+            # 注意：系统配置管理接口期望看到的是「字典表/数据库中真实存储的值」，
+            # 不应该应用诸如环境变量自动启用、OpenAI 开关等运行时逻辑。
+            # 因此这里直接通过 SystemConfigManager 读取原始数据，避免 load_models/load_pricing
+            # 中的额外状态修正逻辑导致前端展示与字典表不一致。
+            if not self.system_config_manager or not self.system_config_manager.is_connected():
+                raise RuntimeError("系统配置管理器未连接，无法获取系统配置")
+
             if 'models' in config_types:
-                result['models'] = [asdict(model) for model in self.load_models()]
+                # 直接返回 MongoDB 中的原始模型配置（包含 enabled 的真实存储值）
+                result['models'] = self.system_config_manager.load_models()
             
             if 'pricing' in config_types:
-                result['pricing'] = [asdict(price) for price in self.load_pricing()]
+                # 定价配置当前没有运行时修正逻辑，直接返回原始数据即可
+                result['pricing'] = self.system_config_manager.load_pricing()
             
             if 'settings' in config_types:
-                result['settings'] = self.load_settings()
+                # 设置项也直接返回原始持久化值
+                result['settings'] = self.system_config_manager.load_settings()
         
         except Exception as e:
             logger.error(f"获取系统配置失败: {e}")
