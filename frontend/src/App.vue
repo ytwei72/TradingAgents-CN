@@ -127,16 +127,55 @@
           <span>分析流程</span>
         </router-link>
 
-        <router-link 
-          to="/backtest" 
-          class="flex items-center space-x-3 px-4 py-3 rounded-lg transition"
-          :class="route.path === '/backtest' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-          </svg>
-          <span>研判回测</span>
-        </router-link>
+        <!-- Backtest Group -->
+        <div>
+          <button
+            type="button"
+            class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition text-left border-l-4"
+            :class="isBacktestActive ? 'border-blue-500 text-gray-100 font-semibold bg-transparent' : 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white'"
+            @click="showBacktest = !showBacktest"
+          >
+            <div class="flex items-center space-x-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"></path>
+              </svg>
+              <span>回测系统</span>
+            </div>
+            <svg
+              class="w-4 h-4 transform transition-transform"
+              :class="showBacktest ? 'rotate-90' : ''"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <div v-if="showBacktest" class="mt-1 space-y-1 ml-6">
+            <router-link 
+              to="/backtest" 
+              class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition"
+              :class="route.path === '/backtest' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              <span>单项回测</span>
+            </router-link>
+
+            <router-link 
+              to="/batch-backtest" 
+              class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition"
+              :class="route.path === '/batch-backtest' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+              </svg>
+              <span>批量回测</span>
+            </router-link>
+          </div>
+        </div>
 
       </nav>
 
@@ -164,6 +203,10 @@ const route = useRoute()
 const systemLogsPaths = ['/model-usage-stats', '/operation-logs', '/task-run-logs']
 const showSystemLogs = ref(systemLogsPaths.includes(route.path))
 const isSystemLogsActive = computed(() => systemLogsPaths.includes(route.path))
+
+const backtestPaths = ['/backtest', '/batch-backtest']
+const showBacktest = ref(backtestPaths.includes(route.path))
+const isBacktestActive = computed(() => backtestPaths.includes(route.path))
 </script>
 
 <style>
