@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-screen bg-[#0f172a] text-gray-100 font-sans overflow-hidden">
     <!-- Sidebar -->
-    <aside class="w-64 bg-[#1e293b] border-r border-gray-700 flex flex-col">
+    <aside class="w-56 bg-[#1e293b] border-r border-gray-700 flex flex-col">
       <div class="p-6 flex items-center space-x-3 border-b border-gray-700">
         <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">AR</div>
         <div>
@@ -44,38 +44,66 @@
           <span>缓存管理</span>
         </a>
 
-        <router-link 
-          to="/model-usage-stats" 
-          class="flex items-center space-x-3 px-4 py-3 rounded-lg transition"
-          :class="route.path === '/model-usage-stats' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span>用量统计</span>
-        </router-link>
+        <!-- System Logs Group -->
+        <div>
+          <button
+            type="button"
+            class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition text-left border-l-4"
+            :class="isSystemLogsActive ? 'border-blue-500 text-gray-100 font-semibold bg-transparent' : 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white'"
+            @click="showSystemLogs = !showSystemLogs"
+          >
+            <div class="flex items-center space-x-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v4H4zM4 10h16v10H4z"></path>
+              </svg>
+              <span>系统日志</span>
+            </div>
+            <svg
+              class="w-4 h-4 transform transition-transform"
+              :class="showSystemLogs ? 'rotate-90' : ''"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
 
-        <router-link 
-          to="/operation-logs" 
-          class="flex items-center space-x-3 px-4 py-3 rounded-lg transition"
-          :class="route.path === '/operation-logs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span>运行日志-老</span>
-        </router-link>
+          <div v-if="showSystemLogs" class="mt-1 space-y-1 ml-6">
+            <router-link 
+              to="/model-usage-stats" 
+              class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition"
+              :class="route.path === '/model-usage-stats' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>用量统计</span>
+            </router-link>
 
-        <router-link 
-          to="/task-run-logs" 
-          class="flex items-center space-x-3 px-4 py-3 rounded-lg transition"
-          :class="route.path === '/task-run-logs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-          </svg>
-          <span>运行日志</span>
-        </router-link>
+            <router-link 
+              to="/operation-logs" 
+              class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition"
+              :class="route.path === '/operation-logs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>运行日志-老</span>
+            </router-link>
+
+            <router-link 
+              to="/task-run-logs" 
+              class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition"
+              :class="route.path === '/task-run-logs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span>运行日志</span>
+            </router-link>
+          </div>
+        </div>
 
         <router-link 
           to="/analysis-results" 
@@ -128,9 +156,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
+
+const systemLogsPaths = ['/model-usage-stats', '/operation-logs', '/task-run-logs']
+const showSystemLogs = ref(systemLogsPaths.includes(route.path))
+const isSystemLogsActive = computed(() => systemLogsPaths.includes(route.path))
 </script>
 
 <style>

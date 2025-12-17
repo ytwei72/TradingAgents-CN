@@ -80,6 +80,32 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+@app.middleware("http")
+async def log_api_timing(request: Request, call_next):
+    """记录所有API调用的耗时日志，并在响应头中附加处理时间"""
+    start_time = time.perf_counter()
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        process_time_ms = (time.perf_counter() - start_time) * 1000
+        logger = logging.getLogger("api_timing")
+        logger.info(
+            "API timing | method=%s path=%s status=%s duration_ms=%.2f",
+            request.method,
+            request.url.path,
+            getattr(response, "status_code", "unknown"),
+            process_time_ms,
+        )
+        # 同时在响应头中暴露耗时信息，便于前端或调试工具查看
+        try:
+            response.headers["X-Process-Time-ms"] = f"{process_time_ms:.2f}"
+        except Exception:
+            # 某些情况下 response 可能不可写，忽略头部设置错误
+            pass
+
+
 # TrustedHost middleware (from reference, conditional)
 if not settings.DEBUG:
     app.add_middleware(

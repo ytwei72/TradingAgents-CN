@@ -433,8 +433,20 @@ class MongoDBReportManager:
         try:
             skip = (page - 1) * page_size
             total = self.collection.count_documents({})
-            
-            cursor = self.collection.find({}).sort("updated_at", -1).skip(skip).limit(page_size)
+
+            # 只获取列表展示所需的基础字段，显式排除体积较大的 reports 字段，
+            # 避免在列表接口中一次性加载所有报告内容
+            projection = {
+                "reports": 0  # 报告详情在 `/api/reports/{analysis_id}/reports` 中按需加载
+            }
+
+            cursor = (
+                self.collection
+                .find({}, projection)
+                .sort("updated_at", -1)
+                .skip(skip)
+                .limit(page_size)
+            )
             reports = list(cursor)
 
             # 关联 stock_dict 字典表，补充上市公司名称 stock_name
