@@ -1,120 +1,59 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
-import { getSystemConfig, updateSystemConfig } from '../api'
-
-type MongoConfig = {
-  mongo_host?: string
-  mongo_port?: number | null
-  mongo_username?: string
-  mongo_password?: string
-  mongo_database?: string
-  mongo_auth_source?: string
-  mongo_max_connections?: number | null
-  mongo_min_connections?: number | null
-  mongo_connect_timeout_ms?: number | null
-  mongo_socket_timeout_ms?: number | null
-  mongo_server_selection_timeout_ms?: number | null
-  mongo_uri?: string
-  mongo_db?: string
-}
-
-type SystemConfigState = {
-  llm_provider: string
-  deep_think_llm: string
-  quick_think_llm: string
-  research_depth_default: number
-  market_type_default: string
-  memory_enabled: boolean
-  online_tools: boolean
-  online_news: boolean
-  realtime_data: boolean
-  max_recur_limit: number
-  backend_url: string
-  custom_openai_base_url: string
-  data_dir: string
-  results_dir: string
-  data_cache_dir: string
-  db: {
-    mongo: MongoConfig
-  }
-  [key: string]: any
-}
+import { ref, reactive, onMounted } from 'vue'
+import { getSystemConfig, updateSystemConfig, type ModelConfig, type PricingConfig, type SystemSettings } from '../api'
 
 const loading = ref(true)
 const saving = ref(false)
 const message = ref('')
 const error = ref('')
+const activeTab = ref<'models' | 'pricing' | 'settings'>('models')
 
-const config = reactive<SystemConfigState>({
-  llm_provider: 'dashscope',
-  deep_think_llm: '',
-  quick_think_llm: '',
-  research_depth_default: 3,
-  market_type_default: '美股',
-  memory_enabled: true,
-  online_tools: true,
-  online_news: true,
-  realtime_data: false,
-  max_recur_limit: 100,
-  backend_url: '',
-  custom_openai_base_url: '',
-  data_dir: '',
-  results_dir: '',
-  data_cache_dir: '',
-  db: {
-    mongo: {
-      mongo_host: '',
-      mongo_port: null,
-      mongo_username: '',
-      mongo_password: '',
-      mongo_database: '',
-      mongo_auth_source: '',
-      mongo_max_connections: null,
-      mongo_min_connections: null,
-      mongo_connect_timeout_ms: null,
-      mongo_socket_timeout_ms: null,
-      mongo_server_selection_timeout_ms: null,
-      mongo_uri: '',
-      mongo_db: ''
-    }
-  }
+// 配置数据
+const models = ref<ModelConfig[]>([])
+const pricing = ref<PricingConfig[]>([])
+const settings = reactive<SystemSettings>({
+  default_provider: 'dashscope',
+  default_model: 'qwen-turbo',
+  enable_cost_tracking: true,
+  cost_alert_threshold: 100.0,
+  currency_preference: 'CNY',
+  auto_save_usage: true,
+  max_usage_records: 10000,
+  data_dir: './data',
+  cache_dir: './data/cache',
+  results_dir: './results',
+  auto_create_dirs: true,
+  openai_enabled: false,
+  finnhub_api_key: '',
+  log_level: 'INFO'
 })
 
-const providerOptions = [
-  { value: 'dashscope', label: 'DashScope' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'qianfan', label: '千帆' },
-  { value: 'google', label: 'Google AI' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'siliconflow', label: 'SiliconFlow' },
-  { value: 'custom_openai', label: '自定义OpenAI' }
-]
+// 编辑状态
+const editingModelIndex = ref<number | null>(null)
+const editingPricingIndex = ref<number | null>(null)
+const newModel = ref<Partial<ModelConfig>>({})
+const newPricing = ref<Partial<PricingConfig>>({})
 
-const marketOptions = ['A股', '港股', '美股']
+const providerOptions = ['dashscope', 'openai', 'deepseek', 'google', 'qianfan', 'openrouter', 'siliconflow']
+const currencyOptions = ['CNY', 'USD', 'EUR']
+const logLevelOptions = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
 
-function deepAssign(target: any, source: any) {
-  if (!source || typeof source !== 'object') return
-  Object.keys(source).forEach((key) => {
-    const srcVal = source[key]
-    if (srcVal && typeof srcVal === 'object' && !Array.isArray(srcVal)) {
-      target[key] = target[key] || {}
-      deepAssign(target[key], srcVal)
-    } else {
-      target[key] = srcVal
-    }
-  })
-}
-
+// 加载配置
 const loadConfig = async () => {
   loading.value = true
   error.value = ''
   try {
-    const res = await getSystemConfig()
+    const res = await getSystemConfig(['models', 'pricing', 'settings'])
     if (res.success && res.data) {
-      // 后端默认返回 { settings: { ... } } 结构
-      const settings = res.data.settings || res.data
-      deepAssign(config, settings)
+      if (res.data.models) {
+        models.value = res.data.models
+      }
+      if (res.data.pricing) {
+        pricing.value = res.data.pricing
+      }
+      if (res.data.settings) {
+        Object.assign(settings, res.data.settings)
+      }
     } else {
       error.value = res.message || '加载配置失败'
     }
@@ -125,16 +64,26 @@ const loadConfig = async () => {
   }
 }
 
+// 保存配置
 const saveConfig = async () => {
   saving.value = true
   message.value = ''
   error.value = ''
   try {
-    const payload = JSON.parse(JSON.stringify(config))
+    const payload: any = {}
+    
+    if (activeTab.value === 'models') {
+      payload.models = models.value
+    } else if (activeTab.value === 'pricing') {
+      payload.pricing = pricing.value
+    } else if (activeTab.value === 'settings') {
+      payload.settings = settings
+    }
+    
     const res = await updateSystemConfig(payload)
     if (res.success) {
       message.value = '配置已保存'
-      // 更新接口不返回最新配置，保存后重新拉取一次
+      // 保存后重新加载
       await loadConfig()
     } else {
       error.value = res.message || '保存失败'
@@ -143,6 +92,126 @@ const saveConfig = async () => {
     error.value = err?.response?.data?.detail || err?.message || '保存失败'
   } finally {
     saving.value = false
+  }
+}
+
+// 保存所有配置
+const saveAllConfig = async () => {
+  saving.value = true
+  message.value = ''
+  error.value = ''
+  try {
+    const payload = {
+      models: models.value,
+      pricing: pricing.value,
+      settings: settings
+    }
+    
+    const res = await updateSystemConfig(payload)
+    if (res.success) {
+      message.value = '所有配置已保存'
+      await loadConfig()
+    } else {
+      error.value = res.message || '保存失败'
+    }
+  } catch (err: any) {
+    error.value = err?.response?.data?.detail || err?.message || '保存失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+// 模型配置操作
+const startEditModel = (index: number) => {
+  editingModelIndex.value = index
+}
+
+const cancelEditModel = () => {
+  editingModelIndex.value = null
+  newModel.value = {}
+}
+
+const saveModel = (index: number) => {
+  if (index < 0) {
+    // 新增
+    if (newModel.value.provider && newModel.value.model_name) {
+      models.value.push({
+        provider: newModel.value.provider!,
+        model_name: newModel.value.model_name!,
+        api_key: newModel.value.api_key || '',
+        base_url: newModel.value.base_url || null,
+        max_tokens: newModel.value.max_tokens || 4000,
+        temperature: newModel.value.temperature || 0.7,
+        enabled: newModel.value.enabled ?? true
+      })
+      newModel.value = {}
+    }
+  } else {
+    // 编辑现有
+    editingModelIndex.value = null
+  }
+}
+
+const deleteModel = (index: number) => {
+  if (confirm('确定要删除此模型配置吗？')) {
+    models.value.splice(index, 1)
+  }
+}
+
+const addNewModel = () => {
+  newModel.value = {
+    provider: 'dashscope',
+    model_name: '',
+    api_key: '',
+    base_url: null,
+    max_tokens: 4000,
+    temperature: 0.7,
+    enabled: true
+  }
+}
+
+// 定价配置操作
+const startEditPricing = (index: number) => {
+  editingPricingIndex.value = index
+}
+
+const cancelEditPricing = () => {
+  editingPricingIndex.value = null
+  newPricing.value = {}
+}
+
+const savePricing = (index: number) => {
+  if (index < 0) {
+    // 新增
+    if (newPricing.value.provider && newPricing.value.model_name) {
+      pricing.value.push({
+        provider: newPricing.value.provider!,
+        model_name: newPricing.value.model_name!,
+        input_price_per_1k: newPricing.value.input_price_per_1k || 0,
+        output_price_per_1k: newPricing.value.output_price_per_1k || 0,
+        currency: newPricing.value.currency || 'CNY'
+      })
+      newPricing.value = {}
+    }
+  } else {
+    // 编辑现有
+    editingPricingIndex.value = null
+  }
+}
+
+const deletePricing = (index: number) => {
+  if (confirm('确定要删除此定价配置吗？')) {
+    pricing.value.splice(index, 1)
+  }
+}
+
+const addNewPricing = () => {
+  newPricing.value = {
+    provider: 'dashscope',
+    model_name: '',
+    input_price_per_1k: 0,
+    output_price_per_1k: 0,
+    currency: 'CNY'
   }
 }
 
@@ -155,221 +224,354 @@ onMounted(() => {
   <div class="space-y-6 text-gray-100">
     <header class="flex justify-between items-center">
       <div>
-        <h1 class="text-2xl font-bold">配置管理</h1>
-        <p class="text-sm text-gray-400">基于 prepare_analysis_steps 的系统配置项</p>
+        <h1 class="text-2xl font-bold">系统配置管理</h1>
+        <p class="text-sm text-gray-400">管理模型配置、定价配置和系统设置</p>
       </div>
-      <button
-        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold disabled:opacity-60"
-        :disabled="saving || loading"
-        @click="saveConfig"
-      >
-        {{ saving ? '保存中...' : '保存配置' }}
-      </button>
+      <div class="flex gap-2">
+        <button
+          class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-semibold disabled:opacity-60 transition-colors"
+          :disabled="saving || loading"
+          @click="saveAllConfig"
+        >
+          {{ saving ? '保存中...' : '保存所有配置' }}
+        </button>
+        <button
+          class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-semibold disabled:opacity-60 transition-colors"
+          :disabled="saving || loading"
+          @click="saveConfig"
+        >
+          {{ saving ? '保存中...' : '保存当前标签页' }}
+        </button>
+      </div>
     </header>
 
     <div v-if="loading" class="bg-[#1e293b] border border-gray-700 rounded-lg p-6">
       加载配置中...
     </div>
-    <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <section class="bg-[#1e293b] border border-gray-700 rounded-lg p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-semibold">LLM 设置</h2>
-            <p class="text-xs text-gray-400">llm_provider / deep_think_llm / quick_think_llm / backend_url</p>
-          </div>
+
+    <div v-else>
+      <!-- 标签页 -->
+      <div class="flex border-b border-gray-700 mb-6">
+        <button
+          @click="activeTab = 'models'"
+          :class="[
+            'px-6 py-3 font-medium text-sm transition-colors',
+            activeTab === 'models'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          ]"
+        >
+          模型配置
+        </button>
+        <button
+          @click="activeTab = 'pricing'"
+          :class="[
+            'px-6 py-3 font-medium text-sm transition-colors',
+            activeTab === 'pricing'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          ]"
+        >
+          定价配置
+        </button>
+        <button
+          @click="activeTab = 'settings'"
+          :class="[
+            'px-6 py-3 font-medium text-sm transition-colors',
+            activeTab === 'settings'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          ]"
+        >
+          系统设置
+        </button>
+      </div>
+
+      <!-- 模型配置 -->
+      <div v-if="activeTab === 'models'" class="bg-[#1e293b] border border-gray-700 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">模型配置</h2>
+          <button
+            @click="addNewModel"
+            class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors"
+          >
+            新增模型
+          </button>
         </div>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">LLM 提供商 (llm_provider)</label>
-            <select v-model="config.llm_provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2">
-              <option v-for="item in providerOptions" :key="item.value" :value="item.value">
-                {{ item.label }}
-              </option>
-            </select>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm table-fixed">
+            <thead>
+              <tr class="border-b border-gray-700">
+                <th class="text-left p-3 w-28">供应商</th>
+                <th class="text-left p-3 w-40">模型名称</th>
+                <th class="text-left p-3 min-w-[200px]">API密钥</th>
+                <th class="text-left p-3 min-w-[180px]">Base URL</th>
+                <th class="text-left p-3 w-24">最大Token</th>
+                <th class="text-left p-3 w-20">温度</th>
+                <th class="text-left p-3 w-16">启用</th>
+                <th class="text-left p-3 w-20">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 新增行 -->
+              <tr v-if="newModel.provider" class="border-b border-gray-700 hover:bg-[#0f172a]">
+                <td class="p-3">
+                  <select v-model="newModel.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
+                    <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </td>
+                <td class="p-3">
+                  <input v-model="newModel.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="模型名称" />
+                </td>
+                <td class="p-3">
+                  <input v-model="newModel.api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="API密钥" />
+                </td>
+                <td class="p-3">
+                  <input v-model="newModel.base_url" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="Base URL (可选)" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="newModel.max_tokens" type="number" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="newModel.temperature" type="number" step="0.1" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <div class="flex justify-center">
+                    <input v-model="newModel.enabled" type="checkbox" class="form-checkbox text-blue-500" />
+                  </div>
+                </td>
+                <td class="p-3">
+                  <div class="flex gap-2">
+                    <button @click="saveModel(-1)" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded text-xs whitespace-nowrap transition-colors">保存</button>
+                    <button @click="cancelEditModel" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 rounded text-xs whitespace-nowrap transition-colors">取消</button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 数据行 -->
+              <tr v-for="(model, index) in models" :key="index" class="border-b border-gray-700 hover:bg-[#0f172a]">
+                <td class="p-3">
+                  <select v-model="model.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
+                    <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </td>
+                <td class="p-3">
+                  <input v-model="model.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <input v-model="model.api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <input v-model="model.base_url" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="可选" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="model.max_tokens" type="number" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="model.temperature" type="number" step="0.1" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <div class="flex justify-center">
+                    <input v-model="model.enabled" type="checkbox" class="form-checkbox text-blue-500" />
+                  </div>
+                </td>
+                <td class="p-3">
+                  <button @click="deleteModel(index)" class="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 rounded text-xs whitespace-nowrap transition-colors">删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 定价配置 -->
+      <div v-if="activeTab === 'pricing'" class="bg-[#1e293b] border border-gray-700 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">定价配置</h2>
+          <button
+            @click="addNewPricing"
+            class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors"
+          >
+            新增定价
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-700">
+                <th class="text-left p-3">供应商</th>
+                <th class="text-left p-3">模型名称</th>
+                <th class="text-left p-3">输入价格(/1K)</th>
+                <th class="text-left p-3">输出价格(/1K)</th>
+                <th class="text-left p-3">货币</th>
+                <th class="text-left p-3">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 新增行 -->
+              <tr v-if="newPricing.provider" class="border-b border-gray-700 hover:bg-[#0f172a]">
+                <td class="p-3">
+                  <select v-model="newPricing.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
+                    <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </td>
+                <td class="p-3">
+                  <input v-model="newPricing.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" placeholder="模型名称" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="newPricing.input_price_per_1k" type="number" step="0.0001" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="newPricing.output_price_per_1k" type="number" step="0.0001" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <select v-model="newPricing.currency" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
+                    <option v-for="opt in currencyOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </td>
+                <td class="p-3">
+                  <div class="flex gap-2">
+                    <button @click="savePricing(-1)" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded text-xs whitespace-nowrap transition-colors">保存</button>
+                    <button @click="cancelEditPricing" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 rounded text-xs whitespace-nowrap transition-colors">取消</button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 数据行 -->
+              <tr v-for="(price, index) in pricing" :key="index" class="border-b border-gray-700 hover:bg-[#0f172a]">
+                <td class="p-3">
+                  <select v-model="price.provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
+                    <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </td>
+                <td class="p-3">
+                  <input v-model="price.model_name" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="price.input_price_per_1k" type="number" step="0.0001" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <input v-model.number="price.output_price_per_1k" type="number" step="0.0001" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1" />
+                </td>
+                <td class="p-3">
+                  <select v-model="price.currency" class="w-full bg-[#0f172a] border border-gray-700 rounded p-1">
+                    <option v-for="opt in currencyOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </td>
+                <td class="p-3">
+                  <button @click="deletePricing(index)" class="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 rounded text-xs whitespace-nowrap transition-colors">删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 系统设置 -->
+      <div v-if="activeTab === 'settings'" class="bg-[#1e293b] border border-gray-700 rounded-lg p-6 space-y-6">
+        <h2 class="text-lg font-semibold">系统设置</h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- 基本设置 -->
+          <section class="space-y-4">
+            <h3 class="text-md font-semibold text-gray-300 border-b border-gray-700 pb-2">基本设置</h3>
+            
             <div>
-              <label class="block text-sm text-gray-300 mb-1">深度思考模型 (deep_think_llm)</label>
-              <input v-model="config.deep_think_llm" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+              <label class="block text-sm text-gray-300 mb-1">默认供应商 (default_provider)</label>
+              <select v-model="settings.default_provider" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2">
+                <option v-for="opt in providerOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
             </div>
+
             <div>
-              <label class="block text-sm text-gray-300 mb-1">快速思考模型 (quick_think_llm)</label>
-              <input v-model="config.quick_think_llm" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+              <label class="block text-sm text-gray-300 mb-1">默认模型 (default_model)</label>
+              <input v-model="settings.default_model" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
             </div>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">LLM 后端地址 (backend_url)</label>
-            <input v-model="config.backend_url" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">自定义 OpenAI Base URL (custom_openai_base_url)</label>
-            <input v-model="config.custom_openai_base_url" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-        </div>
-      </section>
 
-      <section class="bg-[#1e293b] border border-gray-700 rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-lg font-semibold">分析默认值</h2>
-          <p class="text-xs text-gray-400">research_depth_default / market_type_default / max_recur_limit</p>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">默认研究深度 (research_depth_default)</label>
-            <input
-              v-model.number="config.research_depth_default"
-              type="number"
-              min="1"
-              max="5"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">默认市场 (market_type_default)</label>
-            <select v-model="config.market_type_default" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2">
-              <option v-for="item in marketOptions" :key="item" :value="item">{{ item }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">最大递归限制 (max_recur_limit)</label>
-            <input
-              v-model.number="config.max_recur_limit"
-              type="number"
-              min="1"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-        </div>
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">货币偏好 (currency_preference)</label>
+              <select v-model="settings.currency_preference" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2">
+                <option v-for="opt in currencyOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="flex items-center space-x-2">
-            <input id="memory_enabled" v-model="config.memory_enabled" type="checkbox" class="form-checkbox text-blue-500" />
-            <label for="memory_enabled" class="text-sm text-gray-300">启用记忆 (memory_enabled)</label>
-          </div>
-          <div class="flex items-center space-x-2">
-            <input id="online_tools" v-model="config.online_tools" type="checkbox" class="form-checkbox text-blue-500" />
-            <label for="online_tools" class="text-sm text-gray-300">在线工具 (online_tools)</label>
-          </div>
-          <div class="flex items-center space-x-2">
-            <input id="online_news" v-model="config.online_news" type="checkbox" class="form-checkbox text-blue-500" />
-            <label for="online_news" class="text-sm text-gray-300">在线新闻 (online_news)</label>
-          </div>
-          <div class="flex items-center space-x-2">
-            <input id="realtime_data" v-model="config.realtime_data" type="checkbox" class="form-checkbox text-blue-500" />
-            <label for="realtime_data" class="text-sm text-gray-300">实时数据 (realtime_data)</label>
-          </div>
-        </div>
-      </section>
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">日志级别 (log_level)</label>
+              <select v-model="settings.log_level" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2">
+                <option v-for="opt in logLevelOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
 
-      <section class="bg-[#1e293b] border border-gray-700 rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-lg font-semibold">路径配置</h2>
-          <p class="text-xs text-gray-400">data_dir / results_dir / data_cache_dir</p>
-        </div>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">数据目录 (data_dir)</label>
-            <input v-model="config.data_dir" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">结果目录 (results_dir)</label>
-            <input v-model="config.results_dir" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">数据缓存目录 (data_cache_dir)</label>
-            <input v-model="config.data_cache_dir" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-        </div>
-      </section>
+            <div class="flex items-center space-x-2">
+              <input id="enable_cost_tracking" v-model="settings.enable_cost_tracking" type="checkbox" class="form-checkbox text-blue-500" />
+              <label for="enable_cost_tracking" class="text-sm text-gray-300">启用成本跟踪 (enable_cost_tracking)</label>
+            </div>
 
-      <section class="bg-[#1e293b] border border-gray-700 rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-lg font-semibold">数据库配置 (db.mongo)</h2>
-          <p class="text-xs text-gray-400">对应 config.db.mongo 结构</p>
-        </div>
+            <div class="flex items-center space-x-2">
+              <input id="auto_save_usage" v-model="settings.auto_save_usage" type="checkbox" class="form-checkbox text-blue-500" />
+              <label for="auto_save_usage" class="text-sm text-gray-300">自动保存使用记录 (auto_save_usage)</label>
+            </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_host</label>
-            <input v-model="config.db.mongo.mongo_host" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_port</label>
-            <input
-              v-model.number="config.db.mongo.mongo_port"
-              type="number"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_username</label>
-            <input v-model="config.db.mongo.mongo_username" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_password</label>
-            <input v-model="config.db.mongo.mongo_password" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_database</label>
-            <input v-model="config.db.mongo.mongo_database" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_auth_source</label>
-            <input v-model="config.db.mongo.mongo_auth_source" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_max_connections</label>
-            <input
-              v-model.number="config.db.mongo.mongo_max_connections"
-              type="number"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_min_connections</label>
-            <input
-              v-model.number="config.db.mongo.mongo_min_connections"
-              type="number"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_connect_timeout_ms</label>
-            <input
-              v-model.number="config.db.mongo.mongo_connect_timeout_ms"
-              type="number"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_socket_timeout_ms</label>
-            <input
-              v-model.number="config.db.mongo.mongo_socket_timeout_ms"
-              type="number"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_server_selection_timeout_ms</label>
-            <input
-              v-model.number="config.db.mongo.mongo_server_selection_timeout_ms"
-              type="number"
-              class="w-full bg-[#0f172a] border border-gray-700 rounded p-2"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_uri</label>
-            <input v-model="config.db.mongo.mongo_uri" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">mongo_db</label>
-            <input v-model="config.db.mongo.mongo_db" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
-          </div>
+            <div class="flex items-center space-x-2">
+              <input id="auto_create_dirs" v-model="settings.auto_create_dirs" type="checkbox" class="form-checkbox text-blue-500" />
+              <label for="auto_create_dirs" class="text-sm text-gray-300">自动创建目录 (auto_create_dirs)</label>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <input id="openai_enabled" v-model="settings.openai_enabled" type="checkbox" class="form-checkbox text-blue-500" />
+              <label for="openai_enabled" class="text-sm text-gray-300">启用 OpenAI (openai_enabled)</label>
+            </div>
+          </section>
+
+          <!-- 成本与使用设置 -->
+          <section class="space-y-4">
+            <h3 class="text-md font-semibold text-gray-300 border-b border-gray-700 pb-2">成本与使用设置</h3>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">成本警告阈值 (cost_alert_threshold)</label>
+              <input v-model.number="settings.cost_alert_threshold" type="number" step="0.1" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">最大使用记录数 (max_usage_records)</label>
+              <input v-model.number="settings.max_usage_records" type="number" min="1" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+            </div>
+          </section>
+
+          <!-- 路径设置 -->
+          <section class="space-y-4">
+            <h3 class="text-md font-semibold text-gray-300 border-b border-gray-700 pb-2">路径设置</h3>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">数据目录 (data_dir)</label>
+              <input v-model="settings.data_dir" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">缓存目录 (cache_dir)</label>
+              <input v-model="settings.cache_dir" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">结果目录 (results_dir)</label>
+              <input v-model="settings.results_dir" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+            </div>
+          </section>
+
+          <!-- API密钥设置 -->
+          <section class="space-y-4">
+            <h3 class="text-md font-semibold text-gray-300 border-b border-gray-700 pb-2">API密钥设置</h3>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-1">FinnHub API密钥 (finnhub_api_key)</label>
+              <input v-model="settings.finnhub_api_key" type="password" class="w-full bg-[#0f172a] border border-gray-700 rounded p-2" />
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
 
+    <!-- 消息提示 -->
     <div class="space-y-2">
       <p v-if="message" class="text-green-400 text-sm">{{ message }}</p>
       <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
@@ -383,4 +585,3 @@ onMounted(() => {
   height: 16px;
 }
 </style>
-

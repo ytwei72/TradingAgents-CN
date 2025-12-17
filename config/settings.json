@@ -12,8 +12,5 @@
   "auto_create_dirs": true,
   "openai_enabled": false,
   "finnhub_api_key": "d3msb11r01qmso358b1gd3msb11r01qmso358b20",
-  "reddit_client_id": "your_reddit_client_id",
-  "reddit_client_secret": "your_reddit_client_secret",
-  "reddit_user_agent": "TradingAgents-CN/1.0",
   "log_level": "INFO"
 }

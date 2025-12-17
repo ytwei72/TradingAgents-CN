@@ -27,6 +27,13 @@ except ImportError:
     MONGODB_AVAILABLE = False
     ModelUsageManager = None
 
+try:
+    from tradingagents.storage.mongodb.system_config_manager import SystemConfigManager
+    SYSTEM_CONFIG_MANAGER_AVAILABLE = True
+except ImportError:
+    SYSTEM_CONFIG_MANAGER_AVAILABLE = False
+    SystemConfigManager = None
+
 
 @dataclass
 class ModelConfig:
@@ -72,8 +79,13 @@ class ConfigManager:
         # 初始化MongoDB存储（如果可用）
         self.model_usage_manager = None
         self._init_model_usage_manager()
+        
+        # 初始化系统配置管理器（数据库优先）
+        self.system_config_manager = None
+        self._init_system_config_manager()
 
-        self._init_default_configs()
+        # 不再需要初始化默认配置到文件（由 SystemConfigManager 处理）
+        # self._init_default_configs()
 
     def _load_env_file(self):
         """加载.env文件（保持向后兼容）"""
@@ -155,111 +167,131 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"❌ 模型使用记录管理器初始化失败: {e}", exc_info=True)
             self.model_usage_manager = None
+    
+    def _init_system_config_manager(self):
+        """初始化系统配置管理器（数据库优先）"""
+        if not SYSTEM_CONFIG_MANAGER_AVAILABLE or SystemConfigManager is None:
+            logger.warning("⚠️ 系统配置管理器不可用，将使用JSON文件存储")
+            return
+        
+        try:
+            self.system_config_manager = SystemConfigManager(str(self.config_dir))
+            
+            if self.system_config_manager.is_connected():
+                logger.info("✅ 系统配置管理器已启用（数据库优先）")
+            else:
+                logger.warning("⚠️ 系统配置管理器连接失败，将使用JSON文件存储")
+
+        except Exception as e:
+            logger.error(f"❌ 系统配置管理器初始化失败: {e}", exc_info=True)
+            self.system_config_manager = None
 
     def _init_default_configs(self):
-        """初始化默认配置"""
+        """
+        初始化默认配置到数据库
+        注意：配置文件仅用于读取默认值，不再写入配置文件
+        """
+        if not self.system_config_manager or not self.system_config_manager.is_connected():
+            raise RuntimeError("系统配置管理器未连接，无法初始化默认配置")
+        
         # 默认模型配置
-        if not self.models_file.exists():
-            default_models = [
-                ModelConfig(
-                    provider="dashscope",
-                    model_name="qwen-turbo",
-                    api_key="",
-                    max_tokens=4000,
-                    temperature=0.7
-                ),
-                ModelConfig(
-                    provider="dashscope",
-                    model_name="qwen-plus-latest",
-                    api_key="",
-                    max_tokens=8000,
-                    temperature=0.7
-                ),
-                ModelConfig(
-                    provider="openai",
-                    model_name="gpt-3.5-turbo",
-                    api_key="",
-                    max_tokens=4000,
-                    temperature=0.7,
-                    enabled=False
-                ),
-                ModelConfig(
-                    provider="openai",
-                    model_name="gpt-4",
-                    api_key="",
-                    max_tokens=8000,
-                    temperature=0.7,
-                    enabled=False
-                ),
-                ModelConfig(
-                    provider="google",
-                    model_name="gemini-2.5-pro",
-                    api_key="",
-                    max_tokens=4000,
-                    temperature=0.7,
-                    enabled=False
-                ),
-                ModelConfig(
-                    provider="deepseek",
-                    model_name="deepseek-chat",
-                    api_key="",
-                    max_tokens=8000,
-                    temperature=0.7,
-                    enabled=False
-                )
-            ]
-            self.save_models(default_models)
+        default_models = [
+            ModelConfig(
+                provider="dashscope",
+                model_name="qwen-turbo",
+                api_key="",
+                max_tokens=4000,
+                temperature=0.7
+            ),
+            ModelConfig(
+                provider="dashscope",
+                model_name="qwen-plus-latest",
+                api_key="",
+                max_tokens=8000,
+                temperature=0.7
+            ),
+            ModelConfig(
+                provider="openai",
+                model_name="gpt-3.5-turbo",
+                api_key="",
+                max_tokens=4000,
+                temperature=0.7,
+                enabled=False
+            ),
+            ModelConfig(
+                provider="openai",
+                model_name="gpt-4",
+                api_key="",
+                max_tokens=8000,
+                temperature=0.7,
+                enabled=False
+            ),
+            ModelConfig(
+                provider="google",
+                model_name="gemini-2.5-pro",
+                api_key="",
+                max_tokens=4000,
+                temperature=0.7,
+                enabled=False
+            ),
+            ModelConfig(
+                provider="deepseek",
+                model_name="deepseek-chat",
+                api_key="",
+                max_tokens=8000,
+                temperature=0.7,
+                enabled=False
+            )
+        ]
+        self.save_models(default_models)
         
         # 默认定价配置
-        if not self.pricing_file.exists():
-            default_pricing = [
-                # 阿里百炼定价 (人民币)
-                PricingConfig("dashscope", "qwen-turbo", 0.002, 0.006, "CNY"),
-                PricingConfig("dashscope", "qwen-plus-latest", 0.004, 0.012, "CNY"),
-                PricingConfig("dashscope", "qwen-max", 0.02, 0.06, "CNY"),
+        default_pricing = [
+            # 阿里百炼定价 (人民币)
+            PricingConfig("dashscope", "qwen-turbo", 0.002, 0.006, "CNY"),
+            PricingConfig("dashscope", "qwen-plus-latest", 0.004, 0.012, "CNY"),
+            PricingConfig("dashscope", "qwen-max", 0.02, 0.06, "CNY"),
 
-                # DeepSeek定价 (人民币) - 2025年最新价格
-                PricingConfig("deepseek", "deepseek-chat", 0.0014, 0.0028, "CNY"),
-                PricingConfig("deepseek", "deepseek-coder", 0.0014, 0.0028, "CNY"),
+            # DeepSeek定价 (人民币) - 2025年最新价格
+            PricingConfig("deepseek", "deepseek-chat", 0.0014, 0.0028, "CNY"),
+            PricingConfig("deepseek", "deepseek-coder", 0.0014, 0.0028, "CNY"),
 
-                # OpenAI定价 (美元)
-                PricingConfig("openai", "gpt-3.5-turbo", 0.0015, 0.002, "USD"),
-                PricingConfig("openai", "gpt-4", 0.03, 0.06, "USD"),
-                PricingConfig("openai", "gpt-4-turbo", 0.01, 0.03, "USD"),
+            # OpenAI定价 (美元)
+            PricingConfig("openai", "gpt-3.5-turbo", 0.0015, 0.002, "USD"),
+            PricingConfig("openai", "gpt-4", 0.03, 0.06, "USD"),
+            PricingConfig("openai", "gpt-4-turbo", 0.01, 0.03, "USD"),
 
-                # Google定价 (美元)
-                PricingConfig("google", "gemini-2.5-pro", 0.00025, 0.0005, "USD"),
-                PricingConfig("google", "gemini-2.5-flash", 0.00025, 0.0005, "USD"),
-                PricingConfig("google", "gemini-2.0-flash", 0.00025, 0.0005, "USD"),
-                PricingConfig("google", "gemini-1.5-pro", 0.00025, 0.0005, "USD"),
-                PricingConfig("google", "gemini-1.5-flash", 0.00025, 0.0005, "USD"),
-                PricingConfig("google", "gemini-2.5-flash-lite-preview-06-17", 0.00025, 0.0005, "USD"),
-                PricingConfig("google", "gemini-pro", 0.00025, 0.0005, "USD"),
-                PricingConfig("google", "gemini-pro-vision", 0.00025, 0.0005, "USD"),
-            ]
-            self.save_pricing(default_pricing)
+            # Google定价 (美元)
+            PricingConfig("google", "gemini-2.5-pro", 0.00025, 0.0005, "USD"),
+            PricingConfig("google", "gemini-2.5-flash", 0.00025, 0.0005, "USD"),
+            PricingConfig("google", "gemini-2.0-flash", 0.00025, 0.0005, "USD"),
+            PricingConfig("google", "gemini-1.5-pro", 0.00025, 0.0005, "USD"),
+            PricingConfig("google", "gemini-1.5-flash", 0.00025, 0.0005, "USD"),
+            PricingConfig("google", "gemini-2.5-flash-lite-preview-06-17", 0.00025, 0.0005, "USD"),
+            PricingConfig("google", "gemini-pro", 0.00025, 0.0005, "USD"),
+            PricingConfig("google", "gemini-pro-vision", 0.00025, 0.0005, "USD"),
+        ]
+        self.save_pricing(default_pricing)
         
         # 默认设置
-        if not self.settings_file.exists():
-            # 导入默认数据目录配置
-            import os
-            default_data_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data")
-            
-            default_settings = {
-                "default_provider": "dashscope",
-                "default_model": "qwen-turbo",
-                "enable_cost_tracking": True,
-                "cost_alert_threshold": 100.0,  # 成本警告阈值
-                "currency_preference": "CNY",
-                "auto_save_usage": True,
-                "max_usage_records": 10000,
-                "data_dir": default_data_dir,  # 数据目录配置
-                "cache_dir": os.path.join(default_data_dir, "cache"),  # 缓存目录
-                "results_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results"),  # 结果目录
-                "auto_create_dirs": True,  # 自动创建目录
-                "openai_enabled": False,  # OpenAI模型是否启用
-            }
-            self.save_settings(default_settings)
+        import os
+        default_data_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data")
+        
+        default_settings = {
+            "default_provider": "dashscope",
+            "default_model": "qwen-turbo",
+            "enable_cost_tracking": True,
+            "cost_alert_threshold": 100.0,  # 成本警告阈值
+            "currency_preference": "CNY",
+            "auto_save_usage": True,
+            "max_usage_records": 10000,
+            "data_dir": default_data_dir,  # 数据目录配置
+            "cache_dir": os.path.join(default_data_dir, "cache"),  # 缓存目录
+            "results_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results"),  # 结果目录
+            "auto_create_dirs": True,  # 自动创建目录
+            "openai_enabled": False,  # OpenAI模型是否启用
+        }
+        self.save_settings(default_settings)
 
     def fetch_system_config(self, config_types: Optional[List[str]] = None) -> Dict[str, Any]:
         """
@@ -330,68 +362,85 @@ class ConfigManager:
             raise
     
     def load_models(self) -> List[ModelConfig]:
-        """加载模型配置，优先使用.env中的API密钥"""
-        try:
-            with open(self.models_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                models = [ModelConfig(**item) for item in data]
+        """
+        加载模型配置，优先使用.env中的API密钥
+        
+        Raises:
+            RuntimeError: 如果数据库操作失败
+        """
+        if not self.system_config_manager or not self.system_config_manager.is_connected():
+            raise RuntimeError("系统配置管理器未连接，无法加载模型配置")
+        
+        # 从数据库读取
+        data = self.system_config_manager.load_models()
+        models = [ModelConfig(**item) for item in data]
+        
+        # 获取设置
+        settings = self.load_settings()
+        openai_enabled = settings.get("openai_enabled", False)
 
-                # 获取设置
-                settings = self.load_settings()
-                openai_enabled = settings.get("openai_enabled", False)
+        # 合并.env中的API密钥（优先级更高）
+        for model in models:
+            env_api_key = self._get_env_api_key(model.provider)
+            if env_api_key:
+                model.api_key = env_api_key
+                # 如果.env中有API密钥，自动启用该模型
+                if not model.enabled:
+                    model.enabled = True
+            
+            # 特殊处理OpenAI模型
+            if model.provider.lower() == "openai":
+                # 检查OpenAI是否在配置中启用
+                if not openai_enabled:
+                    model.enabled = False
+                    logger.info(f"🔒 OpenAI模型已禁用: {model.model_name}")
+                # 如果有API密钥但格式不正确，禁用模型（验证始终启用）
+                elif model.api_key and not self.validate_openai_api_key_format(model.api_key):
+                    model.enabled = False
+                    logger.warning(f"⚠️ OpenAI模型因密钥格式不正确而禁用: {model.model_name}")
 
-                # 合并.env中的API密钥（优先级更高）
-                for model in models:
-                    env_api_key = self._get_env_api_key(model.provider)
-                    if env_api_key:
-                        model.api_key = env_api_key
-                        # 如果.env中有API密钥，自动启用该模型
-                        if not model.enabled:
-                            model.enabled = True
-                    
-                    # 特殊处理OpenAI模型
-                    if model.provider.lower() == "openai":
-                        # 检查OpenAI是否在配置中启用
-                        if not openai_enabled:
-                            model.enabled = False
-                            logger.info(f"🔒 OpenAI模型已禁用: {model.model_name}")
-                        # 如果有API密钥但格式不正确，禁用模型（验证始终启用）
-                        elif model.api_key and not self.validate_openai_api_key_format(model.api_key):
-                            model.enabled = False
-                            logger.warning(f"⚠️ OpenAI模型因密钥格式不正确而禁用: {model.model_name}")
-
-                return models
-        except Exception as e:
-            logger.error(f"加载模型配置失败: {e}")
-            return []
+        return models
     
     def save_models(self, models: List[ModelConfig]):
-        """保存模型配置"""
-        try:
-            data = [asdict(model) for model in models]
-            with open(self.models_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"保存模型配置失败: {e}")
+        """
+        保存模型配置
+        
+        Raises:
+            RuntimeError: 如果数据库操作失败
+        """
+        if not self.system_config_manager or not self.system_config_manager.is_connected():
+            raise RuntimeError("系统配置管理器未连接，无法保存模型配置")
+        
+        data = [asdict(model) for model in models]
+        self.system_config_manager.save_models(data)
+        logger.debug("✅ 模型配置已保存到数据库")
     
     def load_pricing(self) -> List[PricingConfig]:
-        """加载定价配置"""
-        try:
-            with open(self.pricing_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            return [PricingConfig(**item) for item in data]
-        except Exception as e:
-            logger.error(f"加载定价配置失败: {e}")
-            return []
+        """
+        加载定价配置
+        
+        Raises:
+            RuntimeError: 如果数据库操作失败
+        """
+        if not self.system_config_manager or not self.system_config_manager.is_connected():
+            raise RuntimeError("系统配置管理器未连接，无法加载定价配置")
+        
+        data = self.system_config_manager.load_pricing()
+        return [PricingConfig(**item) for item in data]
     
     def save_pricing(self, pricing: List[PricingConfig]):
-        """保存定价配置"""
-        try:
-            data = [asdict(price) for price in pricing]
-            with open(self.pricing_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"保存定价配置失败: {e}")
+        """
+        保存定价配置
+        
+        Raises:
+            RuntimeError: 如果数据库操作失败
+        """
+        if not self.system_config_manager or not self.system_config_manager.is_connected():
+            raise RuntimeError("系统配置管理器未连接，无法保存定价配置")
+        
+        data = [asdict(price) for price in pricing]
+        self.system_config_manager.save_pricing(data)
+        logger.debug("✅ 定价配置已保存到数据库")
     
     def load_usage_records(self) -> List[UsageRecord]:
         """
@@ -526,57 +575,43 @@ class ConfigManager:
         return 0.0
     
     def load_settings(self) -> Dict[str, Any]:
-        """加载设置，合并.env中的配置"""
-        try:
-            if self.settings_file.exists():
-                with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-            else:
-                # 如果设置文件不存在，创建默认设置
-                settings = {
-                    "default_provider": "dashscope",
-                    "default_model": "qwen-turbo",
-                    "enable_cost_tracking": True,
-                    "cost_alert_threshold": 100.0,
-                    "currency_preference": "CNY",
-                    "auto_save_usage": True,
-                    "max_usage_records": 10000,
-                    "data_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data"),
-                    "cache_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data", "cache"),
-                    "results_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results"),
-                    "auto_create_dirs": True,
-                    "openai_enabled": False,
-                }
-                self.save_settings(settings)
-        except Exception as e:
-            logger.error(f"加载设置失败: {e}")
-            settings = {}
+        """
+        加载设置，合并.env中的配置
+        
+        Raises:
+            RuntimeError: 如果数据库操作失败
+        """
+        if not self.system_config_manager or not self.system_config_manager.is_connected():
+            raise RuntimeError("系统配置管理器未连接，无法加载设置配置")
+        
+        # 从数据库读取
+        settings = self.system_config_manager.load_settings()
 
-        # 合并.env中的其他配置
-        env_settings = {
-            "finnhub_api_key": os.getenv("FINNHUB_API_KEY", ""),
-            "reddit_client_id": os.getenv("REDDIT_CLIENT_ID", ""),
-            "reddit_client_secret": os.getenv("REDDIT_CLIENT_SECRET", ""),
-            "reddit_user_agent": os.getenv("REDDIT_USER_AGENT", ""),
-            "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", ""),
-            "log_level": os.getenv("TRADINGAGENTS_LOG_LEVEL", "INFO"),
-            "data_dir": os.getenv("TRADINGAGENTS_DATA_DIR", ""),  # 数据目录环境变量
-            "cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", ""),  # 缓存目录环境变量
-        }
+        # # 合并.env中的其他配置
+        # env_settings = {
+        #     "finnhub_api_key": os.getenv("FINNHUB_API_KEY", ""),
+        #     "reddit_client_id": os.getenv("REDDIT_CLIENT_ID", ""),
+        #     "reddit_client_secret": os.getenv("REDDIT_CLIENT_SECRET", ""),
+        #     "reddit_user_agent": os.getenv("REDDIT_USER_AGENT", ""),
+        #     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", ""),
+        #     "log_level": os.getenv("TRADINGAGENTS_LOG_LEVEL", "INFO"),
+        #     "data_dir": os.getenv("TRADINGAGENTS_DATA_DIR", ""),  # 数据目录环境变量
+        #     "cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", ""),  # 缓存目录环境变量
+        # }
 
         # 添加OpenAI相关配置
-        openai_enabled_env = os.getenv("OPENAI_ENABLED", "").lower()
-        if openai_enabled_env in ["true", "false"]:
-            env_settings["openai_enabled"] = openai_enabled_env == "true"
+        # openai_enabled_env = os.getenv("OPENAI_ENABLED", "").lower()
+        # if openai_enabled_env in ["true", "false"]:
+        #     env_settings["openai_enabled"] = openai_enabled_env == "true"
 
         # 只有当环境变量存在且不为空时才覆盖
-        for key, value in env_settings.items():
-            # 对于布尔值，直接使用
-            if isinstance(value, bool):
-                settings[key] = value
-            # 对于字符串，只有非空时才覆盖
-            elif value != "" and value is not None:
-                settings[key] = value
+        # for key, value in env_settings.items():
+        #     # 对于布尔值，直接使用
+        #     if isinstance(value, bool):
+        #         settings[key] = value
+        #     # 对于字符串，只有非空时才覆盖
+        #     elif value != "" and value is not None:
+        #         settings[key] = value
 
         return settings
 
@@ -599,12 +634,17 @@ class ConfigManager:
         }
 
     def save_settings(self, settings: Dict[str, Any]):
-        """保存设置"""
-        try:
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"保存设置失败: {e}")
+        """
+        保存设置
+        
+        Raises:
+            RuntimeError: 如果数据库操作失败
+        """
+        if not self.system_config_manager or not self.system_config_manager.is_connected():
+            raise RuntimeError("系统配置管理器未连接，无法保存设置配置")
+        
+        self.system_config_manager.save_settings(settings)
+        logger.debug("✅ 设置已保存到数据库")
     
     def get_enabled_models(self) -> List[ModelConfig]:
         """获取启用的模型"""

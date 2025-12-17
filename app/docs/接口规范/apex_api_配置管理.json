@@ -101,7 +101,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/api/config/system?config_types=models,pricing,usage,settings",
+							"raw": "{{base_url}}/api/config/system?config_types=models,pricing,settings",
 							"host": [
 								"{{base_url}}"
 							],
@@ -113,7 +113,7 @@
 							"query": [
 								{
 									"key": "config_types",
-									"value": "models,pricing,usage,settings"
+									"value": "models,pricing,settings"
 								}
 							]
 						},
@@ -241,5 +241,3 @@
 		}
 	]
 }
-
-

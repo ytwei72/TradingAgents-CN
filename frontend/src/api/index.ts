@@ -104,9 +104,51 @@ export const getReportsList = async (page: number = 1, page_size: number = 10): 
   return response.data;
 };
 
+// System Config Types
+export interface ModelConfig {
+  provider: string;
+  model_name: string;
+  api_key: string;
+  base_url: string | null;
+  max_tokens: number;
+  temperature: number;
+  enabled: boolean;
+}
+
+export interface PricingConfig {
+  provider: string;
+  model_name: string;
+  input_price_per_1k: number;
+  output_price_per_1k: number;
+  currency: string;
+}
+
+export interface SystemSettings {
+  default_provider: string;
+  default_model: string;
+  enable_cost_tracking: boolean;
+  cost_alert_threshold: number;
+  currency_preference: string;
+  auto_save_usage: boolean;
+  max_usage_records: number;
+  data_dir: string;
+  cache_dir: string;
+  results_dir: string;
+  auto_create_dirs: boolean;
+  openai_enabled: boolean;
+  finnhub_api_key: string;
+  log_level: string;
+}
+
+export interface SystemConfigData {
+  models?: ModelConfig[];
+  pricing?: PricingConfig[];
+  settings?: SystemSettings;
+}
+
 export interface SystemConfigResponse {
   success: boolean;
-  data: Record<string, any>;
+  data: SystemConfigData;
   message: string;
 }
 
@@ -116,9 +158,9 @@ export const getSystemConfig = async (configTypes: string[] = ['settings']): Pro
   return response.data;
 };
 
-export const updateSystemConfig = async (payload: Record<string, any>): Promise<SystemConfigResponse> => {
-  // 后端要求按照 config_types 分类提交，这里只更新 settings
-  const response = await api.put<SystemConfigResponse>('/config/system', { settings: payload });
+export const updateSystemConfig = async (payload: Partial<SystemConfigData>): Promise<SystemConfigResponse> => {
+  // 后端要求按照 config_types 分类提交，可以包含 models、pricing、settings 中的任意几个
+  const response = await api.put<SystemConfigResponse>('/config/system', payload);
   return response.data;
 };
 
