@@ -494,6 +494,114 @@ class MongoDBReportManager:
             logger.error(f"❌ 分页获取报告失败: {e}")
             return [], 0
 
+    def get_reports_with_formatted_decisions(
+        self,
+        start_date: str,
+        end_date: str,
+        stock_code: Optional[str] = None,
+        action: Optional[str] = None,
+        analyst: Optional[str] = None,
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """
+        获取包含 formatted_decision 的报告数据（用于批量回测）
+        
+        :param start_date: 开始日期，格式 YYYY-MM-DD
+        :param end_date: 结束日期，格式 YYYY-MM-DD
+        :param stock_code: 可选，按股票代码筛选
+        :param action: 可选，按 formatted_decision.action 筛选
+        :param analyst: 可选，按分析师筛选
+        :return: (报告列表, 总条数)
+        """
+        if not self.connected:
+            return [], 0
+        
+        if self.collection is None:
+            logger.error("❌ 报告集合未初始化")
+            return [], 0
+        
+        try:
+            # 构造 MongoDB 查询条件
+            query: Dict[str, Any] = {
+                "analysis_date": {"$gte": start_date, "$lte": end_date}
+            }
+
+            if stock_code:
+                query["stock_symbol"] = stock_code
+
+            if analyst:
+                # 分析师字段为数组时，使用 $in 匹配
+                query["analysts"] = {"$in": [analyst]}
+
+            if action:
+                # formatted_decision 为嵌套 JSON 字段
+                query["formatted_decision.action"] = action
+
+            # 只取需要的字段，显式排除体积较大的 reports 字段
+            projection = {
+                "reports": 0,
+            }
+
+            total = self.collection.count_documents(query)
+
+            cursor = (
+                self.collection.find(query, projection)
+                .sort("analysis_date", 1)
+            )
+
+            raw_reports: List[Dict[str, Any]] = list(cursor)
+            
+            logger.info(
+                f"✅ 从MongoDB获取 formatted_decisions: 条数={len(raw_reports)}, 区间={start_date}~{end_date}"
+            )
+            
+            return raw_reports, total
+            
+        except Exception as e:
+            logger.error(f"❌ 获取 formatted_decisions 失败: {e}")
+            return [], 0
+
+    def get_reports_by_ids(
+        self,
+        analysis_ids: List[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        根据 analysis_ids 获取研报数据
+        
+        :param analysis_ids: 研报 ID 列表
+        :return: 研报数据列表，每个元素包含：
+            - analysis_id
+            - analysis_date
+            - stock_symbol
+            - formatted_decision
+            - summary
+        """
+        if not self.connected:
+            return []
+        
+        if self.collection is None:
+            logger.error("❌ 报告集合未初始化")
+            return []
+        
+        try:
+            # 查询研报
+            query = {"analysis_id": {"$in": analysis_ids}}
+            # 只使用排除字段，不能同时使用包含和排除（除了 _id）
+            projection = {
+                "reports": 0,  # 排除体积较大的 reports 字段
+            }
+
+            raw_reports = list(self.collection.find(query, projection))
+            
+            logger.info(
+                f"✅ 从MongoDB根据ID列表获取报告: 请求{len(analysis_ids)}个, 实际获取{len(raw_reports)}个"
+            )
+            
+            return raw_reports
+            
+        except Exception as e:
+            logger.error(f"❌ 根据ID列表获取报告失败: {e}")
+            return []
+
 
 # 创建全局实例
 mongodb_report_manager = MongoDBReportManager()

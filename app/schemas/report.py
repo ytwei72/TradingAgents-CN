@@ -107,3 +107,20 @@ class ReportsListResponse(BaseModel):
     success: bool
     data: dict = Field(default_factory=dict, description="数据")
     message: str = Field(default="", description="消息")
+
+
+class FormattedDecisionItem(BaseModel):
+    """用于批量回测的简化报告条目"""
+    analysis_id: str = Field(..., description="分析ID")
+    analysis_date: str = Field(..., description="分析日期，ISO 日期字符串")
+    stock_symbol: str = Field(..., description="股票代码")
+    formatted_decision: Optional[dict] = Field(default_factory=dict, description="格式化决策")
+    summary: Optional[str] = Field(default="", description="摘要或简要说明")
+
+
+class FormattedDecisionsResponse(BaseModel):
+    """在指定日期区间内返回的 formatted_decision 列表"""
+    success: bool
+    data: List[FormattedDecisionItem] = Field(default_factory=list, description="报告列表")
+    total: int = Field(..., description="符合条件的报告总数")
+    message: str = Field(default="", description="提示信息")

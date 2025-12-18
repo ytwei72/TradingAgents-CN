@@ -1,77 +1,77 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:8000/api', // Adjust if backend runs on different port
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: 'http://localhost:8000/api', // Adjust if backend runs on different port
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 export interface AnalysisRequest {
-    stock_symbol: string;
-    market_type: string;
-    analysis_date?: string;
-    analysts: string[];
-    research_depth: number;
-    include_sentiment?: boolean;
-    include_risk_assessment?: boolean;
-    custom_prompt?: string;
-    extra_config?: Record<string, any>;
+  stock_symbol: string;
+  market_type: string;
+  analysis_date?: string;
+  analysts: string[];
+  research_depth: number;
+  include_sentiment?: boolean;
+  include_risk_assessment?: boolean;
+  custom_prompt?: string;
+  extra_config?: Record<string, any>;
 }
 
 export interface AnalysisResponse {
-    analysis_id: string;
-    status: string;
-    message: string;
+  analysis_id: string;
+  status: string;
+  message: string;
 }
 
 export interface AnalysisStatus {
-    analysis_id: string;
-    status: string;
-    current_message?: string;
-    progress_log?: any[];
-    progress?: any;
-    error?: string;
+  analysis_id: string;
+  status: string;
+  current_message?: string;
+  progress_log?: any[];
+  progress?: any;
+  error?: string;
 }
 
 export const startAnalysis = async (data: AnalysisRequest) => {
-    const response = await api.post<AnalysisResponse>('/analysis/start', data);
-    return response.data;
+  const response = await api.post<AnalysisResponse>('/analysis/start', data);
+  return response.data;
 };
 
 export const getAnalysisStatus = async (analysisId: string) => {
-    const response = await api.get<AnalysisStatus>(`/analysis/${analysisId}/status`);
-    return response.data;
+  const response = await api.get<AnalysisStatus>(`/analysis/${analysisId}/status`);
+  return response.data;
 };
 
 export const getAnalysisResult = async (analysisId: string) => {
-    const response = await api.get<any>(`/analysis/${analysisId}/result`);
-    return response.data;
+  const response = await api.get<any>(`/analysis/${analysisId}/result`);
+  return response.data;
 };
 
 export const pauseAnalysis = async (analysisId: string) => {
-    const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/pause`);
-    return response.data;
+  const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/pause`);
+  return response.data;
 };
 
 export const resumeAnalysis = async (analysisId: string) => {
-    const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/resume`);
-    return response.data;
+  const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/resume`);
+  return response.data;
 };
 
 export const stopAnalysis = async (analysisId: string) => {
-    const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/stop`);
-    return response.data;
+  const response = await api.post<AnalysisResponse>(`/analysis/${analysisId}/stop`);
+  return response.data;
 };
 
 export const getPlannedSteps = async (analysisId: string) => {
-    const response = await api.get<any>(`/analysis/${analysisId}/planned_steps`);
-    return response.data;
+  const response = await api.get<any>(`/analysis/${analysisId}/planned_steps`);
+  return response.data;
 };
 
 export const getAnalysisHistory = async (analysisId: string) => {
-    const response = await api.get<any[]>(`/analysis/${analysisId}/history`);
-    return response.data;
+  const response = await api.get<any[]>(`/analysis/${analysisId}/history`);
+  return response.data;
 };
 
 export interface ReportListItem {
@@ -101,6 +101,43 @@ export interface ReportsResponse {
 export const getReportsList = async (page: number = 1, page_size: number = 10): Promise<ReportsResponse> => {
   const params = new URLSearchParams({ page: page.toString(), page_size: page_size.toString() });
   const response = await api.get<ReportsResponse>(`/reports/list?${params.toString()}`);
+  return response.data;
+};
+
+// 批量回测 - 研究报告决策列表（按日期区间）
+export interface FormattedDecisionItem {
+  analysis_id: string;
+  stock_symbol: string;
+  analysis_date: string;
+  formatted_decision: {
+    action?: 'buy' | 'hold' | 'sell' | string;
+    confidence?: number;
+    target_price?: number;
+    risk_score?: number;
+    [key: string]: any;
+  };
+  summary?: string;
+  [key: string]: any;
+}
+
+export interface FormattedDecisionsResponse {
+  success: boolean;
+  data: FormattedDecisionItem[];
+  total: number;
+  message: string;
+}
+
+export const getFormattedDecisions = async (
+  startDate: string,
+  endDate: string
+): Promise<FormattedDecisionsResponse> => {
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate
+  });
+  const response = await api.get<FormattedDecisionsResponse>(
+    `/reports/formatted-decisions?${params.toString()}`
+  );
   return response.data;
 };
 
@@ -214,7 +251,7 @@ export const getOperationLogs = async (
   if (level) params.append('level', level);
   if (logger) params.append('logger', logger);
   params.append('limit', limit.toString());
-  
+
   const response = await api.get<LogsResponse>(`/logs/operation/query?${params.toString()}`);
   return response.data;
 };
@@ -278,6 +315,37 @@ export interface AnalysisReportsResponse {
   message: string;
 }
 
+// 批量回测结果结构
+export interface SingleReportProfit {
+  analysis_id: string;
+  stock_symbol: string;
+  company_name: string;
+  analysis_date: string;
+  action: string;
+  profits: number[];  // 收益序列（%），每个元素对应第1天到第N天的收益
+  formatted_decision?: {
+    action?: string;
+    confidence?: number;
+    risk_score?: number;
+    target_price?: number;
+  };
+  trade_dates?: string[];  // 交易日期列表
+  trade_prices?: number[];  // 成交价列表（开盘价）
+  close_prices?: number[];  // 收盘价列表
+  index_prices?: number[];  // 大盘指数收益序列（%）
+}
+
+export interface BatchBacktestResult {
+  success: boolean;
+  data: {
+    profits: SingleReportProfit[];  // 每个研报的收益序列
+    stats: {
+      weighted_avg: number[];  // 加权平均收益序列（%）
+    };
+  };
+  message: string;
+}
+
 export const getStockBasicInfo = async (stockCode: string): Promise<StockBasicInfoResponse> => {
   const response = await api.get<StockBasicInfoResponse>(`/stock-data/basic-info/${stockCode}`);
   return response.data;
@@ -324,6 +392,15 @@ export const getAnalysisReportsByStock = async (
   const response = await api.get<AnalysisReportsResponse>(
     `/stock-data/analysis-reports/${codeForRequest}?${params.toString()}`
   );
+  return response.data;
+};
+
+export const startBatchBacktest = async (payload: {
+  analysis_ids: string[];
+}): Promise<BatchBacktestResult> => {
+  // 后端当前在 app/routers/backtest.py 中定义的路径为：/backtest/batch/start-backtest
+  // 回测配置参数从数据库的backtest_config中获取，不再通过请求参数传递
+  const response = await api.post<BatchBacktestResult>('/backtest/batch/start-backtest', payload);
   return response.data;
 };
 

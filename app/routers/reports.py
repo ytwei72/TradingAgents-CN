@@ -9,16 +9,97 @@ from pathlib import Path
 from datetime import datetime
 
 from app.schemas.report import (
-    ReportGenerateRequest, ReportGenerateResponse, ReportResponse, 
-    ReportsListResponse, ReportListItem
+    ReportGenerateRequest,
+    ReportGenerateResponse,
+    ReportResponse,
+    ReportsListResponse,
+    ReportListItem,
+    FormattedDecisionsResponse,
+    FormattedDecisionItem,
 )
 from app.services.report_service import report_service, get_reports_from_fs, get_reports_from_db
 from tradingagents.utils.logging_manager import get_logger
 from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 router = APIRouter()
 logger = get_logger("reports_router")
+
+
+@router.get("/formatted-decisions", response_model=FormattedDecisionsResponse)
+async def get_formatted_decisions(
+    start_date: str = Query(..., description="开始日期，格式 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期，格式 YYYY-MM-DD"),
+    stock_code: Optional[str] = Query(None, description="按股票代码筛选"),
+    action: Optional[str] = Query(None, description="按 formatted_decision.action 筛选"),
+    analyst: Optional[str] = Query(None, description="按分析师筛选"),
+):
+    """
+    在指定分析日期区间内，获取所有包含 formatted_decision 的报告基础信息。
+
+    返回的数据用于前端批量回测候选研报列表，仅包含必要字段：
+    - analysis_id
+    - analysis_date
+    - stock_symbol
+    - formatted_decision
+    - summary
+    """
+    try:
+        if not mongodb_report_manager or not mongodb_report_manager.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="报告数据库未连接",
+            )
+
+        if start_date > end_date:
+            raise HTTPException(
+                status_code=400,
+                detail="start_date 必须小于或等于 end_date",
+            )
+
+        # 调用封装的数据库读取方法
+        raw_reports, total = mongodb_report_manager.get_reports_with_formatted_decisions(
+            start_date=start_date,
+            end_date=end_date,
+            stock_code=stock_code,
+            action=action,
+            analyst=analyst,
+        )
+
+        # 拼装 FormattedDecisionItem 返回
+        items: List[FormattedDecisionItem] = []
+        for report in raw_reports:
+            item = FormattedDecisionItem(
+                analysis_id=report.get("analysis_id", ""),
+                analysis_date=report.get("analysis_date", ""),
+                stock_symbol=report.get("stock_symbol", ""),
+                formatted_decision=report.get("formatted_decision") or {},
+                summary=report.get("summary", ""),
+            )
+            items.append(item)
+
+        logger.info(
+            "获取 formatted_decisions 成功: 条数=%s, 区间=%s~%s",
+            len(items),
+            start_date,
+            end_date,
+        )
+
+        return FormattedDecisionsResponse(
+            success=True,
+            data=items,
+            total=total,
+            message="formatted_decisions 获取成功",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取 formatted_decisions 失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取 formatted_decisions 失败: {str(e)}",
+        )
 
 
 @router.get("/list", response_model=ReportsListResponse)

@@ -434,4 +434,102 @@ class SystemConfigManager:
         except Exception as e:
             logger.error(f"❌ 保存设置配置到数据库失败: {e}")
             raise RuntimeError(f"保存设置配置到数据库失败: {e}") from e
+    
+    def load_backtest_config(self) -> Dict:
+        """
+        加载回测配置
+        
+        Returns:
+            Dict: 回测配置字典，包含以下键：
+                - backtest_start_date: str
+                - backtest_end_date: str
+                - horizon_days: int
+                - extend_days_before: int
+                - extend_days_after: int
+                - weight_mode: str
+                - date_mode: str
+        
+        Raises:
+            RuntimeError: 如果数据库未连接或操作失败
+        """
+        if not self._connected:
+            raise RuntimeError("MongoDB未连接，无法加载回测配置")
+        
+        # 确保配置存在
+        self._ensure_config_exists('settings')
+        
+        try:
+            # settings 集合只存储一个文档
+            setting = self.settings_collection.find_one({}, {"_id": 0, "updated_at": 0})
+            if not setting:
+                raise RuntimeError("数据库中的设置配置为空")
+            
+            # 获取backtest_config字段，如果不存在则返回默认值
+            backtest_config = setting.get('backtest_config', {})
+            
+            # 如果backtest_config为空，返回默认配置
+            if not backtest_config:
+                from datetime import date, timedelta
+                default_config = {
+                    "backtest_start_date": (date.today() - timedelta(days=365)).strftime('%Y-%m-%d'),
+                    "backtest_end_date": date.today().strftime('%Y-%m-%d'),
+                    "horizon_days": 90,
+                    "extend_days_before": 30,
+                    "extend_days_after": 180,
+                    "weight_mode": "equal",
+                    "date_mode": "calendar_day"
+                }
+                logger.info("✅ 回测配置不存在，返回默认配置")
+                return default_config
+            
+            logger.debug("✅ 从数据库加载了回测配置")
+            return backtest_config
+        except Exception as e:
+            logger.error(f"❌ 从数据库加载回测配置失败: {e}")
+            raise RuntimeError(f"从数据库加载回测配置失败: {e}") from e
+    
+    def save_backtest_config(self, backtest_config: Dict):
+        """
+        保存回测配置
+        
+        Args:
+            backtest_config: 回测配置字典，包含以下键：
+                - backtest_start_date: str
+                - backtest_end_date: str
+                - horizon_days: int
+                - extend_days_before: int
+                - extend_days_after: int
+                - weight_mode: str
+                - date_mode: str
+        
+        Raises:
+            RuntimeError: 如果数据库未连接或操作失败
+        """
+        if not self._connected:
+            raise RuntimeError("MongoDB未连接，无法保存回测配置到数据库")
+        
+        try:
+            # 确保settings文档存在
+            self._ensure_config_exists('settings')
+            
+            # 获取当前settings
+            current_settings = self.settings_collection.find_one({}, {"_id": 0, "updated_at": 0})
+            if not current_settings:
+                # 如果不存在，创建新的settings文档
+                current_settings = self._get_default_settings()
+            
+            # 更新backtest_config字段
+            current_settings['backtest_config'] = backtest_config
+            current_settings['updated_at'] = datetime.utcnow()
+            
+            # 保存到数据库
+            self.settings_collection.replace_one(
+                {},  # 空查询匹配所有文档
+                current_settings,
+                upsert=True
+            )
+            logger.info("✅ 已保存回测配置到数据库")
+        except Exception as e:
+            logger.error(f"❌ 保存回测配置到数据库失败: {e}")
+            raise RuntimeError(f"保存回测配置到数据库失败: {e}") from e
 
