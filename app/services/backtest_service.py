@@ -16,6 +16,7 @@ from tradingagents.storage.mongodb.system_config_manager import SystemConfigMana
 from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
 from tradingagents.storage.mongodb.stock_dict_manager import stock_dict_manager
 from tradingagents.storage.mongodb.stock_history_manager import stock_history_manager
+from tradingagents.storage.mongodb.index_history_helper import index_history_helper
 
 def _get_market_index_code(stock_code: str) -> tuple[str, str]:
     """根据股票代码确定对应的大盘指数代码"""
@@ -221,6 +222,15 @@ class BacktestService:
         start_date = analysis_date - timedelta(days=extend_days_before)
         end_date = analysis_date + timedelta(days=extend_days_after)
 
+        # 检查并修正结束日期：如果结束日期大于前一天，则用前一天替换
+        try:
+            yesterday = date.today() - timedelta(days=1)
+            if end_date > yesterday:
+                logger.debug(f"结束日期{end_date}大于前一天{yesterday}，已修正为{yesterday}")
+                end_date = yesterday
+        except Exception as e:
+            logger.warning(f"检查结束日期时出错: {e}，继续使用原始结束日期")
+
         # 获取股票历史数据（从 stock_history_manager）
         # 处理股票代码格式：去掉交易所后缀（如 .SZ, .SH）
         clean_stock_code = stock_symbol.split('.')[0] if '.' in stock_symbol else stock_symbol
@@ -242,13 +252,14 @@ class BacktestService:
         # 获取大盘指数代码
         index_code, index_name = _get_market_index_code(clean_stock_code)
         
-        # 获取大盘指数历史数据（使用Tushare的指数接口）
-        index_data = self._get_index_data(
+        # 获取大盘指数历史数据（使用index_history_helper）
+        index_data = index_history_helper.get_index_history(
             index_code=index_code,
             start_date=start_date.strftime("%Y-%m-%d"),
             end_date=end_date.strftime("%Y-%m-%d"),
         )
         if index_data is not None and not index_data.empty and 'date' in index_data.columns:
+            # index_history_helper返回的date列是字符串格式，需要转换为date类型
             index_data['date'] = pd.to_datetime(index_data['date']).dt.date
         else:
             index_data = pd.DataFrame()
@@ -542,152 +553,6 @@ class BacktestService:
                 weighted_avg[day] += profits[day] * weight
 
         return weighted_avg
-
-    def _get_index_data(
-        self,
-        index_code: str,
-        start_date: str,
-        end_date: str,
-    ) -> pd.DataFrame:
-        """获取大盘指数历史数据，优先使用 BaoStock，失败时回退到 Tushare。
-
-        Args:
-            index_code: 指数代码（如：000001、399001）
-            start_date: 开始日期（YYYY-MM-DD格式）
-            end_date: 结束日期（YYYY-MM-DD格式）
-
-        Returns:
-            pd.DataFrame: 指数历史数据，包含date和close列
-        """
-        # 1. 优先尝试 BaoStock
-        try:
-            try:
-                import baostock as bs  # type: ignore
-            except ImportError:
-                bs = None
-
-            if bs is not None:
-                # BaoStock 指数代码映射，例如：上证指数 sh.000001，深证成指 sz.399001
-                if index_code == "000001":
-                    bs_code = "sh.000001"
-                elif index_code == "399001":
-                    bs_code = "sz.399001"
-                else:
-                    # 简单推断：39* 为深市，00* 为沪市
-                    if index_code.startswith("39"):
-                        bs_code = f"sz.{index_code}"
-                    elif index_code.startswith("00"):
-                        bs_code = f"sh.{index_code}"
-                    else:
-                        bs_code = index_code
-
-                lg = bs.login()
-                if lg.error_code != "0":
-                    logger.warning(f"⚠️ BaoStock 登录失败: {lg.error_msg}")
-                else:
-                    try:
-                        rs = bs.query_history_k_data_plus(
-                            bs_code,
-                            "date,close",
-                            start_date=start_date,
-                            end_date=end_date,
-                            frequency="d",
-                            adjustflag="3",  # 不复权
-                        )
-                        if rs.error_code != "0":
-                            logger.warning(f"⚠️ BaoStock 指数查询失败: {rs.error_msg}")
-                        else:
-                            data_list: list[list[str]] = []
-                            while rs.error_code == "0" and rs.next():
-                                data_list.append(rs.get_row_data())
-
-                            if data_list:
-                                df = pd.DataFrame(data_list, columns=rs.fields)
-                                # 确保列名与类型
-                                if "date" in df.columns and "close" in df.columns:
-                                    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-                                    df["close"] = pd.to_numeric(df["close"], errors="coerce")
-                                    df = df.sort_values("date").reset_index(drop=True)
-                                    logger.info(
-                                        f"✅ BaoStock 获取指数{index_code}数据成功: {len(df)}条（{start_date}至{end_date}）"
-                                    )
-                                    bs.logout()
-                                    return df
-                                else:
-                                    logger.warning(f"⚠️ BaoStock 指数数据缺少必要列: {list(df.columns)}")
-                    except Exception as bs_e:
-                        logger.warning(f"⚠️ BaoStock 获取指数{index_code}数据异常: {bs_e}")
-                    finally:
-                        try:
-                            bs.logout()
-                        except Exception:
-                            pass
-        except Exception as e:
-            logger.debug(f"BaoStock 指数数据获取阶段异常: {e}", exc_info=True)
-
-        # 2. 回退到 Tushare
-        try:
-            from tradingagents.dataflows.tushare_adapter import get_tushare_adapter
-
-            adapter = get_tushare_adapter()
-            if adapter and adapter.provider and adapter.provider.connected:
-                # 对于指数，需要转换为Tushare标准格式
-                if index_code == "000001":
-                    # 上证指数
-                    index_symbols = ["000001.SH", "000001"]
-                elif index_code == "399001":
-                    # 深证成指
-                    index_symbols = ["399001.SZ", "399001"]
-                else:
-                    # 尝试自动判断交易所
-                    if index_code.startswith("39"):
-                        index_symbols = [f"{index_code}.SZ", index_code]
-                    elif index_code.startswith("00"):
-                        index_symbols = [f"{index_code}.SH", index_code]
-                    else:
-                        index_symbols = [index_code]
-
-                for symbol in index_symbols:
-                    try:
-                        df = adapter.provider.get_index_daily(symbol, start_date, end_date)
-                        if df is not None and not df.empty:
-                            # 标准化列名
-                            if "trade_date" in df.columns:
-                                df["date"] = df["trade_date"]
-                            elif "date" not in df.columns:
-                                logger.warning(f"指数数据缺少date列: {list(df.columns)}")
-                                continue
-
-                            # 确保date列是字符串格式
-                            if "date" in df.columns:
-                                df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-
-                            # 标准化close列名
-                            if "close" not in df.columns:
-                                logger.warning(f"指数数据缺少close列: {list(df.columns)}")
-                                continue
-
-                            # 确保数值列为数值类型
-                            df["close"] = pd.to_numeric(df["close"], errors="coerce")
-
-                            # 按日期排序
-                            df = df.sort_values("date").reset_index(drop=True)
-
-                            logger.info(f"✅ Tushare 获取指数{index_code}数据成功: {len(df)}条（{start_date}至{end_date}）")
-                            return df
-                    except Exception as e:
-                        logger.debug(f"尝试获取指数{symbol}数据失败: {e}")
-                        continue
-
-                logger.warning(f"⚠️ 无法获取指数{index_code}数据（尝试了所有符号格式）")
-                return pd.DataFrame()
-            else:
-                logger.warning("⚠️ Tushare适配器不可用，无法获取指数数据")
-                return pd.DataFrame()
-
-        except Exception as e:
-            logger.error(f"❌ 获取指数{index_code}数据失败: {e}", exc_info=True)
-            return pd.DataFrame()
 
 
 backtest_service = BacktestService()

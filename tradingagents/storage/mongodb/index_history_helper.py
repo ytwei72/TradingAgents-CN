@@ -16,9 +16,11 @@ logger = get_logger('storage')
 
 try:
     from pymongo import ASCENDING, DESCENDING
+    from pymongo.operations import UpdateOne
     MONGODB_AVAILABLE = True
 except ImportError:
     MONGODB_AVAILABLE = False
+    UpdateOne = None
     logger.warning("pymongo未安装，MongoDB功能不可用")
 
 
@@ -98,7 +100,14 @@ class IndexHistoryHelper:
         Returns:
             pd.DataFrame: 指数历史数据，包含以下列：
                 - date: 交易日期
+                - open: 开盘价
+                - high: 最高价
+                - low: 最低价
                 - close: 收盘价
+                - preclose: 前收盘价（如果可用）
+                - volume: 成交量（如果可用）
+                - amount: 成交额（如果可用）
+                - pctChg: 涨跌幅%（如果可用）
                 如果查询失败或数据为空，返回空的DataFrame
         """
         # 1. 首先尝试从数据库读取
@@ -113,21 +122,39 @@ class IndexHistoryHelper:
                     end_dt = pd.to_datetime(end_date)
                     df_from_db['date'] = pd.to_datetime(df_from_db['date'])
                     
-                    # 检查是否有缺失的日期
-                    date_range = pd.date_range(start=start_dt, end=end_dt, freq='D')
-                    existing_dates = set(df_from_db['date'].dt.date)
-                    missing_dates = [
-                        d.date() for d in date_range 
-                        if d.date() not in existing_dates and d.weekday() < 5  # 排除周末
-                    ]
+                    # 从dict_trading_dates集合获取交易日列表
+                    trading_dates_set = self._get_trading_dates_from_dict(start_date, end_date)
                     
-                    if not missing_dates:
-                        # 数据完整，直接返回
-                        df_from_db['date'] = df_from_db['date'].dt.strftime('%Y-%m-%d')
-                        logger.info(f"✅ 从数据库获取指数{index_code}历史数据成功: {len(df_from_db)}条（{start_date}至{end_date}）")
-                        return df_from_db
+                    if trading_dates_set:
+                        # 使用交易日列表检查缺失日期
+                        existing_dates = set(df_from_db['date'].dt.date)
+                        missing_dates = [
+                            date for date in trading_dates_set 
+                            if date not in existing_dates
+                        ]
+                        
+                        if not missing_dates:
+                            # 数据完整，直接返回
+                            df_from_db['date'] = df_from_db['date'].dt.strftime('%Y-%m-%d')
+                            logger.info(f"✅ 从数据库获取指数{index_code}历史数据成功: {len(df_from_db)}条（{start_date}至{end_date}）")
+                            return df_from_db
+                        else:
+                            logger.info(f"⚠️ 指数{index_code}数据库中存在部分数据，缺失{len(missing_dates)}个交易日，将从API补充")
                     else:
-                        logger.info(f"⚠️ 指数{index_code}数据库中存在部分数据，缺失{len(missing_dates)}个交易日，将从API补充")
+                        # 如果无法从dict_trading_dates获取，使用简单的周末排除方法作为后备
+                        date_range = pd.date_range(start=start_dt, end=end_dt, freq='D')
+                        existing_dates = set(df_from_db['date'].dt.date)
+                        missing_dates = [
+                            d.date() for d in date_range 
+                            if d.date() not in existing_dates and d.weekday() < 5  # 排除周末
+                        ]
+                        
+                        if not missing_dates:
+                            df_from_db['date'] = df_from_db['date'].dt.strftime('%Y-%m-%d')
+                            logger.info(f"✅ 从数据库获取指数{index_code}历史数据成功: {len(df_from_db)}条（{start_date}至{end_date}）")
+                            return df_from_db
+                        else:
+                            logger.info(f"⚠️ 指数{index_code}数据库中存在部分数据，缺失{len(missing_dates)}个可能的交易日，将从API补充")
                 except Exception as e:
                     logger.warning(f"检查数据完整性时出错: {e}，将从API重新获取")
         
@@ -227,6 +254,95 @@ class IndexHistoryHelper:
             logger.error(f"❌ 从数据库获取指数历史数据失败: {e}", exc_info=True)
             return None
     
+    def _get_trading_dates_from_dict(self, start_date: str, end_date: str) -> Optional[set]:
+        """
+        从dict_trading_dates集合获取指定日期范围内的交易日集合
+        
+        Args:
+            start_date: 开始日期（YYYY-MM-DD格式）
+            end_date: 结束日期（YYYY-MM-DD格式）
+        
+        Returns:
+            set: 交易日集合（date对象），如果获取失败返回None
+        """
+        if not self.connected:
+            return None
+        
+        try:
+            from tradingagents.storage.manager import get_mongo_collection
+            
+            # 获取dict_trading_dates集合
+            trading_dates_collection = get_mongo_collection("dict_trading_dates")
+            if trading_dates_collection is None:
+                logger.debug("dict_trading_dates集合不可用")
+                return None
+            
+            # 将字符串日期转换为datetime对象
+            try:
+                start_dt = pd.to_datetime(start_date).to_pydatetime()
+                end_dt = pd.to_datetime(end_date).to_pydatetime()
+            except Exception as e:
+                logger.warning(f"日期格式转换失败: {e}")
+                return None
+            
+            # 查询交易日（尝试不同的字段名）
+            query_candidates = [
+                {'date': {'$gte': start_dt, '$lte': end_dt}},
+                {'trade_date': {'$gte': start_dt, '$lte': end_dt}},
+                {'date': {'$gte': start_date, '$lte': end_date}},  # 字符串格式
+                {'trade_date': {'$gte': start_date, '$lte': end_date}},  # 字符串格式
+            ]
+            
+            trading_dates = set()
+            for query in query_candidates:
+                try:
+                    cursor = trading_dates_collection.find(query)
+                    records = list(cursor)
+                    
+                    if records:
+                        # 确定日期字段名
+                        date_field = None
+                        if 'date' in query:
+                            date_field = 'date'
+                        elif 'trade_date' in query:
+                            date_field = 'trade_date'
+                        
+                        if date_field:
+                            for record in records:
+                                if date_field in record:
+                                    date_val = record[date_field]
+                                    # 转换为date对象
+                                    if isinstance(date_val, datetime):
+                                        trading_dates.add(date_val.date())
+                                    elif isinstance(date_val, str):
+                                        try:
+                                            dt = pd.to_datetime(date_val).to_pydatetime()
+                                            trading_dates.add(dt.date())
+                                        except:
+                                            pass
+                        
+                        if trading_dates:
+                            logger.debug(f"从dict_trading_dates获取到{len(trading_dates)}个交易日（{start_date}至{end_date}）")
+                            return trading_dates
+                except Exception as e:
+                    logger.debug(f"查询dict_trading_dates失败（查询: {query}）: {e}")
+                    continue
+            
+            # 如果没有找到数据，尝试查找集合中所有记录的字段结构
+            try:
+                sample = trading_dates_collection.find_one()
+                if sample:
+                    logger.debug(f"dict_trading_dates集合示例记录字段: {list(sample.keys())}")
+            except:
+                pass
+            
+            logger.debug(f"无法从dict_trading_dates获取交易日列表")
+            return None
+            
+        except Exception as e:
+            logger.debug(f"从dict_trading_dates获取交易日列表失败: {e}")
+            return None
+    
     def _get_index_data_from_api(
         self,
         index_code: str,
@@ -272,9 +388,10 @@ class IndexHistoryHelper:
                     logger.warning(f"⚠️ BaoStock 登录失败: {lg.error_msg}")
                 else:
                     try:
+                        # 获取更多字段：日期、开盘、最高、最低、收盘、前收盘、成交量、成交额、涨跌幅
                         rs = bs.query_history_k_data_plus(
                             bs_code,
-                            "date,close",
+                            "date,open,high,low,close,preclose,volume,amount,pctChg",
                             start_date=start_date,
                             end_date=end_date,
                             frequency="d",
@@ -291,8 +408,15 @@ class IndexHistoryHelper:
                                 df = pd.DataFrame(data_list, columns=rs.fields)
                                 # 确保列名与类型
                                 if "date" in df.columns and "close" in df.columns:
+                                    # 日期列转换为字符串格式
                                     df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-                                    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+                                    
+                                    # 数值列转换为数值类型
+                                    numeric_columns = ["open", "high", "low", "close", "preclose", "volume", "amount", "pctChg"]
+                                    for col in numeric_columns:
+                                        if col in df.columns:
+                                            df[col] = pd.to_numeric(df[col], errors="coerce")
+                                    
                                     df = df.sort_values("date").reset_index(drop=True)
                                     logger.info(
                                         f"✅ BaoStock 获取指数{index_code}数据成功: {len(df)}条（{start_date}至{end_date}）"
@@ -348,13 +472,35 @@ class IndexHistoryHelper:
                             if "date" in df.columns:
                                 df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
 
-                            # 标准化close列名
+                            # 标准化close列名（必要字段）
                             if "close" not in df.columns:
                                 logger.warning(f"指数数据缺少close列: {list(df.columns)}")
                                 continue
 
+                            # 标准化其他可能存在的列名
+                            column_mapping = {
+                                "open": ["open"],
+                                "high": ["high"],
+                                "low": ["low"],
+                                "preclose": ["pre_close", "preclose"],
+                                "volume": ["vol", "volume"],
+                                "amount": ["amount"],
+                                "pctChg": ["pct_chg", "pctChg", "change_pct"],
+                            }
+                            
+                            # 映射列名
+                            for standard_col, possible_cols in column_mapping.items():
+                                if standard_col not in df.columns:
+                                    for possible_col in possible_cols:
+                                        if possible_col in df.columns:
+                                            df[standard_col] = df[possible_col]
+                                            break
+
                             # 确保数值列为数值类型
-                            df["close"] = pd.to_numeric(df["close"], errors="coerce")
+                            numeric_columns = ["open", "high", "low", "close", "preclose", "volume", "amount", "pctChg"]
+                            for col in numeric_columns:
+                                if col in df.columns:
+                                    df[col] = pd.to_numeric(df[col], errors="coerce")
 
                             # 按日期排序
                             df = df.sort_values("date").reset_index(drop=True)
@@ -398,6 +544,9 @@ class IndexHistoryHelper:
             logger.error("❌ 数据格式错误：缺少date或close列")
             return False
         
+        # 定义需要保存的字段列表（date和code用于查询条件，不在$set中）
+        save_fields = ['open', 'high', 'low', 'close', 'preclose', 'volume', 'amount', 'pctChg']
+        
         try:
             # 准备批量插入的数据
             records = []
@@ -414,16 +563,47 @@ class IndexHistoryHelper:
                     logger.warning(f"日期转换失败: {date_str}, {e}")
                     continue
                 
+                # 构建记录，包含所有可用字段
                 record = {
                     'code': index_code,
                     'date': date_dt,
-                    'close': float(row['close']) if pd.notna(row['close']) else None,
                 }
                 
-                # 添加其他可能存在的列
+                # 添加需要保存的字段
+                for field in save_fields:
+                    if field in df.columns:
+                        value = row[field]
+                        if pd.notna(value):
+                            # 根据字段类型转换
+                            if field in ['volume', 'amount']:
+                                # 成交量和成交额可能是整数或浮点数
+                                try:
+                                    record[field] = float(value)
+                                except (ValueError, TypeError):
+                                    record[field] = None
+                            elif field in ['open', 'high', 'low', 'close', 'preclose', 'pctChg']:
+                                # 价格和涨跌幅为浮点数
+                                try:
+                                    record[field] = float(value)
+                                except (ValueError, TypeError):
+                                    record[field] = None
+                            else:
+                                record[field] = value
+                
+                # 添加其他可能存在的列（不在标准字段列表中的）
                 for col in df.columns:
-                    if col not in ['date', 'close', 'code']:
-                        record[col] = row[col]
+                    if col not in ['date', 'code'] and col not in save_fields:
+                        value = row[col]
+                        if pd.notna(value):
+                            # 尝试转换为数值类型，如果失败则保留原值
+                            try:
+                                num_value = pd.to_numeric(value, errors='coerce')
+                                if pd.notna(num_value):
+                                    record[col] = float(num_value) if isinstance(num_value, (int, float)) else value
+                                else:
+                                    record[col] = value
+                            except (ValueError, TypeError):
+                                record[col] = value
                 
                 records.append(record)
             
@@ -434,14 +614,20 @@ class IndexHistoryHelper:
             # 批量插入（使用upsert，避免重复）
             bulk_ops = []
             for record in records:
+                # 分离查询条件和更新数据（code和date用于查询，不放入$set）
+                filter_dict = {
+                    'code': record['code'],
+                    'date': record['date']
+                }
+                # 构建更新数据（排除code和date）
+                update_dict = {k: v for k, v in record.items() if k not in ['code', 'date']}
+                
                 bulk_ops.append(
-                    {
-                        'updateOne': {
-                            'filter': {'code': record['code'], 'date': record['date']},
-                            'update': {'$set': record},
-                            'upsert': True
-                        }
-                    }
+                    UpdateOne(
+                        filter_dict,
+                        {'$set': update_dict},
+                        upsert=True
+                    )
                 )
             
             if bulk_ops:
