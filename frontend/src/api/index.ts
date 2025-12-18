@@ -323,6 +323,7 @@ export interface SingleReportProfit {
   analysis_date: string;
   action: string;
   profits: number[];  // 收益序列（%），每个元素对应第1天到第N天的收益
+  index_name?: string;  // 大盘指数名称（如：上证指数、深证成指）
   formatted_decision?: {
     action?: string;
     confidence?: number;
@@ -332,7 +333,9 @@ export interface SingleReportProfit {
   trade_dates?: string[];  // 交易日期列表
   trade_prices?: number[];  // 成交价列表（开盘价）
   close_prices?: number[];  // 收盘价列表
-  index_prices?: number[];  // 大盘指数收益序列（%）
+  index_returns?: number[];  // 大盘指数涨幅序列（%）
+  index_closes?: number[];   // 大盘指数收盘点位序列
+  strategy_trade_price?: number;  // 按照回测策略在分析日的成交价（建仓价）
 }
 
 export interface BatchBacktestResult {

@@ -1,0 +1,195 @@
+{
+	"info": {
+		"_postman_id": "backtest-api-collection",
+		"name": "TradingAgents API - 策略回测",
+		"description": "策略回测相关接口",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "研报批量回测",
+			"item": [
+				{
+					"name": "启动研报批量回测",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"analysis_ids\": [\n        \"analysis_001\",\n        \"analysis_002\",\n        \"analysis_003\"\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/backtest/batch/start-backtest",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"backtest",
+								"batch",
+								"start-backtest"
+							]
+						},
+						"description": "启动研报批量回测任务。根据选定的研报 analysis_id 列表进行批量回测分析。\n\n**请求参数**:\n- analysis_ids: 前端选中的研报 analysis_id 列表（必填）\n\n**回测配置说明**:\n回测配置参数（horizon_days、extend_days_before、extend_days_after、weight_mode、date_mode）从数据库的 backtest_config 中获取。\n\n**响应数据**:\n- profits: 每篇研报的收益序列数组\n  - analysis_id: 研报ID\n  - stock_symbol: 股票代码\n  - company_name: 公司名称\n  - analysis_date: 分析日期\n  - action: 操作类型\n  - profits: 收益序列（%）\n- stats: 批量回测统计信息\n  - weighted_avg: 加权平均收益序列"
+					},
+					"response": [
+						{
+							"name": "成功响应示例",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"analysis_ids\": [\n        \"analysis_001\",\n        \"analysis_002\"\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/backtest/batch/start-backtest",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"backtest",
+										"batch",
+										"start-backtest"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"success\": true,\n    \"message\": \"研报批量回测完成\",\n    \"data\": {\n        \"profits\": [\n            {\n                \"analysis_id\": \"analysis_001\",\n                \"stock_symbol\": \"600519\",\n                \"company_name\": \"贵州茅台\",\n                \"analysis_date\": \"2025-12-01\",\n                \"action\": \"买入\",\n                \"profits\": [0.5, 1.2, 1.8, 2.3, 2.5]\n            },\n            {\n                \"analysis_id\": \"analysis_002\",\n                \"stock_symbol\": \"000858\",\n                \"company_name\": \"五粮液\",\n                \"analysis_date\": \"2025-12-02\",\n                \"action\": \"买入\",\n                \"profits\": [0.3, 0.8, 1.0, 1.5, 1.8]\n            }\n        ],\n        \"stats\": {\n            \"weighted_avg\": [0.4, 1.0, 1.4, 1.9, 2.15]\n        }\n    }\n}"
+						},
+						{
+							"name": "参数错误响应示例",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"analysis_ids\": []\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/backtest/batch/start-backtest",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"backtest",
+										"batch",
+										"start-backtest"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"detail\": \"analysis_ids 不能为空\"\n}"
+						}
+					]
+				},
+				{
+					"name": "启动研报批量回测（单个研报）",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"analysis_ids\": [\n        \"analysis_001\"\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/backtest/batch/start-backtest",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"backtest",
+								"batch",
+								"start-backtest"
+							]
+						},
+						"description": "启动单个研报的回测任务。虽然接口设计为批量回测，但也支持传入单个 analysis_id 进行回测。"
+					},
+					"response": []
+				},
+				{
+					"name": "启动研报批量回测（多个研报）",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"analysis_ids\": [\n        \"analysis_001\",\n        \"analysis_002\",\n        \"analysis_003\",\n        \"analysis_004\",\n        \"analysis_005\"\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/backtest/batch/start-backtest",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"backtest",
+								"batch",
+								"start-backtest"
+							]
+						},
+						"description": "批量回测多个研报。传入多个 analysis_id，系统会对每个研报进行回测，并计算加权平均收益。"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}
+

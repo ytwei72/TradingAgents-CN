@@ -394,6 +394,32 @@
             </div>
           </div>
         </div>
+        <!-- 模拟操作信息 -->
+        <div
+          v-if="selectedReportDetail"
+          class="mt-3 bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-gray-300 flex flex-wrap gap-4"
+        >
+          <div>
+            <span class="text-gray-400">模拟操作日期：</span>
+            <span class="font-medium">
+              {{ selectedReportDetail.analysis_date || '未知' }}
+            </span>
+          </div>
+          <div>
+            <span class="text-gray-400">模拟建仓价：</span>
+            <span class="font-medium">
+              {{
+                selectedReportDetail.strategy_trade_price !== undefined && selectedReportDetail.strategy_trade_price !== null
+                  ? selectedReportDetail.strategy_trade_price.toFixed(2)
+                  : (
+                      selectedReportDetail.trade_prices && selectedReportDetail.trade_prices.length > 0
+                        ? selectedReportDetail.trade_prices[0].toFixed(2)
+                        : '未知'
+                    )
+              }}
+            </span>
+          </div>
+        </div>
         <div v-if="selectedReportDetail" class="overflow-x-auto max-h-80 border border-slate-800 rounded-lg">
           <table class="min-w-full text-xs text-gray-200">
             <thead class="bg-slate-900/80 sticky top-0 z-10">
@@ -754,35 +780,40 @@ const reportChartData = computed(() => {
     }
   ]
   
-  // 添加大盘指数曲线
-  if (report.index_prices && report.index_prices.length > 0) {
+  // 添加大盘指数曲线（涨幅，%）
+  if (report.index_returns && report.index_returns.length > 0) {
     datasets.push({
       label: '大盘指数收益(%)',
-      data: report.index_prices,
+      data: report.index_returns,
       borderColor: 'rgb(59, 130, 246)',
       backgroundColor: 'rgba(59, 130, 246, 0.1)',
       fill: false,
       tension: 0.2,
       pointRadius: 0,
       pointHoverRadius: 3,
+      // 使用类型断言添加虚线样式，避免TS类型报错
+      ...({
+        borderDash: [6, 4]
+      } as any),
       yAxisID: 'y',
     })
   }
   
-  // 添加股票收盘价曲线（归一化到百分比）
+  // 添加股票收盘价曲线（使用收盘价原始数据）
   if (report.close_prices && report.close_prices.length > 0 && report.close_prices[0] > 0) {
-    const basePrice = report.close_prices[0]
-    const normalizedPrices = report.close_prices.map(price => ((price - basePrice) / basePrice) * 100)
     datasets.push({
-      label: '股票收盘价收益(%)',
-      data: normalizedPrices,
+      label: '股票收盘价',
+      data: report.close_prices,
       borderColor: 'rgb(251, 146, 60)',
       backgroundColor: 'rgba(251, 146, 60, 0.1)',
       fill: false,
       tension: 0.2,
       pointRadius: 0,
       pointHoverRadius: 3,
-      yAxisID: 'y',
+      ...({
+        borderDash: [6, 4]
+      } as any),
+      yAxisID: 'y1',  // 使用第二个Y轴显示价格
     })
   }
   
@@ -818,7 +849,13 @@ const reportChartOptions = computed(() => ({
       callbacks: {
         label: (ctx: any) => {
           const value = ctx.parsed.y ?? 0
-          return ` ${ctx.dataset.label}：${value.toFixed(2)}%`
+          const datasetLabel = ctx.dataset.label || ''
+          // 如果是收盘价，显示价格；否则显示百分比
+          if (datasetLabel.includes('收盘价')) {
+            return ` ${datasetLabel}：${value.toFixed(2)}`
+          } else {
+            return ` ${datasetLabel}：${value.toFixed(2)}%`
+          }
         }
       }
     }
@@ -835,12 +872,38 @@ const reportChartOptions = computed(() => ({
       }
     },
     y: {
+      type: 'linear' as const,
+      position: 'left' as const,
       ticks: {
         color: 'rgb(148, 163, 184)',
         callback: (value: number | string) => `${value}%`
       },
       grid: {
         color: 'rgba(55, 65, 81, 0.6)'
+      },
+      title: {
+        display: true,
+        text: '收益(%)',
+        color: 'rgb(148, 163, 184)'
+      }
+    },
+    y1: {
+      type: 'linear' as const,
+      position: 'right' as const,
+      ticks: {
+        color: 'rgb(251, 146, 60)',
+        callback: (value: number | string) => {
+          const numValue = typeof value === 'number' ? value : parseFloat(String(value))
+          return isNaN(numValue) ? '0.00' : numValue.toFixed(2)
+        }
+      },
+      grid: {
+        drawOnChartArea: false,  // 不绘制网格线，避免与左侧Y轴重叠
+      },
+      title: {
+        display: true,
+        text: '价格',
+        color: 'rgb(251, 146, 60)'
       }
     }
   }
