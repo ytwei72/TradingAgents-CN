@@ -16,7 +16,7 @@ from tradingagents.storage.mongodb.system_config_manager import SystemConfigMana
 from tradingagents.storage.mongodb.report_manager import mongodb_report_manager
 from tradingagents.storage.mongodb.stock_dict_manager import stock_dict_manager
 from tradingagents.storage.mongodb.stock_history_manager import stock_history_manager
-from tradingagents.storage.mongodb.index_history_helper import index_history_helper
+from tradingagents.storage.mongodb.index_history_manager import index_history_manager
 
 def _get_market_index_code(stock_code: str) -> tuple[str, str]:
     """根据股票代码确定对应的大盘指数代码"""
@@ -252,8 +252,8 @@ class BacktestService:
         # 获取大盘指数代码
         index_code, index_name = _get_market_index_code(clean_stock_code)
         
-        # 获取大盘指数历史数据（使用index_history_helper）
-        index_data = index_history_helper.get_index_history(
+        # 获取大盘指数历史数据（使用index_history_manager从a_index_his_records集合读取）
+        index_data = index_history_manager.get_index_history(
             index_code=index_code,
             start_date=start_date.strftime("%Y-%m-%d"),
             end_date=end_date.strftime("%Y-%m-%d"),

@@ -10,6 +10,7 @@ from .model_usage_manager import ModelUsageManager, UsageRecord
 from .stock_dict_manager import StockDictManager, stock_dict_manager
 from .stock_history_manager import StockHistoryManager, stock_history_manager
 from .index_history_helper import IndexHistoryHelper, index_history_helper
+from .index_history_manager import IndexHistoryManager, index_history_manager
 
 __all__ = [
     'MongoDBConnection',
@@ -26,5 +27,7 @@ __all__ = [
     'stock_history_manager',
     'IndexHistoryHelper',
     'index_history_helper',
+    'IndexHistoryManager',
+    'index_history_manager',
 ]
 
