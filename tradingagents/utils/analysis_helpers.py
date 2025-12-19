@@ -391,6 +391,15 @@ def prepare_analysis_steps(
             research_depth=research_depth,
             market_type=market_type
         )
+
+        # 将本次分析实际使用的 config 写入任务对象（根节点），方便后续步骤统一读取
+        try:
+            state_machine = task_manager._get_task_state_machine(analysis_id)
+            # 直接挂在 task_status 顶层，而不是嵌入 params
+            state_machine.update_state({'config': config})
+        except Exception as e:
+            logger.warning(f"⚠️ 将 config 写入任务状态失败（不影响主流程）: {e}")
+
         _update_step_success("✅ 配置构建完成")
     except Exception as e:
         _update_step_error(f"⚠️ 配置构建失败：{str(e)}")
@@ -721,7 +730,7 @@ def process_analysis_results(
     except ImportError:
         pass
     
-    # 直接对 results 进行赋值，从 params 中获取所有需要的值
+    # 直接对 results 进行赋值，从任务参数中获取所有需要的值
     results = {}
     results['stock_symbol'] = params.get('stock_symbol', 'UNKNOWN')
     results['analysis_date'] = params.get('analysis_date') or params.get('date', '')
@@ -732,6 +741,14 @@ def process_analysis_results(
     results['success'] = True
     results['error'] = None
     results['session_id'] = params.get('session_id') or analysis_id
+
+    # 优先从任务中保存的 config 对象获取 LLM 配置
+    # config 在准备阶段构建完毕后已经写入任务状态：task_status['config']
+    config = task_status.get('config') or {}
+
+    results['llm_provider'] = config.get('llm_provider') or 'dashscope'
+    results['llm_model'] = results['deep_think_llm'] = config.get('deep_think_llm') or 'qwen-max'
+    results['quick_think_llm'] = config.get('quick_think_llm') or 'qwen-plus'
     
     # 记录Token使用
     track_token_usage(results, params)

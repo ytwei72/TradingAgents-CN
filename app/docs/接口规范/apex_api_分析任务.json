@@ -126,6 +126,100 @@
 					"response": []
 				},
 				{
+					"name": "批量启动分析任务--相同参数",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"console.log('批量任务启动结果:', jsonData);",
+									"if (jsonData.tasks && jsonData.tasks.length > 0) {",
+									"    pm.environment.set(\"analysis_id\", jsonData.tasks[0].analysis_id);",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"stock_symbols\": [\"000002\", \"002230\", \"300017\", \"300458\", \"300502\", \"600519\", \"601127\", \"601899\", \"603039\", \"603296\", \"603881\", \"603893\", \"688008\", \"688018\", \"688213\", \"688256\", \"688347\"],\n    \"market_type\": \"A股\",\n    \"analysis_date\": \"2025-09-02\",\n    \"research_depth\": 3,\n    \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n    \"include_sentiment\": true,\n    \"include_risk_assessment\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/analysis/start/batch-same-params",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"start",
+								"batch-same-params"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "批量启动分析任务--独立参数",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"console.log('批量任务启动结果:', jsonData);",
+									"if (jsonData.tasks && jsonData.tasks.length > 0) {",
+									"    pm.environment.set(\"analysis_id\", jsonData.tasks[0].analysis_id);",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n    {\n        \"stock_symbol\": \"000002\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"002230\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"300017\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"300458\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"300502\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"600519\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"601127\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"601899\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"603039\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"603296\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"603881\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"603893\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"688008\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"688018\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"688213\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"688256\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    },\n    {\n        \"stock_symbol\": \"688347\",\n        \"market_type\": \"A股\",\n        \"analysis_date\": \"2025-09-02\",\n        \"research_depth\": 3,\n        \"analysts\": [\"market\", \"fundamentals\", \"news\"],\n        \"include_sentiment\": true,\n        \"include_risk_assessment\": true\n    }\n]"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/analysis/start/batch",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"start",
+								"batch"
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "查询任务状态",
 					"request": {
 						"method": "GET",

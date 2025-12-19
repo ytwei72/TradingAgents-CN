@@ -428,13 +428,13 @@ def format_analysis_results(results):
         'analysts': results['analysts'],
         'research_depth': results['research_depth'],
         'llm_provider': results.get('llm_provider', 'dashscope'),
-        'llm_model': results['llm_model'],
+        'llm_model': results.get('llm_model', 'qwen-max'),
         'metadata': {
             'analysis_date': results['analysis_date'],
             'analysts': results['analysts'],
             'research_depth': results['research_depth'],
             'llm_provider': results.get('llm_provider', 'dashscope'),
-            'llm_model': results['llm_model']
+            'llm_model': results.get('llm_model', 'qwen-max')
         }
     }
 
