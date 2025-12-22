@@ -201,13 +201,11 @@ def _load_cached_step_output(
             doc = _graph_instance.steps_status_manager.find_cached_step_status(
                 ticker=ticker,
                 trade_date=trade_date,
-                research_depth=research_depth,
-                analysts=analysts,
-                market_type=market_type,
+                node_name=node_name,
             )
 
             if doc:
-                if _graph_instance._match_node_output(node_name, "", doc):
+                if _graph_instance._match_node_output(node_name, doc):
                     logger.info(f"✅ [缓存命中] 从MongoDB找到匹配的缓存结果: {node_name} (股票: {ticker}, 日期: {trade_date})")
                     return _graph_instance._convert_historical_to_state(doc, node_name, current_state)
                 else:

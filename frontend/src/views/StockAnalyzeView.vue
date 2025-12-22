@@ -45,6 +45,12 @@ const showHistory = ref(false); // For accordion toggle
 const showReportResult = ref(false); // For report result accordion toggle, default collapsed
 const showResearchReport = ref(false); // For research report accordion toggle, default collapsed
 
+// --- Confirm Dialog State (reused from SystemConfig) ---
+const showConfirmDialog = ref(false);
+const confirmTitle = ref('');
+const confirmMessage = ref('');
+const confirmResolve = ref<((value: boolean) => void) | null>(null);
+
 // Task Control State
 const autoRefresh = ref(true);
 const pollingTimer = ref<any>(null);
@@ -280,10 +286,41 @@ const resume = async () => {
     }
 };
 
+// Confirm dialog helpers
+const showConfirm = (title: string, message: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    confirmTitle.value = title;
+    confirmMessage.value = message;
+    confirmResolve.value = resolve;
+    showConfirmDialog.value = true;
+  });
+};
+
+const handleConfirm = () => {
+  showConfirmDialog.value = false;
+  if (confirmResolve.value) {
+    confirmResolve.value(true);
+    confirmResolve.value = null;
+  }
+};
+
+const handleCancel = () => {
+  showConfirmDialog.value = false;
+  if (confirmResolve.value) {
+    confirmResolve.value(false);
+    confirmResolve.value = null;
+  }
+};
+
 const stop = async () => {
     if (!analysisId.value) return;
-    if (!confirm('确定要停止当前分析任务吗？此操作不可恢复。')) return;
-    
+
+    const confirmed = await showConfirm(
+      '确认停止任务',
+      '确定要停止当前分析任务吗？此操作不可恢复。'
+    );
+    if (!confirmed) return;
+
     try {
         await stopAnalysis(analysisId.value);
         status.value = 'stopped';
@@ -734,6 +771,28 @@ const getStatusText = (status: string) => {
         </section>
 
     </div>
+
+    <!-- 确认对话框 -->
+    <div v-if="showConfirmDialog" class="confirm-dialog-overlay" @click.self="handleCancel">
+      <div class="bg-[#1e293b] border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl confirm-dialog-content">
+        <h3 class="text-lg font-semibold text-white mb-4">{{ confirmTitle }}</h3>
+        <p class="text-gray-300 mb-6">{{ confirmMessage }}</p>
+        <div class="flex justify-end gap-3">
+          <button
+            @click="handleCancel"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-600 text-white hover:bg-gray-500"
+          >
+            取消
+          </button>
+          <button
+            @click="handleConfirm"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-500"
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -752,5 +811,32 @@ const getStatusText = (status: string) => {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b; 
+}
+
+/* 确认对话框样式，与配置管理页保持一致风格 */
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+}
+
+.confirm-dialog-content {
+  animation: dialog-fade-in 0.2s ease-out;
+}
+
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 </style>

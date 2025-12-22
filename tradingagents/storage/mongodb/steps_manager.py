@@ -58,14 +58,12 @@ class MongoDBStepsStatusManager:
             if not self.connected or not self.collection:
                 return
                 
-            # 创建复合唯一索引，确保每个股票代码和日期只有一条记录
-            # 注意：由于现在支持按参数查询，这个唯一索引可能需要调整
-            # 但为了保持向后兼容，暂时保留
+            # 创建复合唯一索引，确保每个股票代码、日期和分析ID只有一条记录
             try:
                 self.collection.create_index(
-                    [("company_of_interest", 1), ("trade_date", 1)],
+                    [("company_of_interest", 1), ("trade_date", 1), ("analysis_id", 1)],
                     unique=True,
-                    name="ticker_date_unique"
+                    name="ticker_date_analysis_unique"
                 )
             except Exception:
                 # 如果索引已存在，忽略错误
@@ -126,7 +124,7 @@ class MongoDBStepsStatusManager:
         """保存步骤状态到MongoDB
         
         Args:
-            step_data: 步骤数据字典，必须包含 company_of_interest 和 trade_date 字段
+            step_data: 步骤数据字典，必须包含 company_of_interest、trade_date 和 analysis_id 字段
             
         Returns:
             保存成功返回 True，否则返回 False
@@ -155,12 +153,18 @@ class MongoDBStepsStatusManager:
             if 'analysis_id' not in document or not document.get('analysis_id'):
                 if 'session_id' in document and document.get('session_id'):
                     document['analysis_id'] = document['session_id']
+                else:
+                    logger.warning(f"⚠️ [MongoDB步骤状态] 缺少analysis_id字段：ticker={ticker}, trade_date={normalized_date}")
+                    return False
             
-            # 使用upsert操作，基于ticker和trade_date的唯一性
+            analysis_id = document.get('analysis_id')
+            
+            # 使用upsert操作，基于ticker、trade_date和analysis_id的唯一性
             result = self.collection.update_one(
                 {
                     "company_of_interest": ticker,
-                    "trade_date": normalized_date
+                    "trade_date": normalized_date,
+                    "analysis_id": analysis_id
                 },
                 {
                     "$set": document
@@ -169,9 +173,9 @@ class MongoDBStepsStatusManager:
             )
             
             if result.upserted_id:
-                logger.debug(f"✅ [MongoDB步骤状态] 插入新记录: {ticker} - {normalized_date}")
+                logger.debug(f"✅ [MongoDB步骤状态] 插入新记录: {ticker} - {normalized_date} - {analysis_id}")
             else:
-                logger.debug(f"🔄 [MongoDB步骤状态] 更新已存在记录: {ticker} - {normalized_date}")
+                logger.debug(f"🔄 [MongoDB步骤状态] 更新已存在记录: {ticker} - {normalized_date} - {analysis_id}")
             
             return True
             
@@ -222,22 +226,9 @@ class MongoDBStepsStatusManager:
         self,
         ticker: str,
         trade_date: str,
-        research_depth: Optional[int] = None,
-        analysts: Optional[list] = None,
-        market_type: Optional[str] = None
+        node_name: str,
     ) -> Optional[Dict[str, Any]]:
-        """根据完整参数查找缓存的步骤状态（用于结果复用）
-        
-        Args:
-            ticker: 股票代码
-            trade_date: 交易日期
-            research_depth: 研究深度（可选）
-            analysts: 分析师列表（可选）
-            market_type: 市场类型（可选）
-            
-        Returns:
-            如果找到匹配的记录则返回文档字典（移除_id字段），否则返回None
-        """
+        """根据 ticker + trade_date 查找包含指定节点有效输出的最新记录"""
         if not self.connected:
             logger.debug("⚠️ [MongoDB步骤状态] 未连接，无法查询缓存")
             return None
@@ -246,38 +237,57 @@ class MongoDBStepsStatusManager:
             # 规范化日期格式
             normalized_date = self._normalize_date(trade_date)
             
-            # 构建查询条件
-            query = {
-                "company_of_interest": ticker,
-                "trade_date": normalized_date
+            # 每个节点对应需要非空的输出字段（支持嵌套，用"."表示）
+            field_map = {
+                "market_analyst": ["market_report"],
+                "fundamentals_analyst": ["fundamentals_report"],
+                "news_analyst": ["news_report"],
+                "social_media_analyst": ["sentiment_report"],
+                "bull_researcher": ["investment_debate_state.bull_history", "investment_debate_state.history"],
+                "bear_researcher": ["investment_debate_state.bear_history", "investment_debate_state.history"],
+                "research_manager": ["investment_plan", "trader_investment_plan", "final_trade_decision"],
+                "trader": ["trader_investment_plan", "investment_plan"],
+                "risky_analyst": ["risk_debate_state.risky_history", "risk_debate_state.history"],
+                "safe_analyst": ["risk_debate_state.safe_history", "risk_debate_state.history"],
+                "neutral_analyst": ["risk_debate_state.neutral_history", "risk_debate_state.history"],
+                "risk_manager": ["risk_debate_state.judge_decision", "final_trade_decision"],
             }
-            
-            # 如果提供了研究深度，添加到查询条件
-            if research_depth is not None:
-                query["research_depth"] = research_depth
-            
-            # 如果提供了分析师列表，添加到查询条件（需要完全匹配）
-            if analysts is not None:
-                # 规范化分析师列表（排序后比较，确保顺序不影响匹配）
-                normalized_analysts = sorted([str(a).lower() for a in analysts])
-                # 使用 $all 和 $size 确保完全匹配（顺序无关）
-                # 注意：这要求数据库中的 analysts 字段也是排序的列表
-                query["analysts"] = {"$all": normalized_analysts, "$size": len(normalized_analysts)}
-            
-            # 如果提供了市场类型，添加到查询条件
-            if market_type is not None:
-                query["market_type"] = market_type
-            
-            # 查询MongoDB，按时间倒序排列，取最新的一条
-            doc = self.collection.find_one(
-                query,
-                sort=[("timestamp", -1)]  # 按时间戳倒序，取最新的
-            )
-            
+
+            target_fields = field_map.get(node_name, [])
+            if not target_fields:
+                logger.debug(f"🔍 [缓存查询] 未知节点 {node_name}，跳过查询")
+                return None
+
+            base_query = {
+                "company_of_interest": ticker,
+                "trade_date": normalized_date,
+            }
+
+            # 仅返回目标字段存在且非空的记录
+            # 字段非空条件：存在且不为 null / ""（与手工测试语句保持一致）
+            non_empty_conditions = [
+                {
+                    field: {
+                        "$exists": True,
+                        "$nin": [None, ""],
+                    }
+                }
+                for field in target_fields
+            ]
+
+            query = {
+                "$and": [
+                    base_query,
+                    {"$or": non_empty_conditions}
+                ]
+            }
+
+            doc = self.collection.find_one(query, sort=[("timestamp", -1)])
+
             if doc:
                 # 移除MongoDB的_id字段，避免序列化问题
                 doc.pop('_id', None)
-                logger.info(f"✅ [缓存查询] 找到匹配的缓存记录: {ticker} - {normalized_date} (研究深度: {research_depth}, 分析师: {analysts})")
+                logger.info(f"✅ [缓存查询] 找到匹配的缓存记录: {ticker} - {normalized_date} (节点: {node_name})")
                 return doc
             else:
                 logger.debug(f"🔍 [缓存查询] 未找到匹配的缓存记录: {ticker} - {normalized_date}")

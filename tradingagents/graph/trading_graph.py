@@ -564,7 +564,7 @@ class TradingAgentsGraph:
                     # 查找匹配的节点输出
                     # 由于MongoDB中存储的是单个步骤数据，直接使用该文档
                     # 检查是否匹配当前节点
-                    if self._match_node_output(node_name, "", doc):
+                    if self._match_node_output(node_name, doc):
                         logger.info(f"🎭 [模拟模式] 从MongoDB找到历史输出: {node_name} (股票: {ticker}, 日期: {trade_date})")
                         return self._convert_historical_to_state(doc, node_name, current_state)
                     else:
@@ -573,125 +573,46 @@ class TradingAgentsGraph:
                     logger.debug(f"🔍 [模拟模式] MongoDB中未找到记录: {ticker} - {trade_date}")
                     
             except Exception as e:
-                logger.warning(f"⚠️ [模拟模式] 从MongoDB读取失败: {e}，尝试从文件系统读取")
+                logger.warning(f"⚠️ [模拟模式] 未找到节点 {node_name} 的历史结果")
         
-        # 如果MongoDB读取失败，回退到文件系统
-        # 查找历史步骤文件
-        step_output_dir = Path(f"eval_results/{ticker}/TradingAgentsStrategy_logs/step_outputs")
-        
-        # 尝试多个可能的日期格式
-        possible_dates = [
-            trade_date,
-            trade_date.replace('-', ''),
-            str(datetime.strptime(trade_date, '%Y-%m-%d').strftime('%Y%m%d')) if '-' in trade_date else None
-        ]
-        
-        for date_str in possible_dates:
-            if not date_str:
-                continue
-            
-            date_dir = step_output_dir / date_str
-            
-            # 检查all_steps.json文件
-            all_steps_file = date_dir / "all_steps.json"
-            if all_steps_file.exists():
-                try:
-                    with open(all_steps_file, 'r', encoding='utf-8') as f:
-                        all_steps = json.load(f)
-                    
-                    # 查找匹配的节点输出（找到最匹配的步骤）
-                    best_match = None
-                    best_match_score = 0
-                    
-                    for step in all_steps:
-                        # 检查消息内容中是否包含节点标识
-                        messages = step.get('messages', [])
-                        match_score = 0
-                        
-                        for msg in messages:
-                            content = str(msg.get('content', ''))
-                            # 根据节点名称和内容特征匹配，计算匹配分数
-                            if self._match_node_output(node_name, content, step):
-                                # 计算匹配分数（关键词匹配数量）
-                                match_score = self._calculate_match_score(node_name, content, step)
-                                if match_score > best_match_score:
-                                    best_match = step
-                                    best_match_score = match_score
-                    
-                    if best_match:
-                        logger.info(f"🎭 [模拟模式] 从文件系统找到历史输出: {node_name} (步骤 {best_match.get('step_number', '?')}, 匹配分数: {best_match_score})")
-                        return self._convert_historical_to_state(best_match, node_name, current_state)
-                except Exception as e:
-                    logger.debug(f"🔍 [模拟模式] 读取历史文件失败: {e}")
-                    continue
-        
-        logger.warning(f"⚠️ [模拟模式] 未找到节点 {node_name} 的历史输出")
         return None
     
-    def _match_node_output(self, node_name: str, content: str, step: Dict[str, Any]) -> bool:
-        """检查步骤是否匹配指定的节点
-        
-        Args:
-            node_name: 节点名称
-            content: 消息内容
-            step: 步骤数据
-            
-        Returns:
-            如果匹配返回True
-        """
-        # 特殊处理：risk_manager节点，优先检查其特定输出字段
-        if node_name == 'risk_manager':
-            # risk_manager的主要输出字段是risk_debate_state.judge_decision和final_trade_decision
-            risk_debate_state = step.get('risk_debate_state', {})
-            if isinstance(risk_debate_state, dict):
-                judge_decision = risk_debate_state.get('judge_decision', '')
-                if judge_decision and len(str(judge_decision).strip()) > 0:
-                    return True
-            
-            # 检查final_trade_decision字段（risk_manager的输出）
-            final_decision = step.get('final_trade_decision', '')
-            if final_decision and len(str(final_decision).strip()) > 0:
-                # 进一步确认：final_trade_decision通常包含风险评级信息
-                final_decision_str = str(final_decision).lower()
-                if any(keyword in final_decision_str for keyword in ['风险', 'risk', '风险评级', '风险等级']):
-                    return True
-        
-        # 节点名称到关键词的映射
-        node_keywords = {
-            'market_analyst': ['市场', '技术', '价格', 'market', '技术分析', '技术指标'],
-            'fundamentals_analyst': ['基本面', '财务', 'fundamental', '财务指标', '财务报表'],
-            'news_analyst': ['新闻', 'news', '事件', '新闻事件'],
-            'social_media_analyst': ['社交', '情绪', 'sentiment', '社交媒体'],
-            'bull_researcher': ['看涨', 'bull', '多头', '乐观'],
-            'bear_researcher': ['看跌', 'bear', '空头', '悲观'],
-            'research_manager': ['研究经理', '综合', '综合判断'],
-            'trader': ['交易', 'trader', '交易计划', '投资建议'],
-            'risky_analyst': ['激进', 'risky', '高风险'],
-            'safe_analyst': ['保守', 'safe', '低风险'],
-            'neutral_analyst': ['中性', 'neutral', '平衡'],
-            'risk_manager': ['风险经理', '风险决策', '风险评级', '风险等级', 'risk_manager', 'risk judge'],
+    def _match_node_output(self, node_name: str, step: Dict[str, Any]) -> bool:
+        """根据步骤内的结构化字段判定是否属于指定节点，不再依赖content关键词匹配"""
+
+        def _has_text(value: Any) -> bool:
+            if value is None:
+                return False
+            if isinstance(value, str):
+                return len(value.strip()) > 0
+            if isinstance(value, (list, dict)):
+                return len(value) > 0
+            return True
+
+        # 定义各节点对应应有的输出字段（字段名, 子字段名）
+        field_map = {
+            'market_analyst': [('market_report', None)],
+            'fundamentals_analyst': [('fundamentals_report', None)],
+            'news_analyst': [('news_report', None)],
+            'social_media_analyst': [('sentiment_report', None)],
+            'bull_researcher': [('investment_debate_state', 'bull_history'), ('investment_debate_state', 'history')],
+            'bear_researcher': [('investment_debate_state', 'bear_history'), ('investment_debate_state', 'history')],
+            'research_manager': [('investment_plan', None), ('trader_investment_plan', None), ('final_trade_decision', None)],
+            'trader': [('trader_investment_plan', None), ('investment_plan', None)],
+            'risky_analyst': [('risk_debate_state', 'risky_history'), ('risk_debate_state', 'history')],
+            'safe_analyst': [('risk_debate_state', 'safe_history'), ('risk_debate_state', 'history')],
+            'neutral_analyst': [('risk_debate_state', 'neutral_history'), ('risk_debate_state', 'history')],
+            'risk_manager': [('risk_debate_state', 'judge_decision'), ('final_trade_decision', None)],
         }
-        
-        keywords = node_keywords.get(node_name, [])
-        if not keywords:
-            return False
-        
-        # 检查内容或字段是否包含关键词
-        content_lower = content.lower()
-        for keyword in keywords:
-            if keyword.lower() in content_lower:
+
+        targets = field_map.get(node_name, [])
+        for field_name, sub_field in targets:
+            value = step.get(field_name)
+            if sub_field and isinstance(value, dict):
+                value = value.get(sub_field)
+            if _has_text(value):
                 return True
-        
-        # 检查步骤中的报告字段
-        report_fields = ['market_report', 'fundamentals_report', 'news_report', 
-                        'sentiment_report', 'investment_plan', 'final_trade_decision']
-        for field in report_fields:
-            field_content = step.get(field, '')
-            if field_content:
-                for keyword in keywords:
-                    if keyword.lower() in str(field_content).lower():
-                        return True
-        
+
         return False
     
     def _calculate_match_score(self, node_name: str, content: str, step: Dict[str, Any]) -> int:
