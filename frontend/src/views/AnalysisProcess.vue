@@ -239,17 +239,17 @@ const markdownContent = ref(`# 🔄 完整分析流程
 
 ---
 
-## 🎭 模拟模式支持
+## 🎭 结果复用模式支持
 
-> 支持节点级别的模拟模式配置，使用历史步骤输出，节省API成本
+> 支持节点级别的历史结果复用的模式配置，使用历史步骤输出，节省API成本
 
-- 通过 \`.env\` 文件配置节点级别的模拟模式
-- 模拟模式会使用历史步骤输出，节省API成本
+- 通过 \`.env\` 文件配置节点级别的结果复用模式
+- 结果复用模式会使用历史步骤输出，节省API成本
 - **配置示例**：
   \`\`\`
-  MOCK_ANALYSIS_MODE=market,news
+  CACHE_REUSE_MODE=market,news
   # 或
-  MOCK_ANALYSIS_MODE=true
+  CACHE_REUSE_MODE=true
   \`\`\`
 
 ---

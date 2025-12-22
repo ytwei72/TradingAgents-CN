@@ -292,11 +292,10 @@ class TradingAgentsGraph:
         self.step_traces = []  # List of all chunks during execution
         self.enable_step_tracking = self.config.get("enable_step_tracking", True)  # 默认启用
         
-        # 模拟模式配置
-        self.mock_mode_config = self._load_mock_mode_config()
-        # 从环境变量读取sleep时间配置，如果没有则使用默认值
-        self.mock_sleep_min = float(os.getenv('MOCK_SLEEP_MIN', '2'))  # 默认2秒
-        self.mock_sleep_max = float(os.getenv('MOCK_SLEEP_MAX', '10'))  # 默认10秒
+        # 保存分析参数（用于结果复用时的参数匹配）
+        self.selected_analysts = selected_analysts
+        self.research_depth = self.config.get("research_depth", 2)  # 从config中获取研究深度
+        self.market_type = self.config.get("market_type", "美股")  # 从config中获取市场类型
         
         # MongoDB步骤状态管理器（用于存储和读取步骤状态）
         from tradingagents.storage.mongodb.steps_manager import mongodb_steps_status_manager
@@ -304,9 +303,9 @@ class TradingAgentsGraph:
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
-        
-        # 设置graph实例到模拟模式辅助工具中
-        from .mock_mode_helper import set_graph_instance
+
+        # 设置graph实例到结果复用辅助工具中
+        from .cache_reuse_helper import set_graph_instance
         set_graph_instance(self)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
@@ -452,27 +451,40 @@ class TradingAgentsGraph:
         # Return decision and processed signal
         return final_state, self.process_signal(final_state["final_trade_decision"], company_name, analysis_id=analysis_id)
 
-    def _load_mock_mode_config(self) -> Dict[str, bool]:
-        """加载模拟模式配置，支持节点级别的配置
+    def _load_cache_reuse_config(self, extra_config: Optional[Dict[str, Any]] = None) -> Dict[str, bool]:
+        """加载结果复用配置，支持节点级别的配置
+        
+        配置优先级：
+        1. extra_config 中的 cache_reuse_mode（如果提供）
+        2. 环境变量 CACHE_REUSE_MODE（新配置名）
         
         支持的配置格式：
-        - MOCK_ANALYSIS_MODE=true: 所有节点启用模拟模式
-        - MOCK_ANALYSIS_MODE=false: 所有节点禁用模拟模式
-        - MOCK_ANALYSIS_MODE=market,news: 只对market和news节点启用模拟模式
-        - MOCK_ANALYSIS_MODE=market_analyst,bull_researcher: 支持节点名称
+        - cache_reuse_mode=true: 所有节点启用结果复用
+        - cache_reuse_mode=false: 所有节点禁用结果复用
+        - cache_reuse_mode=market,news: 只对market和news节点启用结果复用
+        - cache_reuse_mode=market_analyst,bull_researcher: 支持节点名称
+        
+        Args:
+            extra_config: 任务额外配置，可能包含 cache_reuse_mode
         """
-        mock_config = os.getenv('MOCK_ANALYSIS_MODE', 'false').strip().lower()
+        # 优先从 extra_config 读取
+        if extra_config and 'cache_reuse_mode' in extra_config:
+            cache_config = str(extra_config['cache_reuse_mode']).strip().lower()
+            logger.info(f"🔍 [结果复用配置] 从任务配置读取: {cache_config}")
+        else:
+            # 从环境变量读取（优先使用新配置名，向后兼容旧配置名）
+            cache_config = os.getenv('CACHE_REUSE_MODE', 'false').strip().lower()
         
         # 如果配置为false，所有节点都不启用
-        if mock_config == 'false' or mock_config == '':
+        if cache_config == 'false' or cache_config == '':
             return {}
         
         # 如果配置为true，所有节点都启用
-        if mock_config == 'true':
+        if cache_config == 'true':
             return {'all': True}
         
         # 解析节点列表
-        node_list = [node.strip() for node in mock_config.split(',')]
+        node_list = [node.strip() for node in cache_config.split(',')]
         config = {}
         
         # 节点名称映射（支持多种命名方式）
@@ -505,8 +517,12 @@ class TradingAgentsGraph:
             normalized_node = node_mapping.get(node, node)
             config[normalized_node] = True
         
-        logger.info(f"🎭 [模拟模式配置] 已加载: {config}")
+        logger.info(f"✅ [结果复用配置] 已加载: {config}")
         return config
+    
+    def _load_mock_mode_config(self) -> Dict[str, bool]:
+        """向后兼容的别名"""
+        return self._load_cache_reuse_config()
     
     def _should_use_mock_mode(self, node_name: str) -> bool:
         """检查某个节点是否应该使用模拟模式
@@ -827,6 +843,11 @@ class TradingAgentsGraph:
             # 将分析相关标识一起保存，便于在analysis_steps_status集合中按任务维度追踪
             "analysis_id": chunk.get("analysis_id", ""),
             "session_id": chunk.get("session_id", ""),
+            # 保存分析参数，用于缓存查询和结果复用
+            # 注意：analysts 需要排序保存，以便查询时能正确匹配
+            "research_depth": self.research_depth,
+            "analysts": sorted([str(a).lower() for a in self.selected_analysts]) if self.selected_analysts else [],
+            "market_type": self.market_type,
         }
         
         # 序列化消息列表

@@ -59,16 +59,26 @@ class MongoDBStepsStatusManager:
                 return
                 
             # 创建复合唯一索引，确保每个股票代码和日期只有一条记录
-            self.collection.create_index(
-                [("company_of_interest", 1), ("trade_date", 1)],
-                unique=True,
-                name="ticker_date_unique"
-            )
+            # 注意：由于现在支持按参数查询，这个唯一索引可能需要调整
+            # 但为了保持向后兼容，暂时保留
+            try:
+                self.collection.create_index(
+                    [("company_of_interest", 1), ("trade_date", 1)],
+                    unique=True,
+                    name="ticker_date_unique"
+                )
+            except Exception:
+                # 如果索引已存在，忽略错误
+                pass
             
             # 创建单字段索引
             self.collection.create_index("company_of_interest")
             self.collection.create_index("trade_date")
             self.collection.create_index("analysis_id")
+            # 为缓存查询添加索引
+            self.collection.create_index("research_depth")
+            self.collection.create_index("analysts")
+            self.collection.create_index("market_type")
             
             logger.debug("✅ [MongoDB步骤状态] 索引创建成功")
             
@@ -206,6 +216,75 @@ class MongoDBStepsStatusManager:
                 
         except Exception as e:
             logger.warning(f"⚠️ [MongoDB步骤状态] 读取失败: {e}")
+            return None
+    
+    def find_cached_step_status(
+        self,
+        ticker: str,
+        trade_date: str,
+        research_depth: Optional[int] = None,
+        analysts: Optional[list] = None,
+        market_type: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """根据完整参数查找缓存的步骤状态（用于结果复用）
+        
+        Args:
+            ticker: 股票代码
+            trade_date: 交易日期
+            research_depth: 研究深度（可选）
+            analysts: 分析师列表（可选）
+            market_type: 市场类型（可选）
+            
+        Returns:
+            如果找到匹配的记录则返回文档字典（移除_id字段），否则返回None
+        """
+        if not self.connected:
+            logger.debug("⚠️ [MongoDB步骤状态] 未连接，无法查询缓存")
+            return None
+
+        try:
+            # 规范化日期格式
+            normalized_date = self._normalize_date(trade_date)
+            
+            # 构建查询条件
+            query = {
+                "company_of_interest": ticker,
+                "trade_date": normalized_date
+            }
+            
+            # 如果提供了研究深度，添加到查询条件
+            if research_depth is not None:
+                query["research_depth"] = research_depth
+            
+            # 如果提供了分析师列表，添加到查询条件（需要完全匹配）
+            if analysts is not None:
+                # 规范化分析师列表（排序后比较，确保顺序不影响匹配）
+                normalized_analysts = sorted([str(a).lower() for a in analysts])
+                # 使用 $all 和 $size 确保完全匹配（顺序无关）
+                # 注意：这要求数据库中的 analysts 字段也是排序的列表
+                query["analysts"] = {"$all": normalized_analysts, "$size": len(normalized_analysts)}
+            
+            # 如果提供了市场类型，添加到查询条件
+            if market_type is not None:
+                query["market_type"] = market_type
+            
+            # 查询MongoDB，按时间倒序排列，取最新的一条
+            doc = self.collection.find_one(
+                query,
+                sort=[("timestamp", -1)]  # 按时间戳倒序，取最新的
+            )
+            
+            if doc:
+                # 移除MongoDB的_id字段，避免序列化问题
+                doc.pop('_id', None)
+                logger.info(f"✅ [缓存查询] 找到匹配的缓存记录: {ticker} - {normalized_date} (研究深度: {research_depth}, 分析师: {analysts})")
+                return doc
+            else:
+                logger.debug(f"🔍 [缓存查询] 未找到匹配的缓存记录: {ticker} - {normalized_date}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"⚠️ [MongoDB步骤状态] 缓存查询失败: {e}")
             return None
     
     def is_connected(self) -> bool:

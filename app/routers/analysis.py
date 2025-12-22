@@ -71,7 +71,7 @@ async def start_analysis(request: AnalysisRequest):
         'include_sentiment': request.include_sentiment,
         'include_risk_assessment': request.include_risk_assessment,
         'custom_prompt': request.custom_prompt,
-        'extra_config': request.extra_config
+        'extra_config': request.extra_config,
     }
     
     analysis_id = task_manager.start_task(task_params)
@@ -106,7 +106,7 @@ async def start_batch_analysis_same_params(request: BatchSameParamsRequest):
                 'include_sentiment': request.include_sentiment,
                 'include_risk_assessment': request.include_risk_assessment,
                 'custom_prompt': request.custom_prompt,
-                'extra_config': request.extra_config
+                'extra_config': request.extra_config,
             }
             
             analysis_id = task_manager.start_task(task_params)
@@ -159,7 +159,7 @@ async def start_batch_analysis(requests: List[AnalysisRequest]):
                 'include_sentiment': request.include_sentiment,
                 'include_risk_assessment': request.include_risk_assessment,
                 'custom_prompt': request.custom_prompt,
-                'extra_config': request.extra_config
+                'extra_config': request.extra_config,
             }
             
             analysis_id = task_manager.start_task(task_params)

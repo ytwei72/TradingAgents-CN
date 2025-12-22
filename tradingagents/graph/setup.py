@@ -22,8 +22,8 @@ except ImportError:
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
-# 导入模拟模式辅助工具
-from .mock_mode_helper import create_mock_mode_wrapper
+# 导入结果复用辅助工具（替代原先的模拟模式）
+from .cache_reuse_helper import create_cache_reuse_wrapper
 
 
 class GraphSetup:
@@ -102,8 +102,8 @@ class GraphSetup:
             market_analyst_func = create_market_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
-            # 包装节点函数以支持模拟模式
-            analyst_nodes["market"] = create_mock_mode_wrapper(market_analyst_func, "market_analyst")
+            # 包装节点函数以支持结果复用
+            analyst_nodes["market"] = create_cache_reuse_wrapper(market_analyst_func, "market_analyst")
             delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
 
@@ -111,7 +111,7 @@ class GraphSetup:
             social_analyst_func = create_social_media_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
-            analyst_nodes["social"] = create_mock_mode_wrapper(social_analyst_func, "social_media_analyst")
+            analyst_nodes["social"] = create_cache_reuse_wrapper(social_analyst_func, "social_media_analyst")
             delete_nodes["social"] = create_msg_delete()
             tool_nodes["social"] = self.tool_nodes["social"]
 
@@ -119,7 +119,7 @@ class GraphSetup:
             news_analyst_func = create_news_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
-            analyst_nodes["news"] = create_mock_mode_wrapper(news_analyst_func, "news_analyst")
+            analyst_nodes["news"] = create_cache_reuse_wrapper(news_analyst_func, "news_analyst")
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]
 
@@ -147,7 +147,7 @@ class GraphSetup:
             fundamentals_analyst_func = create_fundamentals_analyst(
                 self.quick_thinking_llm, self.toolkit
             )
-            analyst_nodes["fundamentals"] = create_mock_mode_wrapper(fundamentals_analyst_func, "fundamentals_analyst")
+            analyst_nodes["fundamentals"] = create_cache_reuse_wrapper(fundamentals_analyst_func, "fundamentals_analyst")
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
@@ -172,14 +172,14 @@ class GraphSetup:
         )
         
         # 包装所有节点以支持模拟模式
-        bull_researcher_node = create_mock_mode_wrapper(bull_researcher_func, "bull_researcher")
-        bear_researcher_node = create_mock_mode_wrapper(bear_researcher_func, "bear_researcher")
-        research_manager_node = create_mock_mode_wrapper(research_manager_func, "research_manager")
-        trader_node = create_mock_mode_wrapper(trader_func, "trader")
-        risky_analyst = create_mock_mode_wrapper(risky_analyst_func, "risky_analyst")
-        neutral_analyst = create_mock_mode_wrapper(neutral_analyst_func, "neutral_analyst")
-        safe_analyst = create_mock_mode_wrapper(safe_analyst_func, "safe_analyst")
-        risk_manager_node = create_mock_mode_wrapper(risk_manager_func, "risk_manager")
+        bull_researcher_node = create_cache_reuse_wrapper(bull_researcher_func, "bull_researcher")
+        bear_researcher_node = create_cache_reuse_wrapper(bear_researcher_func, "bear_researcher")
+        research_manager_node = create_cache_reuse_wrapper(research_manager_func, "research_manager")
+        trader_node = create_cache_reuse_wrapper(trader_func, "trader")
+        risky_analyst = create_cache_reuse_wrapper(risky_analyst_func, "risky_analyst")
+        neutral_analyst = create_cache_reuse_wrapper(neutral_analyst_func, "neutral_analyst")
+        safe_analyst = create_cache_reuse_wrapper(safe_analyst_func, "safe_analyst")
+        risk_manager_node = create_cache_reuse_wrapper(risk_manager_func, "risk_manager")
 
         # Create workflow
         workflow = StateGraph(AgentState)

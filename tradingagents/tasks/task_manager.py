@@ -374,6 +374,16 @@ class TaskManager:
         # 生成 ID
         task_id = str(uuid.uuid4())
         params['task_id'] = task_id
+
+        # 构建并保存结果复用配置（任务级别）
+        try:
+            cache_cfg = self._build_cache_reuse_config(params)
+            # 将原始配置保存到 params，便于调试（可选）
+            params['cache_reuse_mode'] = cache_cfg['cache_reuse_mode']
+            params['cache_reuse_sleep_min'] = cache_cfg['cache_reuse_sleep_min']
+            params['cache_reuse_sleep_max'] = cache_cfg['cache_reuse_sleep_max']
+        except Exception as e:
+            logger.warning(f"⚠️ [结果复用配置] 构建失败，将使用默认配置: {e}")
         
         # 注册任务控制(原 register_task 逻辑)
         with self._lock:
@@ -388,9 +398,55 @@ class TaskManager:
         # 创建并启动任务(AnalysisTask 负责在状态机中创建记录)
         task = AnalysisTask(task_id, params)
         self.tasks[task_id] = task
+
+        # 将结果复用配置写入任务状态（便于节点从任务状态读取）
+        try:
+            cache_cfg = {
+                "cache_reuse_mode": params.get("cache_reuse_mode"),
+                "cache_reuse_sleep_min": params.get("cache_reuse_sleep_min"),
+                "cache_reuse_sleep_max": params.get("cache_reuse_sleep_max"),
+            }
+            state_machine = task.state_machine
+            state_machine.update_state({"cache_reuse_config": cache_cfg})
+            logger.debug(f"✅ [结果复用配置] 已保存到任务状态: {cache_cfg}")
+        except Exception as e:
+            logger.warning(f"⚠️ [结果复用配置] 保存到任务状态失败（不影响主流程）: {e}")
         task.start()
         
         return task_id
+
+    def _build_cache_reuse_config(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """构建结果复用配置（任务级别）
+
+        优先级：
+        1. params['extra_config'] 中的 cache_reuse_* 字段
+        2. 环境变量 CACHE_REUSE_*（新配置名）
+        3. 环境变量 MOCK_*（向后兼容旧配置名）
+        """
+        extra_config = params.get("extra_config") or {}
+
+        # 结果复用模式
+        if extra_config.get("cache_reuse_mode") is not None:
+            cache_reuse_mode = str(extra_config.get("cache_reuse_mode")).strip()
+        else:
+            cache_reuse_mode = os.getenv("CACHE_REUSE_MODE", "false").strip()
+
+        # 结果复用 sleep 配置
+        if extra_config.get("cache_reuse_sleep_min") is not None:
+            cache_reuse_sleep_min = float(extra_config.get("cache_reuse_sleep_min"))
+        else:
+            cache_reuse_sleep_min = float(os.getenv("CACHE_REUSE_SLEEP_MIN", "2"))
+
+        if extra_config.get("cache_reuse_sleep_max") is not None:
+            cache_reuse_sleep_max = float(extra_config.get("cache_reuse_sleep_max"))
+        else:
+            cache_reuse_sleep_max = float(os.getenv("CACHE_REUSE_SLEEP_MAX", "10"))
+
+        return {
+            "cache_reuse_mode": cache_reuse_mode,
+            "cache_reuse_sleep_min": cache_reuse_sleep_min,
+            "cache_reuse_sleep_max": cache_reuse_sleep_max,
+        }
 
         
     def stop_task(self, task_id: str) -> bool:

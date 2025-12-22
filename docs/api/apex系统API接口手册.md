@@ -81,7 +81,10 @@ Content-Type: application/json
   "custom_prompt": "重点关注技术面分析",
   "extra_config": {
     "llm_provider": "dashscope",
-    "llm_model": "qwen-max"
+    "llm_model": "qwen-max",
+    "cache_reuse_mode": "true",
+    "cache_reuse_sleep_min": 2.0,
+    "cache_reuse_sleep_max": 10.0
   }
 }
 ```
@@ -98,6 +101,16 @@ Content-Type: application/json
 | include_risk_assessment | boolean | 否 | 是否包含风险评估，默认 true |
 | custom_prompt | string | 否 | 自定义分析提示词 |
 | extra_config | object | 否 | 额外配置参数 |
+
+**extra_config 结果复用配置**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| cache_reuse_mode | string | 结果复用模式：`false`（禁用）、`true`（全部启用）、或节点列表如 `"market,fundamentals"` |
+| cache_reuse_sleep_min | number | 结果复用模拟延迟最小值（秒），默认 2.0 |
+| cache_reuse_sleep_max | number | 结果复用模拟延迟最大值（秒），默认 10.0 |
+
+**结果复用说明**: 当分析任务的参数（股票代码、分析日期、研究深度、分析师团队、市场类型）都相同时，系统可以从数据库缓存中读取历史分析结果，避免重复计算。配置优先级：`extra_config` > 环境变量 `CACHE_REUSE_*` > 环境变量 `MOCK_*`（向后兼容）。
 
 **响应示例**:
 ```json

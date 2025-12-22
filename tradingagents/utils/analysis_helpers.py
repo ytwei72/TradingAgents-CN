@@ -430,6 +430,7 @@ def prepare_analysis_steps(
     
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
+        # 初始化分析引擎（TradingAgentsGraph）
         graph = TradingAgentsGraph(analysts, config=config, debug=False)
         _update_step_success("✅ 分析引擎初始化完成")
     except Exception as e:

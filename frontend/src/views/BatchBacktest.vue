@@ -420,6 +420,12 @@
             </span>
           </div>
         </div>
+        <!-- 收益曲线图 -->
+        <div v-if="selectedReportDetail && reportChartData" class="mt-4 h-80 bg-slate-950/80 border border-slate-800 rounded-lg p-4">
+          <h4 class="text-sm font-semibold text-gray-100 mb-3">收益对比曲线</h4>
+          <Line :data="reportChartData" :options="reportChartOptions" />
+        </div>
+        <!-- 收益序列表 -->
         <div v-if="selectedReportDetail" class="overflow-x-auto max-h-80 border border-slate-800 rounded-lg">
           <table class="min-w-full text-xs text-gray-200">
             <thead class="bg-slate-900/80 sticky top-0 z-10">
@@ -456,12 +462,6 @@
         </div>
         <div v-else class="text-xs text-gray-500 text-center py-4">
           请选择一个研报查看其收益序列
-        </div>
-        
-        <!-- 收益曲线图 -->
-        <div v-if="selectedReportDetail && reportChartData" class="mt-4 h-80 bg-slate-950/80 border border-slate-800 rounded-lg p-4">
-          <h4 class="text-sm font-semibold text-gray-100 mb-3">收益对比曲线</h4>
-          <Line :data="reportChartData" :options="reportChartOptions" />
         </div>
       </div>
     </section>
