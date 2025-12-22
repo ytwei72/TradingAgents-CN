@@ -8,6 +8,7 @@ import OperationLogsView from '../views/TaskRunLogsOld.vue'
 import TaskRunLogsView from '../views/TaskRunLogs.vue'
 import BacktestView from '../views/Backtest.vue'
 import BatchBacktestView from '../views/BatchBacktest.vue'
+import CacheManagementView from '../views/CacheManagement.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -54,6 +55,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/batch-backtest',
     name: 'BatchBacktest',
     component: BatchBacktestView
+  },
+  {
+    path: '/cache-management',
+    name: 'CacheManagement',
+    component: CacheManagementView
   }
 ]
 

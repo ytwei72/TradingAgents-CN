@@ -407,4 +407,65 @@ export const startBatchBacktest = async (payload: {
   return response.data;
 };
 
+// Cache Management API
+export interface CacheCountResponse {
+  success: boolean;
+  total: number;
+  message: string;
+}
+
+export interface CacheListItem {
+  task_id: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  analysis_date?: string;
+  stock_symbol?: string;
+  company_name?: string;
+}
+
+export interface CacheListResponse {
+  success: boolean;
+  data: CacheListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  message: string;
+}
+
+export interface CacheDetailData {
+  current_step?: any;
+  history?: any;
+  props?: any;
+}
+
+export interface CacheDetailResponse {
+  success: boolean;
+  data: CacheDetailData;
+  message: string;
+}
+
+export const getCacheCount = async (): Promise<CacheCountResponse> => {
+  const response = await api.get<CacheCountResponse>('/cache/count');
+  return response.data;
+};
+
+export const getCacheList = async (
+  page: number = 1,
+  page_size: number = 10
+): Promise<CacheListResponse> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: page_size.toString()
+  });
+  const response = await api.get<CacheListResponse>(`/cache/list?${params.toString()}`);
+  return response.data;
+};
+
+export const getCacheDetail = async (analysisId: string): Promise<CacheDetailResponse> => {
+  const response = await api.get<CacheDetailResponse>(`/cache/${analysisId}`);
+  return response.data;
+};
+
 export default api;

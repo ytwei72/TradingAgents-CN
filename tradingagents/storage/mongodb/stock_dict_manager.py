@@ -464,13 +464,44 @@ class StockDictManager:
         快速获取股票名称
         
         Args:
-            symbol: 股票代码
+            symbol: 股票代码（支持带交易所后缀，如"000001.SZ"）
             
         Returns:
             str: 股票名称，不存在返回空字符串
         """
-        result = self.get_by_symbol(symbol)
+        if not symbol:
+            return ''
+        
+        # 处理带交易所后缀的代码（如"000001.SZ" -> "000001"）
+        normalized_symbol = symbol
+        if "." in normalized_symbol:
+            normalized_symbol = normalized_symbol.split(".")[0]
+        
+        result = self.get_by_symbol(normalized_symbol)
         return result.get('name', '') if result else ''
+    
+    def get_company_name(self, symbol: str) -> Optional[str]:
+        """
+        获取股票公司名称（返回Optional类型，便于判断是否存在）
+        
+        Args:
+            symbol: 股票代码（支持带交易所后缀，如"000001.SZ"）
+            
+        Returns:
+            Optional[str]: 股票名称，不存在返回None
+        """
+        if not symbol:
+            return None
+        
+        # 处理带交易所后缀的代码（如"000001.SZ" -> "000001"）
+        normalized_symbol = symbol
+        if "." in normalized_symbol:
+            normalized_symbol = normalized_symbol.split(".")[0]
+        
+        result = self.get_by_symbol(normalized_symbol)
+        if result and isinstance(result, dict):
+            return result.get('name')
+        return None
     
     def exists(self, symbol: str) -> bool:
         """

@@ -1,0 +1,182 @@
+{
+	"info": {
+		"_postman_id": "cache-management-collection",
+		"name": "TradingAgents API - 缓存管理",
+		"description": "缓存管理相关接口，提供Redis缓存记录的查询功能",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "缓存管理",
+			"item": [
+				{
+					"name": "设置analysis_id",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"pm.environment.set(\"analysis_id\", \"4d3b84ab-a7be-414f-93a9-78f25160477d\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"health"
+							]
+						},
+						"description": "此请求用于设置环境变量 analysis_id，方便后续测试使用"
+					},
+					"response": []
+				},
+				{
+					"name": "获取缓存记录总数",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cache/count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cache",
+								"count"
+							]
+						},
+						"description": "获取Redis中所有任务缓存记录的总数"
+					},
+					"response": []
+				},
+				{
+					"name": "分页查询缓存记录列表--第1页",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cache/list?page=1&page_size=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cache",
+								"list"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "页码，从1开始"
+								},
+								{
+									"key": "page_size",
+									"value": "10",
+									"description": "每页数量，范围1-100"
+								}
+							]
+						},
+						"description": "分页查询缓存记录的缩略信息，返回包含任务ID、状态、创建时间、更新时间、分析日期、股票代码、公司名称等字段的列表"
+					},
+					"response": []
+				},
+				{
+					"name": "分页查询缓存记录列表--第2页",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cache/list?page=2&page_size=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cache",
+								"list"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "2",
+									"description": "页码，从1开始"
+								},
+								{
+									"key": "page_size",
+									"value": "20",
+									"description": "每页数量，范围1-100"
+								}
+							]
+						},
+						"description": "分页查询缓存记录列表，每页20条"
+					},
+					"response": []
+				},
+				{
+					"name": "获取缓存记录详细信息",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cache/{{analysis_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cache",
+								"{{analysis_id}}"
+							]
+						},
+						"description": "根据analysis_id获取指定任务的缓存记录详细信息，包括current_step、history、props三个子键的数据。每个字段值最多显示50个字符，超出部分用省略号表示。"
+					},
+					"response": []
+				},
+				{
+					"name": "获取缓存记录详细信息--指定ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cache/4d3b84ab-a7be-414f-93a9-78f25160477d",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cache",
+								"4d3b84ab-a7be-414f-93a9-78f25160477d"
+							]
+						},
+						"description": "获取指定任务ID的缓存记录详细信息"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "analysis_id",
+			"value": "4d3b84ab-a7be-414f-93a9-78f25160477d",
+			"type": "string"
+		}
+	]
+}
+

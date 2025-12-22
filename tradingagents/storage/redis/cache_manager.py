@@ -6,7 +6,8 @@ Redis 缓存管理器
 
 import json
 import pickle
-from typing import Optional, Dict, Any, Union
+import re
+from typing import Optional, Dict, Any, Union, List
 from datetime import timedelta
 
 from tradingagents.utils.logging_manager import get_logger
@@ -256,6 +257,256 @@ class RedisCacheManager:
                 "keys": 0,
                 "memory_usage": "N/A"
             }
+    
+    def _parse_task_id_from_key(self, key: str) -> Optional[str]:
+        """
+        从Redis键中解析task_id
+        
+        Args:
+            key: Redis键，格式为 task:{task_id}:{suffix}
+            
+        Returns:
+            Optional[str]: task_id，如果解析失败返回None
+        """
+        # 格式: task:{task_id}:{suffix}
+        match = re.match(r'^task:([^:]+):', key)
+        if match:
+            return match.group(1)
+        return None
+    
+    def get_all_task_ids(self) -> List[str]:
+        """
+        获取所有task_id列表
+        
+        Returns:
+            List[str]: task_id列表，按倒序排列
+        """
+        if not self.is_available():
+            return []
+        
+        try:
+            # 获取所有task相关的键（包括props、current_step、history）
+            keys = self._client.keys("task:*:*")
+            task_ids = []
+            for key in keys:
+                task_id = self._parse_task_id_from_key(key)
+                if task_id:
+                    task_ids.append(task_id)
+            
+            # 去重并排序
+            unique_task_ids = list(set(task_ids))
+            # 按task_id倒序排列
+            return sorted(unique_task_ids, reverse=True)
+        except Exception as e:
+            logger.error(f"获取task_id列表失败: {e}")
+            return []
+    
+    def get_task_props(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """
+        获取task的props数据
+        
+        Args:
+            task_id: 任务ID
+            
+        Returns:
+            Optional[Dict[str, Any]]: task的props数据，如果不存在返回None
+        """
+        if not self.is_available():
+            return None
+        
+        try:
+            key = f"task:{task_id}:props"
+            data = self._client.get(key)
+            if data:
+                return json.loads(data)
+        except Exception as e:
+            logger.error(f"获取task props失败: {e}")
+        
+        return None
+    
+    def get_task_cache_list(
+        self,
+        sub_key: str = "props",
+        fields: Optional[List[str]] = None,
+        page: int = 1,
+        page_size: int = 10
+    ) -> Dict[str, Any]:
+        """
+        获取缓存记录列表（分页）
+        
+        Args:
+            sub_key: 要查询的子键（如 'props', 'current_step', 'history'），默认为 'props'
+            fields: 要提取的字段列表，如果为None则返回所有字段
+            page: 页码，从1开始
+            page_size: 每页数量
+            
+        Returns:
+            Dict[str, Any]: 包含以下键的字典
+                - items: List[Dict[str, Any]]: 缓存记录列表
+                - total: int: 总记录数
+                - page: int: 当前页码
+                - page_size: int: 每页数量
+                - pages: int: 总页数
+        """
+        if not self.is_available():
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+                "pages": 0
+            }
+        
+        try:
+            # 获取所有task_id
+            task_ids = self.get_all_task_ids()
+            total = len(task_ids)
+            
+            # 计算分页
+            pages = (total + page_size - 1) // page_size if total > 0 else 0
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            
+            # 获取当前页的task_id
+            page_task_ids = task_ids[start_idx:end_idx]
+            
+            # 获取每个task的数据
+            items = []
+            for task_id in page_task_ids:
+                key = f"task:{task_id}:{sub_key}"
+                item = {"task_id": task_id}
+                try:
+                    data = self._client.get(key)
+                    if data:
+                        task_data = json.loads(data)
+                        if isinstance(task_data, dict):
+                            # 如果指定了字段列表，只提取指定字段
+                            if fields:
+                                # 获取params字段（如果存在）
+                                params = task_data.get('params', {})
+                                for field in fields:
+                                    # analysis_date和stock_symbol在params字段下
+                                    if field in ['analysis_date', 'stock_symbol']:
+                                        item[field] = params.get(field) if isinstance(params, dict) else None
+                                    else:
+                                        item[field] = task_data.get(field)
+                            else:
+                                # 返回所有字段
+                                item.update(task_data)
+                    # 即使没有数据，也添加基本项（只包含task_id）
+                    items.append(item)
+                except Exception as e:
+                    logger.warning(f"获取task {task_id} 的 {sub_key} 数据失败: {e}")
+                    # 即使获取失败，也添加基本项
+                    items.append(item)
+            
+            return {
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "pages": pages
+            }
+        except Exception as e:
+            logger.error(f"获取缓存记录列表失败: {e}")
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+                "pages": 0
+            }
+    
+    def get_task_cache_detail(
+        self,
+        task_id: str,
+        sub_keys: Optional[List[str]] = None,
+        truncate_length: Optional[int] = 50
+    ) -> Dict[str, Any]:
+        """
+        获取缓存记录的详细信息
+        
+        Args:
+            task_id: 任务ID（analysis_id）
+            sub_keys: 要获取的子键列表（如 ['current_step', 'history', 'props']），
+                      如果为None则获取所有子键
+            truncate_length: 字段截断长度，None表示不截断，默认50
+        
+        Returns:
+            Dict[str, Any]: 包含指定子键的数据字典，如果所有子键都不存在则返回空字典
+        """
+        if not self.is_available():
+            return {}
+        
+        # 默认获取所有子键
+        if sub_keys is None:
+            sub_keys = ["current_step", "history", "props"]
+        
+        result = {}
+        
+        for sub_key in sub_keys:
+            try:
+                key = f"task:{task_id}:{sub_key}"
+                data = self._client.get(key)
+                if data:
+                    sub_data = json.loads(data)
+                    # 如果需要截断
+                    if truncate_length is not None:
+                        result[sub_key] = self._truncate_dict_values(sub_data, truncate_length)
+                    else:
+                        result[sub_key] = sub_data
+                else:
+                    result[sub_key] = None
+            except Exception as e:
+                logger.warning(f"获取task {task_id} 的 {sub_key} 数据失败: {e}")
+                result[sub_key] = None
+        
+        return result
+    
+    def _truncate_field(self, value: Any, max_length: int) -> str:
+        """
+        截断字段值，超过长度用省略号表示
+        
+        Args:
+            value: 要截断的值
+            max_length: 最大长度
+            
+        Returns:
+            str: 截断后的字符串
+        """
+        if value is None:
+            return ""
+        
+        str_value = str(value)
+        if len(str_value) <= max_length:
+            return str_value
+        
+        return str_value[:max_length] + "..."
+    
+    def _truncate_dict_values(self, data: Any, max_length: int) -> Any:
+        """
+        递归截断字典中的字符串值
+        
+        Args:
+            data: 要处理的数据（可以是dict、list、str等）
+            max_length: 最大长度
+            
+        Returns:
+            Any: 处理后的数据
+        """
+        if isinstance(data, dict):
+            return {k: self._truncate_dict_values(v, max_length) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._truncate_dict_values(item, max_length) for item in data]
+        elif isinstance(data, str):
+            return self._truncate_field(data, max_length)
+        elif isinstance(data, (int, float, bool)):
+            return data
+        elif data is None:
+            return None
+        else:
+            # 对于其他类型，转换为字符串后截断
+            return self._truncate_field(str(data), max_length)
 
 
 # 全局缓存管理器实例
