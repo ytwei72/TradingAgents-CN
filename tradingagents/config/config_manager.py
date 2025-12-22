@@ -276,6 +276,11 @@ class ConfigManager:
         # 默认设置
         import os
         default_data_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data")
+        default_results_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results")
+        
+        # 规范化路径：统一使用正斜杠（跨平台兼容）
+        normalized_data_dir = default_data_dir.replace("\\", "/")
+        normalized_results_dir = default_results_dir.replace("\\", "/")
         
         default_settings = {
             "default_provider": "dashscope",
@@ -285,9 +290,9 @@ class ConfigManager:
             "currency_preference": "CNY",
             "auto_save_usage": True,
             "max_usage_records": 10000,
-            "data_dir": default_data_dir,  # 数据目录配置
-            "cache_dir": os.path.join(default_data_dir, "cache"),  # 缓存目录
-            "results_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results"),  # 结果目录
+            "data_dir": normalized_data_dir,  # 数据目录配置
+            "cache_dir": f"{normalized_data_dir}/cache",  # 缓存目录
+            "results_dir": normalized_results_dir,  # 结果目录
             "auto_create_dirs": True,  # 自动创建目录
             "openai_enabled": False,  # OpenAI模型是否启用
         }
@@ -596,6 +601,12 @@ class ConfigManager:
         
         # 从数据库读取
         settings = self.system_config_manager.load_settings()
+        
+        # 规范化路径字段：统一使用正斜杠（跨平台兼容，兼容旧数据）
+        path_fields = ['data_dir', 'cache_dir', 'results_dir']
+        for field in path_fields:
+            if field in settings and isinstance(settings[field], str):
+                settings[field] = settings[field].replace("\\", "/")
 
         # # 合并.env中的其他配置
         # env_settings = {
@@ -653,7 +664,14 @@ class ConfigManager:
         if not self.system_config_manager or not self.system_config_manager.is_connected():
             raise RuntimeError("系统配置管理器未连接，无法保存设置配置")
         
-        self.system_config_manager.save_settings(settings)
+        # 规范化路径字段：统一使用正斜杠（跨平台兼容）
+        path_fields = ['data_dir', 'cache_dir', 'results_dir']
+        normalized_settings = settings.copy()
+        for field in path_fields:
+            if field in normalized_settings and isinstance(normalized_settings[field], str):
+                normalized_settings[field] = normalized_settings[field].replace("\\", "/")
+        
+        self.system_config_manager.save_settings(normalized_settings)
         logger.debug("✅ 设置已保存到数据库")
     
     def get_enabled_models(self) -> List[ModelConfig]:
@@ -748,9 +766,10 @@ class ConfigManager:
     def set_data_dir(self, data_dir: str):
         """设置数据目录路径"""
         settings = self.load_settings()
-        settings["data_dir"] = data_dir
-        # 同时更新缓存目录
-        settings["cache_dir"] = os.path.join(data_dir, "cache")
+        # 规范化路径：统一使用正斜杠（跨平台兼容）
+        normalized_data_dir = data_dir.replace("\\", "/")
+        settings["data_dir"] = normalized_data_dir
+        # cache_dir 是独立配置项，不从 data_dir 自动计算，直接从数据库读取
         self.save_settings(settings)
         
         # 如果启用自动创建目录，则创建目录

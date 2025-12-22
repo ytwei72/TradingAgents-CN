@@ -4,7 +4,6 @@
 管理 models、pricing、settings 三类系统配置
 """
 
-import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -32,7 +31,7 @@ class SystemConfigManager:
         初始化系统配置管理器
         
         Args:
-            config_dir: 默认配置文件目录，用于读取默认配置
+            config_dir: 配置文件目录（保留用于兼容性，不再用于读取JSON文件）
         """
         self.config_dir = Path(config_dir)
         
@@ -100,40 +99,6 @@ class SystemConfigManager:
     def is_connected(self) -> bool:
         """检查是否已连接到MongoDB"""
         return self._connected
-    
-    def _load_default_from_file(self, config_type: str) -> Any:
-        """
-        从默认配置文件加载配置
-        
-        Args:
-            config_type: 配置类型，'models', 'pricing', 或 'settings'
-        
-        Returns:
-            配置数据
-        """
-        file_map = {
-            'models': self.config_dir / 'models.json',
-            'pricing': self.config_dir / 'pricing.json',
-            'settings': self.config_dir / 'settings.json'
-        }
-        
-        config_file = file_map.get(config_type)
-        if not config_file or not config_file.exists():
-            # 如果文件不存在，返回空数据
-            if config_type == 'settings':
-                return {}
-            return []
-        
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                logger.info(f"📄 从文件加载默认配置: {config_type}")
-                return data
-        except Exception as e:
-            logger.error(f"❌ 加载默认配置文件失败 ({config_type}): {e}")
-            if config_type == 'settings':
-                return {}
-            return []
     
     def _get_default_configs(self) -> Dict[str, Any]:
         """
@@ -230,6 +195,11 @@ class SystemConfigManager:
         """获取默认设置配置"""
         import os
         default_data_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data")
+        default_results_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results")
+        
+        # 规范化路径：统一使用正斜杠（跨平台兼容）
+        normalized_data_dir = default_data_dir.replace("\\", "/")
+        normalized_results_dir = default_results_dir.replace("\\", "/")
         
         return {
             "default_provider": "dashscope",
@@ -239,16 +209,16 @@ class SystemConfigManager:
             "currency_preference": "CNY",
             "auto_save_usage": True,
             "max_usage_records": 10000,
-            "data_dir": default_data_dir,
-            "cache_dir": os.path.join(default_data_dir, "cache"),
-            "results_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results"),
+            "data_dir": normalized_data_dir,
+            "cache_dir": f"{normalized_data_dir}/cache",
+            "results_dir": normalized_results_dir,
             "auto_create_dirs": True,
             "openai_enabled": False,
         }
     
     def _ensure_config_exists(self, config_type: str):
         """
-        确保配置存在于数据库中，如果不存在则从默认配置加载
+        确保配置存在于数据库中，如果不存在则使用代码中的默认配置初始化
         
         Args:
             config_type: 配置类型，'models', 'pricing', 或 'settings'
@@ -262,28 +232,24 @@ class SystemConfigManager:
         try:
             if config_type == 'models':
                 if self.models_collection.count_documents({}) == 0:
-                    # 从默认配置文件读取（仅用于初始化）
-                    default_config = self._load_default_from_file(config_type)
-                    if not default_config:
-                        default_config = self._get_default_models()
+                    # 使用代码中的默认配置初始化
+                    default_config = self._get_default_models()
                     self.save_models(default_config)
-                    logger.info("✅ 已从默认配置初始化 models 配置到数据库")
+                    logger.info("✅ 已从代码默认配置初始化 models 配置到数据库")
             
             elif config_type == 'pricing':
                 if self.pricing_collection.count_documents({}) == 0:
-                    default_config = self._load_default_from_file(config_type)
-                    if not default_config:
-                        default_config = self._get_default_pricing()
+                    # 使用代码中的默认配置初始化
+                    default_config = self._get_default_pricing()
                     self.save_pricing(default_config)
-                    logger.info("✅ 已从默认配置初始化 pricing 配置到数据库")
+                    logger.info("✅ 已从代码默认配置初始化 pricing 配置到数据库")
             
             elif config_type == 'settings':
                 if self.settings_collection.count_documents({}) == 0:
-                    default_config = self._load_default_from_file(config_type)
-                    if not default_config:
-                        default_config = self._get_default_settings()
+                    # 使用代码中的默认配置初始化
+                    default_config = self._get_default_settings()
                     self.save_settings(default_config)
-                    logger.info("✅ 已从默认配置初始化 settings 配置到数据库")
+                    logger.info("✅ 已从代码默认配置初始化 settings 配置到数据库")
         
         except Exception as e:
             logger.error(f"❌ 确保配置存在失败 ({config_type}): {e}")

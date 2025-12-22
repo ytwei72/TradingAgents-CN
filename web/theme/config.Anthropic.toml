@@ -1,7 +1,0 @@
-[theme]
-base = "light" # 或 "dark" 根据偏好选择
-primaryColor = "#5A6FE3" # Anthropic 风格的主色（示例值，可替换）
-backgroundColor = "#F7F7F8" # 页面背景色
-secondaryBackgroundColor = "#FFFFFF" # 侧边栏等次要区域背景
-textColor = "#1F2937" # 主文本颜色，需具备高对比度
-font = "sans serif" # 字体，可调整为 "serif"、"monospace" 等
