@@ -68,8 +68,43 @@
       </div>
     </div>
     <!-- JSON内容 -->
-    <div class="json-viewer-content-wrapper flex-1 overflow-hidden min-h-0">
-      <div class="json-viewer-content" :class="{ 'compact': compact }" :style="{ maxHeight: maxHeight }" ref="containerRef">
+    <div class="json-viewer-content-wrapper flex-1 overflow-hidden min-h-0 relative">
+      <!-- 配色选择按钮 -->
+      <div class="absolute top-4 right-4 z-10 color-picker-container">
+        <button
+          @click.stop="showColorPicker = !showColorPicker"
+          class="p-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg text-gray-400 hover:text-white transition-colors"
+          title="选择高亮颜色"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          </svg>
+        </button>
+        <!-- 颜色选择面板 -->
+        <div
+          v-if="showColorPicker"
+          class="absolute top-12 right-0 bg-gray-800 border border-gray-600 rounded-lg shadow-xl p-3 min-w-[200px]"
+          @click.stop
+        >
+          <div class="text-xs text-gray-400 mb-2">选择高亮颜色</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="color in highlightColors"
+              :key="color.name"
+              @click="selectColor(color)"
+              class="flex items-center gap-2 p-2 rounded hover:bg-gray-700 transition-colors text-left"
+              :class="{ 'bg-gray-700': selectedColorName === color.name }"
+            >
+              <div
+                class="w-6 h-6 rounded border border-gray-600 flex-shrink-0"
+                :style="{ backgroundColor: color.value }"
+              ></div>
+              <span class="text-xs text-gray-300">{{ color.name }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="json-viewer-content" :class="{ 'compact': compact }" :style="{ maxHeight: maxHeight, '--line-highlight-bg': selectedColorValue }" ref="containerRef">
         <pre class="json-text" v-html="syntaxHighlightedJson" ref="preRef"></pre>
       </div>
     </div>
@@ -77,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, ref, nextTick } from 'vue'
+import { computed, watch, ref, nextTick, onMounted, onUnmounted } from 'vue'
 
 interface Props {
   data: any
@@ -103,6 +138,36 @@ const searchQuery = ref<string>('')
 // 搜索结果相关
 const searchResults = ref<Array<{ id: string, element: HTMLElement | null }>>([])
 const currentResultIndex = ref<number>(0)
+
+// 颜色选择相关
+interface HighlightColor {
+  name: string
+  value: string
+}
+
+const highlightColors: HighlightColor[] = [
+  { name: '翠绿', value: 'rgba(117, 228, 80, 0.5)' },
+  { name: '浅绿', value: 'rgba(164, 230, 177, 0.4)' },
+  { name: '黄色', value: 'rgba(251, 191, 36, 0.5)' },
+  { name: '橙色', value: 'rgba(249, 115, 22, 0.5)' },
+  { name: '红色', value: 'rgba(239, 68, 68, 0.5)' },
+  { name: '粉色', value: 'rgba(236, 72, 153, 0.5)' },
+  { name: '紫色', value: 'rgba(168, 85, 247, 0.5)' },
+  { name: '蓝色', value: 'rgba(59, 130, 246, 0.5)' },
+  { name: '青色', value: 'rgba(34, 211, 238, 0.5)' },
+  { name: '白色', value: 'rgba(255, 255, 255, 0.3)' }
+]
+
+const showColorPicker = ref<boolean>(false)
+const selectedColorName = ref<string>('浅绿')
+const selectedColorValue = ref<string>('rgba(164, 230, 177, 0.4)')
+
+// 选择颜色
+const selectColor = (color: HighlightColor) => {
+  selectedColorName.value = color.name
+  selectedColorValue.value = color.value
+  showColorPicker.value = false
+}
 
 // 缓存语法高亮结果，避免重复计算
 const syntaxHighlightedJson = ref<string>('')
@@ -428,6 +493,22 @@ const clearSearch = () => {
   searchResults.value = []
   currentResultIndex.value = 0
 }
+
+// 点击外部关闭颜色选择器
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (!target.closest('.color-picker-container')) {
+    showColorPicker.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <style scoped>
@@ -458,7 +539,7 @@ const clearSearch = () => {
   flex: 1;
   min-height: 0;
   /* 整行高亮的颜色变量 - 统一管理背景色和边框色 */
-  --line-highlight-bg: rgba(117, 228, 80, 0.5);
+  /* 背景色通过 :style 动态设置，边框色固定 */
   --line-highlight-border: #f59e0b;
 }
 
