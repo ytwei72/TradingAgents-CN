@@ -1,3 +1,4 @@
+<!-- 缓存详情模态框 (基础版本，已废弃，建议使用 CacheDetailsModalDlgEx.vue) -->
 <template>
   <Transition name="modal">
     <div
@@ -22,7 +23,7 @@
         <!-- 模态框内容 -->
         <div class="flex-1 overflow-hidden p-4 min-h-0">
           <slot>
-            <JsonViewer v-if="data" :data="data" :max-height="'100%'" />
+            <JsonViewer v-if="data" :data="data" :max-height="'100%'" :show-search="true" />
             <div v-else class="text-gray-400 text-center py-8">暂无数据</div>
           </slot>
         </div>

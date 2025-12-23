@@ -19,7 +19,7 @@
           </div>
           
           <!-- 右列：缓存记录概要和子键选择器 -->
-          <div class="w-96 flex flex-col border-l border-gray-700 bg-[#1e293b]">
+          <div class="w-88 flex flex-col border-l border-gray-700 bg-[#1e293b]">
             <!-- 标题区域 -->
             <div class="p-4 border-b border-gray-700 flex items-center justify-between">
               <div>

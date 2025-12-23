@@ -176,19 +176,19 @@
             <!-- Current Step Tab -->
             <div v-show="activeTabs[item.task_id] === 'current_step'" class="flex-1 flex flex-col min-h-0">
               <div class="flex-1 overflow-hidden min-h-0">
-                <JsonViewer :data="cacheDetails[item.task_id]?.current_step" :max-height="'100%'" />
+                <JsonViewer :data="cacheDetails[item.task_id]?.current_step" :max-height="'100%'" :show-search="false" />
               </div>
             </div>
             <!-- History Tab -->
             <div v-show="activeTabs[item.task_id] === 'history'" class="flex-1 flex flex-col min-h-0">
               <div class="flex-1 overflow-hidden min-h-0">
-                <JsonViewer :data="cacheDetails[item.task_id]?.history" :max-height="'100%'" />
+                <JsonViewer :data="cacheDetails[item.task_id]?.history" :max-height="'100%'" :show-search="false" />
               </div>
             </div>
             <!-- Props Tab -->
             <div v-show="activeTabs[item.task_id] === 'props'" class="flex-1 flex flex-col min-h-0">
               <div class="flex-1 overflow-hidden min-h-0">
-                <JsonViewer :data="cacheDetails[item.task_id]?.props" :max-height="'100%'" />
+                <JsonViewer :data="cacheDetails[item.task_id]?.props" :max-height="'100%'" :show-search="false" />
               </div>
             </div>
           </div>
