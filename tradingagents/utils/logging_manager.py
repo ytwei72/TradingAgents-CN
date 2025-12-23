@@ -245,7 +245,7 @@ class TradingAgentsLogger:
         logger.addHandler(file_handler)
     
     def _add_structured_handler(self, logger: logging.Logger):
-        """添加结构化日志处理器"""
+        """添加结构化日志处理器（目前只能写入文件，以免写入mongo造成日志死循环）"""
         log_dir = Path(self.config['handlers']['structured']['directory'])
         log_file = log_dir / 'tradingagents_structured.log'
         
@@ -262,6 +262,30 @@ class TradingAgentsLogger:
         formatter = StructuredFormatter()
         structured_handler.setFormatter(formatter)
         logger.addHandler(structured_handler)
+    
+    def _add_structured_handler_to_mongo(self, logger: logging.Logger):
+        """
+        添加结构化日志处理器（写入MongoDB）
+        不可用，写入mongo造成日志死循环
+        """
+        try:
+            # 导入 MongoDB Handler
+            from tradingagents.utils.mongodb_log_handler import MongoDBLogHandler
+            
+            structured_level = getattr(logging, self.config['handlers']['structured']['level'])
+            
+            # 创建 MongoDB Handler
+            mongodb_handler = MongoDBLogHandler()
+            mongodb_handler.setLevel(structured_level)
+            
+            formatter = StructuredFormatter()
+            mongodb_handler.setFormatter(formatter)
+            logger.addHandler(mongodb_handler)
+            
+        except Exception as e:
+            # 如果 MongoDB Handler 不可用，回退到文件处理器
+            _bootstrap_logger.warning(f"⚠️ MongoDB日志处理器不可用，回退到文件处理器: {e}")
+            self._add_structured_handler_backup(logger)
     
     def _configure_specific_loggers(self):
         """配置特定的日志器"""

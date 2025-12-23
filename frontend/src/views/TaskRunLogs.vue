@@ -365,11 +365,29 @@ const selectDays = (days: number) => {
   loadLogs()
 }
 
-const onDateChange = () => {
-  // 当手动选择日期时，清除"近X天"的选择
-  if (filters.value.startDate || filters.value.endDate) {
+const onDateChange = (payload?: { startDate: string; endDate: string; days: number | null }) => {
+  // 如果是从 DateRangePicker 传来的 change 事件，使用事件参数
+  if (payload) {
+    // 如果选择了"近X天"，保持 days 值，日期已经通过 v-model 更新
+    if (payload.days !== null) {
+      filters.value.days = payload.days
+      filters.value.startDate = payload.startDate
+      filters.value.endDate = payload.endDate
+      currentPage.value = 1
+      loadLogs()
+      return
+    }
+    // 如果手动选择日期，清除"近X天"的选择
     filters.value.days = null
+    filters.value.startDate = payload.startDate
+    filters.value.endDate = payload.endDate
+  } else {
+    // 兼容旧代码：当手动选择日期时，清除"近X天"的选择
+    if (filters.value.startDate || filters.value.endDate) {
+      filters.value.days = null
+    }
   }
+  
   // 如果只选择了开始日期，自动设置结束日期为今天
   if (filters.value.startDate && !filters.value.endDate) {
     filters.value.endDate = formatDate(new Date())

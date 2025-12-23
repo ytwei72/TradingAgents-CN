@@ -127,13 +127,28 @@ const startInputId = computed(() => props.startInputId || 'start-date-input')
 const endInputId = computed(() => props.endInputId || 'end-date-input')
 const isSingleMode = computed(() => props.singleMode === 'start' || props.singleMode === 'end')
 
+const formatDate = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const onSelectDays = (days: number) => {
+  // 计算日期范围：结束日期为今天，开始日期为days天前
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - days + 1) // +1 表示包含今天
+  
+  const startDateStr = formatDate(startDate)
+  const endDateStr = formatDate(endDate)
+  
   emit('update:modelDays', days)
-  emit('update:modelStartDate', '')
-  emit('update:modelEndDate', '')
+  emit('update:modelStartDate', startDateStr)
+  emit('update:modelEndDate', endDateStr)
   emit('change', {
-    startDate: '',
-    endDate: '',
+    startDate: startDateStr,
+    endDate: endDateStr,
     days
   })
 }
