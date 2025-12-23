@@ -6,44 +6,39 @@
       @click.self="handleClose"
     >
       <div class="w-full h-full flex flex-col bg-[#0f172a]">
-        <!-- 模态框头部 -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
-          <h3 class="text-lg font-semibold text-white">缓存详情</h3>
-          <button
-            @click="handleClose"
-            class="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg"
-            title="关闭 (ESC)"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
         <!-- 主要内容区域：左右两列 -->
         <div class="flex-1 flex min-h-0 overflow-hidden">
           <!-- 左列：JSON查看器 -->
           <div class="flex-1 flex flex-col min-h-0 border-r border-gray-700">
-            <div class="p-4 border-b border-gray-700 flex-shrink-0">
-              <h4 class="text-sm font-medium text-gray-300">
-                {{ getSubKeyLabel(selectedSubKey) }}
-              </h4>
-            </div>
-            <div class="flex-1 overflow-hidden p-4 min-h-0">
-              <JsonViewer :data="currentData" :max-height="'100%'" />
-            </div>
+            <JsonViewer
+              :data="currentData"
+              :title="getSubKeyLabel(selectedSubKey)"
+              :max-height="'100%'"
+              :show-search="true"
+            />
           </div>
           
           <!-- 右列：缓存记录概要和子键选择器 -->
-          <div class="w-80 flex flex-col border-l border-gray-700 bg-[#1e293b]">
+          <div class="w-96 flex flex-col border-l border-gray-700 bg-[#1e293b]">
             <!-- 标题区域 -->
-            <div class="p-4 border-b border-gray-700">
-              <h4 class="text-base font-semibold text-white mb-1">
-                {{ cacheInfo.company_name || 'N/A' }}
-              </h4>
-              <p class="text-sm text-gray-400">
-                {{ cacheInfo.stock_symbol || 'N/A' }}
-              </p>
+            <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+              <div>
+                <h4 class="text-base font-semibold text-white mb-1">
+                  {{ cacheInfo.company_name || 'N/A' }}
+                </h4>
+                <p class="text-sm text-gray-400">
+                  {{ cacheInfo.stock_symbol || 'N/A' }}
+                </p>
+              </div>
+              <button
+                @click="handleClose"
+                class="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg"
+                title="关闭 (ESC)"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             
             <!-- 缓存记录概要 -->

@@ -1,14 +1,14 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- 基础模态框 -->
-    <!-- <ModalDialog
+    <!-- <CacheDetailsModalDlg
       v-model="showModal"
       :title="modalTitle"
       :data="modalData"
     /> -->
     
     <!-- 扩展模态框 -->
-    <ModalDialogEx
+    <CacheDetailsModalDlgEx
       v-model="showModalEx"
       :cache-info="modalCacheInfo"
       :cache-data="modalCacheData"
@@ -53,8 +53,7 @@
         <!-- Collapsed View -->
         <div
           v-if="!expandedItems.has(item.task_id)"
-          @click="toggleExpand(item.task_id)"
-          class="p-4 cursor-pointer hover:bg-gray-800/50 transition-colors"
+          class="p-4"
         >
           <div class="flex items-start justify-between">
             <div class="flex-1">
@@ -91,16 +90,31 @@
                 </div>
               </div>
             </div>
-            <div class="ml-4">
-              <svg
-                class="w-5 h-5 text-gray-400 transition-transform"
-                :class="{ 'rotate-180': expandedItems.has(item.task_id) }"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div class="ml-4 flex items-center gap-2">
+              <button
+                @click.stop="openModalExDirectly(item)"
+                class="text-gray-400 hover:text-blue-400 transition-colors p-1"
+                title="放大查看缓存详情"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+              <button
+                @click.stop="toggleExpand(item.task_id)"
+                class="text-gray-400 hover:text-white transition-colors p-1"
+                title="展开/收缩"
+              >
+                <svg
+                  class="w-5 h-5 transition-transform"
+                  :class="{ 'rotate-180': expandedItems.has(item.task_id) }"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -108,43 +122,45 @@
         <!-- Expanded View -->
         <div v-else class="p-4 flex flex-col flex-1 min-h-0">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-white">缓存详情</h3>
-            <button
-              @click="toggleExpand(item.task_id)"
-              class="text-gray-400 hover:text-white transition-colors"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-              </svg>
-            </button>
+            <h3 class="text-lg font-semibold text-white">
+              缓存详情：{{ item.company_name || 'N/A' }}（{{ item.stock_symbol || 'N/A' }}）
+            </h3>
+            <div class="flex items-center gap-2">
+              <button
+                v-if="cacheDetails[item.task_id]"
+                @click="openModalEx(item, cacheDetails[item.task_id])"
+                class="text-gray-400 hover:text-blue-400 transition-colors p-1"
+                title="放大查看缓存详情"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+              <button
+                @click="toggleExpand(item.task_id)"
+                class="text-gray-400 hover:text-white transition-colors p-1"
+                title="展开/收缩"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <!-- Tabs -->
           <div class="mb-4 border-b border-gray-700">
-            <div class="flex items-center justify-between">
-              <div class="flex space-x-4">
-                <button
-                  v-for="tab in tabs"
-                  :key="tab.key"
-                  @click="activeTabs[item.task_id] = tab.key"
-                  class="px-4 py-2 text-sm font-medium transition-colors"
-                  :class="activeTabs[item.task_id] === tab.key
-                    ? 'text-blue-400 border-b-2 border-blue-400'
-                    : 'text-gray-400 hover:text-gray-300'"
-                >
-                  {{ tab.label }}
-                </button>
-              </div>
+            <div class="flex space-x-4">
               <button
-                v-if="cacheDetails[item.task_id]"
-                @click="openModalEx(item, cacheDetails[item.task_id])"
-                class="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors flex items-center gap-1.5"
-                title="放大查看缓存详情"
+                v-for="tab in tabs"
+                :key="tab.key"
+                @click="activeTabs[item.task_id] = tab.key"
+                class="px-4 py-2 text-sm font-medium transition-colors"
+                :class="activeTabs[item.task_id] === tab.key
+                  ? 'text-blue-400 border-b-2 border-blue-400'
+                  : 'text-gray-400 hover:text-gray-300'"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                </svg>
-                放大查看
+                {{ tab.label }}
               </button>
             </div>
           </div>
@@ -216,7 +232,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { getCacheCount, getCacheList, getCacheDetail, type CacheListItem, type CacheDetailData } from '../api'
 import JsonViewer from '../components/JsonViewer.vue'
-import ModalDialogEx from '../components/ModalDialogEx.vue'
+import CacheDetailsModalDlgEx from '../components/CacheDetailsModalDlgEx.vue'
 
 const loading = ref(false)
 const error = ref('')
@@ -281,6 +297,17 @@ const openModalEx = (item: CacheListItem, detailData: CacheDetailData) => {
     props: detailData?.props ?? null
   }
   showModalEx.value = true
+}
+
+const openModalExDirectly = async (item: CacheListItem) => {
+  // 如果数据还没加载，先加载
+  if (!cacheDetails[item.task_id]) {
+    await loadCacheDetail(item.task_id)
+  }
+  // 打开扩展模态框
+  if (cacheDetails[item.task_id]) {
+    openModalEx(item, cacheDetails[item.task_id])
+  }
 }
 
 const toggleExpand = async (taskId: string) => {
