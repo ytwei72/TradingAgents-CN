@@ -70,7 +70,10 @@ class AnalysisConfigBuilder:
             config["max_recur_limit"] = system_overrides["max_recur_limit"]
         
         # 根据LLM提供商设置模型和backend_url
-        provider_config = self._get_provider_config(effective_llm_provider, effective_llm_model, effective_research_depth)
+        provider_config = self._get_provider_config(
+            effective_llm_provider, 
+            research_depth=effective_research_depth
+        )
         config.update(provider_config)
         
         # 设置路径配置
@@ -112,19 +115,30 @@ class AnalysisConfigBuilder:
     def _get_provider_config(
         self,
         llm_provider: str,
-        llm_model: str,
-        research_depth: int
+        research_depth: int = 3
     ) -> Dict[str, Any]:
-        """根据LLM提供商获取配置"""
+        """
+        根据LLM提供商获取配置
+        从系统配置中读取 deep_think_llm 和 quick_think_llm
+        
+        Args:
+            llm_provider: LLM提供商
+            research_depth: 研究深度（可选，某些提供商需要）
+        """
+        # 从系统配置中读取模型配置
+        system_overrides = self._load_system_overrides()
+        deep_think_llm = system_overrides.get("deep_think_llm")
+        quick_think_llm = system_overrides.get("quick_think_llm")
+        
         provider_configs = {
             "dashscope": lambda: self._get_dashscope_config(research_depth),
             "deepseek": lambda: self._get_deepseek_config(),
             "qianfan": lambda: self._get_qianfan_config(research_depth),
             "google": lambda: self._get_google_config(research_depth),
-            "openai": lambda: self._get_openai_config(llm_model),
-            "openrouter": lambda: self._get_openrouter_config(llm_model),
-            "siliconflow": lambda: self._get_siliconflow_config(llm_model),
-            "custom_openai": lambda: self._get_custom_openai_config(llm_model),
+            "openai": lambda: self._get_openai_config(deep_think_llm or quick_think_llm),
+            "openrouter": lambda: self._get_openrouter_config(deep_think_llm or quick_think_llm),
+            "siliconflow": lambda: self._get_siliconflow_config(deep_think_llm or quick_think_llm),
+            "custom_openai": lambda: self._get_custom_openai_config(deep_think_llm or quick_think_llm),
         }
         
         config_func = provider_configs.get(llm_provider.lower())
@@ -132,10 +146,11 @@ class AnalysisConfigBuilder:
             return config_func()
         
         # 默认配置
+        model = deep_think_llm or quick_think_llm or "qwen-max"
         return {
             "backend_url": "https://api.openai.com/v1",
-            "quick_think_llm": llm_model,
-            "deep_think_llm": llm_model,
+            "quick_think_llm": quick_think_llm or model,
+            "deep_think_llm": deep_think_llm or model,
         }
     
     def _get_dashscope_config(self, research_depth: int) -> Dict[str, Any]:
@@ -198,7 +213,12 @@ class AnalysisConfigBuilder:
         }
     
     def _get_openai_config(self, llm_model: str) -> Dict[str, Any]:
-        """获取OpenAI配置"""
+        """
+        获取OpenAI配置
+        
+        Args:
+            llm_model: 模型名称（实际是 deep_think_llm，如果没有则使用 quick_think_llm）
+        """
         logger.info(f"🤖 [OpenAI] 使用模型: {llm_model}")
         return {
             "backend_url": "https://api.openai.com/v1",
@@ -207,7 +227,12 @@ class AnalysisConfigBuilder:
         }
     
     def _get_openrouter_config(self, llm_model: str) -> Dict[str, Any]:
-        """获取OpenRouter配置"""
+        """
+        获取OpenRouter配置
+        
+        Args:
+            llm_model: 模型名称（实际是 deep_think_llm，如果没有则使用 quick_think_llm）
+        """
         logger.info(f"🌐 [OpenRouter] 使用模型: {llm_model}")
         return {
             "backend_url": "https://openrouter.ai/api/v1",
@@ -216,7 +241,12 @@ class AnalysisConfigBuilder:
         }
     
     def _get_siliconflow_config(self, llm_model: str) -> Dict[str, Any]:
-        """获取SiliconFlow配置"""
+        """
+        获取SiliconFlow配置
+        
+        Args:
+            llm_model: 模型名称（实际是 deep_think_llm，如果没有则使用 quick_think_llm）
+        """
         logger.info(f"🌐 [SiliconFlow] 使用模型: {llm_model}")
         return {
             "backend_url": "https://api.siliconflow.cn/v1",
@@ -225,7 +255,12 @@ class AnalysisConfigBuilder:
         }
     
     def _get_custom_openai_config(self, llm_model: str) -> Dict[str, Any]:
-        """获取自定义OpenAI配置"""
+        """
+        获取自定义OpenAI配置
+        
+        Args:
+            llm_model: 模型名称（实际是 deep_think_llm，如果没有则使用 quick_think_llm）
+        """
         # 尝试从streamlit session state获取，如果没有则使用默认值
         try:
             import streamlit as st

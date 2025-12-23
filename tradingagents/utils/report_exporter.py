@@ -191,7 +191,8 @@ class ReportExporter:
 ## 📋 分析配置信息
 
 - **LLM提供商**: {results.get('llm_provider', 'N/A')}
-- **AI模型**: {results.get('llm_model', 'N/A')}
+- **深度思考模型**: {results.get('deep_think_llm', 'N/A')}
+- **快速思考模型**: {results.get('quick_think_llm', 'N/A')}
 - **分析师数量**: {len(results.get('analysts', []))}个
 - **研究深度**: {results.get('research_depth', 'N/A')}
 

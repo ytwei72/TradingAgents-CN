@@ -25,7 +25,7 @@ class ReportDataExtractor:
     
     @staticmethod
     def extract_data(report_content: str, fields: List[str], 
-                     llm_provider: str = None, llm_model: str = None) -> Dict[str, Any]:
+                     llm_provider: str = None, deep_think_llm: str = None, quick_think_llm: str = None) -> Dict[str, Any]:
         """
         从报告中提取指定的数据或信息字段
         
@@ -39,7 +39,8 @@ class ReportDataExtractor:
                 - "deepseek": DeepSeek
                 - "google": Google AI
                 - "openai": OpenAI
-            llm_model: 模型名称（可选），如果不提供则使用默认模型
+            deep_think_llm: 深度思考模型名称（可选），优先使用
+            quick_think_llm: 快速思考模型名称（可选），如果deep_think_llm为None则使用此模型
         
         Returns:
             包含提取数据的JSON对象，格式如：
@@ -71,9 +72,13 @@ class ReportDataExtractor:
             logger.error("❌ [ReportDataExtractor] 报告内容为空")
             return {}
         
+        # 选择使用的模型：优先使用deep_think_llm，如果为None则使用quick_think_llm
+        llm_model = deep_think_llm if deep_think_llm is not None else quick_think_llm
+        
         logger.info(f"🔍 [ReportDataExtractor] 开始提取数据，字段数量: {len(fields)}")
         logger.debug(f"🔍 [ReportDataExtractor] 报告长度: {len(report_content)} 字符")
         logger.debug(f"🔍 [ReportDataExtractor] 需要提取的字段: {fields}")
+        logger.debug(f"🔍 [ReportDataExtractor] 使用模型: {llm_model} (deep_think_llm={deep_think_llm}, quick_think_llm={quick_think_llm})")
         
         # 创建LLM实例
         try:

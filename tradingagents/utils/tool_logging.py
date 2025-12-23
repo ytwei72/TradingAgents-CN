@@ -194,25 +194,35 @@ def log_data_source_call(source_name: str):
     return decorator
 
 
-def log_llm_call(provider: str, model: str):
+def log_llm_call(provider: str, deep_think_llm: str = None, quick_think_llm: str = None):
     """
     LLM调用专用日志装饰器
     
     Args:
         provider: LLM提供商（如：openai、deepseek、tongyi等）
-        model: 模型名称
+        deep_think_llm: 深度思考模型名称（可选）
+        quick_think_llm: 快速思考模型名称（可选）
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             start_time = time.time()
             
+            # 构建模型显示信息
+            model_info = []
+            if deep_think_llm:
+                model_info.append(f"深度:{deep_think_llm}")
+            if quick_think_llm:
+                model_info.append(f"快速:{quick_think_llm}")
+            model_display = "/".join(model_info) if model_info else "未知模型"
+            
             # 记录LLM调用开始
             tool_logger.info(
-                f"🤖 [LLM调用] {provider}/{model} - 开始",
+                f"🤖 [LLM调用] {provider}/{model_display} - 开始",
                 extra={
                     'llm_provider': provider,
-                    'llm_model': model,
+                    'deep_think_llm': deep_think_llm,
+                    'quick_think_llm': quick_think_llm,
                     'event_type': 'llm_call_start',
                     'timestamp': datetime.now().isoformat()
                 }
@@ -223,10 +233,11 @@ def log_llm_call(provider: str, model: str):
                 duration = time.time() - start_time
                 
                 tool_logger.info(
-                    f"✅ [LLM调用] {provider}/{model} - 完成 (耗时: {duration:.2f}s)",
+                    f"✅ [LLM调用] {provider}/{model_display} - 完成 (耗时: {duration:.2f}s)",
                     extra={
                         'llm_provider': provider,
-                        'llm_model': model,
+                        'deep_think_llm': deep_think_llm,
+                        'quick_think_llm': quick_think_llm,
                         'event_type': 'llm_call_success',
                         'duration': duration,
                         'timestamp': datetime.now().isoformat()
@@ -239,10 +250,11 @@ def log_llm_call(provider: str, model: str):
                 duration = time.time() - start_time
                 
                 tool_logger.error(
-                    f"❌ [LLM调用] {provider}/{model} - 失败 (耗时: {duration:.2f}s): {str(e)}",
+                    f"❌ [LLM调用] {provider}/{model_display} - 失败 (耗时: {duration:.2f}s): {str(e)}",
                     extra={
                         'llm_provider': provider,
-                        'llm_model': model,
+                        'deep_think_llm': deep_think_llm,
+                        'quick_think_llm': quick_think_llm,
                         'event_type': 'llm_call_error',
                         'duration': duration,
                         'error': str(e),

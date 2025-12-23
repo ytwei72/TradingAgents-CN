@@ -97,12 +97,13 @@ def estimate_analysis_cost(
     Returns:
         估算的成本（元），如果无法估算则返回None
     """
-    # 从系统配置获取 llm_provider 和 llm_model
+    # 从系统配置获取 llm_provider 和模型配置
     from .analysis_config import AnalysisConfigBuilder
     config_builder = AnalysisConfigBuilder()
     system_overrides = config_builder._load_system_overrides()
     llm_provider = system_overrides.get("llm_provider", "dashscope")
-    llm_model = system_overrides.get("deep_think_llm", "qwen-max")
+    deep_think_llm = system_overrides.get("deep_think_llm", "qwen-max")
+    quick_think_llm = system_overrides.get("quick_think_llm", "qwen-plus")
     
     # 获取消息生产者（如果消息模式启用）
     message_producer = None
@@ -133,9 +134,22 @@ def estimate_analysis_cost(
     estimated_input = int(base_input_tokens * len(analysts) * depth_multiplier)
     estimated_output = int(base_output_tokens * len(analysts) * depth_multiplier)
     
-    estimated_cost = token_tracker.estimate_cost(
-        llm_provider, llm_model, estimated_input, estimated_output
+    # 估算深度思考模型的成本（用于复杂分析任务，约占70%的token）
+    deep_think_input = int(estimated_input * 0.7)
+    deep_think_output = int(estimated_output * 0.7)
+    deep_think_cost = token_tracker.estimate_cost(
+        llm_provider, deep_think_llm, deep_think_input, deep_think_output
     )
+    
+    # 估算快速思考模型的成本（用于简单快速任务，约占30%的token）
+    quick_think_input = int(estimated_input * 0.3)
+    quick_think_output = int(estimated_output * 0.3)
+    quick_think_cost = token_tracker.estimate_cost(
+        llm_provider, quick_think_llm, quick_think_input, quick_think_output
+    )
+    
+    # 总成本 = 深度思考模型成本 + 快速思考模型成本
+    estimated_cost = deep_think_cost + quick_think_cost
     return True, estimated_cost, None
 
 
@@ -250,7 +264,7 @@ def track_token_usage(
     记录Token使用情况
     
     Args:
-        results: 分析结果字典，包含 llm_provider, llm_model, session_id, analysts, research_depth
+        results: 分析结果字典，包含 llm_provider, deep_think_llm, quick_think_llm, session_id, analysts, research_depth
         params: 参数字典，包含 market_type
         
     Returns:
@@ -277,9 +291,10 @@ def track_token_usage(
     
     input_per_analyst, output_per_analyst = depth_token_map.get(research_depth, (2500, 1200))
     
+    # 使用深度思考模型作为主要模型标识（用于Token跟踪）
     usage_record = token_tracker.track_usage(
         provider=results.get('llm_provider', 'dashscope'),
-        model_name=results.get('llm_model', 'qwen-max'),
+        model_name=results.get('deep_think_llm', 'qwen-max'),
         input_tokens=len(analysts) * input_per_analyst,
         output_tokens=len(analysts) * output_per_analyst,
         session_id=results.get('session_id', ''),
@@ -748,7 +763,7 @@ def process_analysis_results(
     config = task_status.get('config') or {}
 
     results['llm_provider'] = config.get('llm_provider') or 'dashscope'
-    results['llm_model'] = results['deep_think_llm'] = config.get('deep_think_llm') or 'qwen-max'
+    results['deep_think_llm'] = config.get('deep_think_llm') or 'qwen-max'
     results['quick_think_llm'] = config.get('quick_think_llm') or 'qwen-plus'
     
     # 记录Token使用
