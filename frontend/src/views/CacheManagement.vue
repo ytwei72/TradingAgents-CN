@@ -1,33 +1,18 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- 放大窗口模态框 -->
-    <Transition name="modal">
-      <div
-        v-if="showModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-        @click.self="closeModal"
-      >
-        <div class="bg-[#1e293b] rounded-lg border border-gray-700 shadow-2xl w-[90vw] h-[90vh] max-w-6xl flex flex-col">
-          <!-- 模态框头部 -->
-          <div class="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
-            <h3 class="text-lg font-semibold text-white">{{ modalTitle }}</h3>
-            <button
-              @click="closeModal"
-              class="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg"
-              title="关闭 (ESC)"
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <!-- 模态框内容 -->
-          <div class="flex-1 overflow-hidden p-4 min-h-0">
-            <JsonViewer :data="modalData" :max-height="'100%'" />
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <!-- 基础模态框 -->
+    <!-- <ModalDialog
+      v-model="showModal"
+      :title="modalTitle"
+      :data="modalData"
+    /> -->
+    
+    <!-- 扩展模态框 -->
+    <ModalDialogEx
+      v-model="showModalEx"
+      :cache-info="modalCacheInfo"
+      :cache-data="modalCacheData"
+    />
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-white">缓存管理</h1>
@@ -60,7 +45,7 @@
     <div v-else-if="cacheList.length > 0" class="flex-1 overflow-y-auto pb-20">
       <div class="grid grid-cols-2 gap-4">
         <div
-          v-for="(item, index) in cacheList"
+          v-for="item in cacheList"
           :key="item.task_id"
           class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 flex flex-col"
           :class="expandedItems.has(item.task_id) ? 'h-[600px]' : ''"
@@ -152,12 +137,9 @@
               </div>
               <button
                 v-if="cacheDetails[item.task_id]"
-                @click="openModal(
-                  tabs.find(t => t.key === activeTabs[item.task_id])?.label || '详情',
-                  cacheDetails[item.task_id]?.[activeTabs[item.task_id]]
-                )"
+                @click="openModalEx(item, cacheDetails[item.task_id])"
                 class="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors flex items-center gap-1.5"
-                title="放大查看当前tab的内容"
+                title="放大查看缓存详情"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
@@ -231,9 +213,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { getCacheCount, getCacheList, getCacheDetail, type CacheListItem, type CacheDetailData } from '../api'
 import JsonViewer from '../components/JsonViewer.vue'
+import ModalDialogEx from '../components/ModalDialogEx.vue'
 
 const loading = ref(false)
 const error = ref('')
@@ -249,10 +232,18 @@ const cacheDetails = reactive<Record<string, CacheDetailData>>({})
 const loadingDetails = reactive<Record<string, boolean>>({})
 const detailErrors = reactive<Record<string, string>>({})
 
-// 模态框相关
-const showModal = ref(false)
-const modalTitle = ref('')
-const modalData = ref<any>(null)
+// 扩展模态框相关
+const showModalEx = ref(false)
+const modalCacheInfo = ref<CacheListItem>({
+  task_id: '',
+  status: '',
+  created_at: undefined,
+  updated_at: undefined,
+  analysis_date: undefined,
+  stock_symbol: undefined,
+  company_name: undefined
+})
+const modalCacheData = ref<CacheDetailData>({})
 
 const tabs = [
   { key: 'current_step', label: 'Current Step' },
@@ -282,39 +273,15 @@ const formatDate = (dateStr?: string) => {
   }
 }
 
-const openModal = (title: string, data: any) => {
-  modalTitle.value = title
-  modalData.value = data
-  showModal.value = true
-  // 阻止背景滚动
-  document.body.style.overflow = 'hidden'
-}
-
-const closeModal = () => {
-  showModal.value = false
-  modalTitle.value = ''
-  modalData.value = null
-  // 恢复背景滚动
-  document.body.style.overflow = ''
-}
-
-// ESC键关闭模态框
-const handleEscape = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && showModal.value) {
-    closeModal()
+const openModalEx = (item: CacheListItem, detailData: CacheDetailData) => {
+  modalCacheInfo.value = { ...item }
+  modalCacheData.value = { 
+    current_step: detailData?.current_step ?? null,
+    history: detailData?.history ?? null,
+    props: detailData?.props ?? null
   }
+  showModalEx.value = true
 }
-
-onMounted(() => {
-  window.addEventListener('keydown', handleEscape)
-  loadCacheList()
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleEscape)
-  // 确保清理样式
-  document.body.style.overflow = ''
-})
 
 const toggleExpand = async (taskId: string) => {
   if (expandedItems.value.has(taskId)) {
@@ -383,6 +350,9 @@ const loadCacheList = async () => {
   }
 }
 
+onMounted(() => {
+  loadCacheList()
+})
 </script>
 
 <style scoped>
@@ -404,26 +374,5 @@ const loadCacheList = async () => {
   background: #64748b;
 }
 
-/* 模态框动画 */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-active > div,
-.modal-leave-active > div {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-from > div,
-.modal-leave-to > div {
-  transform: scale(0.9);
-  opacity: 0;
-}
 </style>
 
