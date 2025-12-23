@@ -241,7 +241,8 @@ export const getOperationLogs = async (
   keyword?: string,
   level?: string,
   logger?: string,
-  limit: number = 1000
+  limit: number = 50,
+  skip: number = 0
 ): Promise<LogsResponse> => {
   const params = new URLSearchParams();
   if (startDate) params.append('start_date', startDate);
@@ -251,6 +252,7 @@ export const getOperationLogs = async (
   if (level) params.append('level', level);
   if (logger) params.append('logger', logger);
   params.append('limit', limit.toString());
+  params.append('skip', skip.toString());
 
   const response = await api.get<LogsResponse>(`/logs/operation/query?${params.toString()}`);
   return response.data;

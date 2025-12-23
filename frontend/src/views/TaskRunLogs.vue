@@ -95,13 +95,9 @@
             <span class="mr-1.5">📊</span>
             总数: {{ response?.total || 0 }}
           </span>
-          <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-600/20 text-green-400 border border-green-600/30">
-            <span class="mr-1.5">🔍</span>
-            筛选: {{ response?.filtered_total || 0 }}
-          </span>
           <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-purple-600/20 text-purple-400 border border-purple-600/30">
             <span class="mr-1.5">📄</span>
-            本页: {{ displayedLogs.length }}
+            本页: {{ displayedLogs.length }} / {{ pageSize }}
           </span>
           <div class="text-sm text-gray-400 ml-2" v-if="stats">
             共 {{ stats.total_files }} 个日志文件
@@ -326,23 +322,23 @@ const filters = ref({
 // Computed
 const displayedLogs = computed(() => {
   if (!response.value) return []
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return response.value.data.slice(start, end)
+  return response.value.data
 })
 
 const totalPages = computed(() => {
   if (!response.value) return 0
-  return Math.ceil(response.value.filtered_total / pageSize.value)
+  return Math.ceil(response.value.total / pageSize.value)
 })
 
-// Watch currentPage to update jumpPage and scroll to top
+// Watch currentPage to update jumpPage, scroll to top, and reload data
 watch(currentPage, (newPage) => {
   jumpPage.value = newPage
   const scrollContainer = document.querySelector('.overflow-y-auto')
   if (scrollContainer) {
     scrollContainer.scrollTop = 0
   }
+  // 切换页面时重新加载数据
+  loadLogs()
 })
 
 // Methods
@@ -362,7 +358,12 @@ const selectDays = (days: number) => {
   
   filters.value.endDate = formatDate(endDate)
   filters.value.startDate = formatDate(startDate)
-  loadLogs()
+  const wasPageOne = currentPage.value === 1
+  currentPage.value = 1 // 重置到第一页
+  // 如果当前页已经是第一页，watch 不会触发，需要手动调用 loadLogs()
+  if (wasPageOne) {
+    loadLogs()
+  }
 }
 
 const onDateChange = (payload?: { startDate: string; endDate: string; days: number | null }) => {
@@ -396,7 +397,7 @@ const onDateChange = (payload?: { startDate: string; endDate: string; days: numb
   if (filters.value.endDate && !filters.value.startDate) {
     filters.value.startDate = filters.value.endDate
   }
-  // 如果两个日期都已设置，自动触发搜索
+  // 如果两个日期都已设置，重置到第一页并触发搜索
   if (filters.value.startDate && filters.value.endDate) {
     currentPage.value = 1
     loadLogs()
@@ -423,7 +424,7 @@ const debounceSearch = () => {
     clearTimeout(searchTimeout)
   }
   searchTimeout = setTimeout(() => {
-    currentPage.value = 1
+    currentPage.value = 1 // 搜索时重置到第一页
     loadLogs()
   }, 500)
 }
@@ -439,6 +440,7 @@ const loadLogs = async () => {
   error.value = null
   
   try {
+    const skip = (currentPage.value - 1) * pageSize.value
     const result = await getOperationLogs(
       filters.value.startDate || undefined,
       filters.value.endDate || undefined,
@@ -446,10 +448,10 @@ const loadLogs = async () => {
       filters.value.keyword || undefined,
       filters.value.level || undefined,
       filters.value.logger || undefined,
-      5000 // limit
+      pageSize.value, // limit: 每页记录数
+      skip // skip: 跳过的记录数
     )
     response.value = result
-    currentPage.value = 1
     expandedLogs.value.clear()
   } catch (err: any) {
     error.value = err.response?.data?.detail || err.message || '加载日志失败'
