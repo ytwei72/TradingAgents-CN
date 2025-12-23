@@ -470,4 +470,146 @@ export const getCacheDetail = async (analysisId: string): Promise<CacheDetailRes
   return response.data;
 };
 
+// Favorite Stocks API
+export interface FavoriteStock {
+  stock_code: string;
+  user_id?: string;
+  stock_name?: string;
+  market_type?: string;
+  category?: string;
+  tags?: string[];
+  concept_plates?: string[];
+  industry_plates?: string[];
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FavoriteStockResponse {
+  success: boolean;
+  data: FavoriteStock | null;
+  message: string;
+}
+
+export interface FavoriteStockListResponse {
+  success: boolean;
+  data: FavoriteStock[] | null;
+  total: number;
+  message: string;
+}
+
+export interface FavoriteStockStatisticsResponse {
+  success: boolean;
+  data: {
+    total_count: number;
+    category_stats: Record<string, number>;
+    tag_stats: Record<string, number>;
+  } | null;
+  message: string;
+}
+
+export interface FavoriteStockCreateRequest {
+  stock_code: string;
+  user_id?: string;
+  stock_name?: string;
+  market_type?: string;
+  category?: string;
+  tags?: string[];
+  concept_plates?: string[];
+  industry_plates?: string[];
+  notes?: string;
+}
+
+export interface FavoriteStockUpdateRequest {
+  stock_name?: string;
+  market_type?: string;
+  category?: string;
+  tags?: string[];
+  concept_plates?: string[];
+  industry_plates?: string[];
+  notes?: string;
+}
+
+export const getFavoriteStocks = async (params?: {
+  user_id?: string;
+  stock_code?: string;
+  category?: string;
+  tag?: string;
+  limit?: number;
+  skip?: number;
+  sort_by?: string;
+  sort_order?: string;
+}): Promise<FavoriteStockListResponse> => {
+  const queryParams = new URLSearchParams();
+  if (params) {
+    if (params.user_id) queryParams.append('user_id', params.user_id);
+    if (params.stock_code) queryParams.append('stock_code', params.stock_code);
+    if (params.category) queryParams.append('category', params.category);
+    if (params.tag) queryParams.append('tag', params.tag);
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.skip) queryParams.append('skip', params.skip.toString());
+    if (params.sort_by) queryParams.append('sort_by', params.sort_by);
+    if (params.sort_order) queryParams.append('sort_order', params.sort_order);
+  }
+  const queryString = queryParams.toString();
+  const url = `/favorite-stocks${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<FavoriteStockListResponse>(url);
+  return response.data;
+};
+
+export const getFavoriteStock = async (
+  stockCode: string,
+  userId?: string
+): Promise<FavoriteStockResponse> => {
+  const queryParams = new URLSearchParams();
+  if (userId) queryParams.append('user_id', userId);
+  const queryString = queryParams.toString();
+  const url = `/favorite-stocks/${stockCode}${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<FavoriteStockResponse>(url);
+  return response.data;
+};
+
+export const createFavoriteStock = async (
+  data: FavoriteStockCreateRequest
+): Promise<FavoriteStockResponse> => {
+  const response = await api.post<FavoriteStockResponse>('/favorite-stocks', data);
+  return response.data;
+};
+
+export const updateFavoriteStock = async (
+  stockCode: string,
+  data: FavoriteStockUpdateRequest,
+  userId?: string
+): Promise<FavoriteStockResponse> => {
+  const queryParams = new URLSearchParams();
+  if (userId) queryParams.append('user_id', userId);
+  const queryString = queryParams.toString();
+  const url = `/favorite-stocks/${stockCode}${queryString ? `?${queryString}` : ''}`;
+  const response = await api.put<FavoriteStockResponse>(url, data);
+  return response.data;
+};
+
+export const deleteFavoriteStock = async (
+  stockCode: string,
+  userId?: string
+): Promise<FavoriteStockResponse> => {
+  const queryParams = new URLSearchParams();
+  if (userId) queryParams.append('user_id', userId);
+  const queryString = queryParams.toString();
+  const url = `/favorite-stocks/${stockCode}${queryString ? `?${queryString}` : ''}`;
+  const response = await api.delete<FavoriteStockResponse>(url);
+  return response.data;
+};
+
+export const getFavoriteStocksStatistics = async (
+  userId?: string
+): Promise<FavoriteStockStatisticsResponse> => {
+  const queryParams = new URLSearchParams();
+  if (userId) queryParams.append('user_id', userId);
+  const queryString = queryParams.toString();
+  const url = `/favorite-stocks/statistics/summary${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<FavoriteStockStatisticsResponse>(url);
+  return response.data;
+};
+
 export default api;
