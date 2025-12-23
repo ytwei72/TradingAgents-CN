@@ -238,6 +238,8 @@ class MongoDBStepsStatusManager:
             normalized_date = self._normalize_date(trade_date)
             
             # 每个节点对应需要非空的输出字段（支持嵌套，用"."表示）
+            # 注意：trader节点只查找trader_investment_plan，不查找investment_plan
+            # 因为investment_plan是research_manager的输出，不是trader的输出
             field_map = {
                 "market_analyst": ["market_report"],
                 "fundamentals_analyst": ["fundamentals_report"],
@@ -245,12 +247,12 @@ class MongoDBStepsStatusManager:
                 "social_media_analyst": ["sentiment_report"],
                 "bull_researcher": ["investment_debate_state.bull_history", "investment_debate_state.history"],
                 "bear_researcher": ["investment_debate_state.bear_history", "investment_debate_state.history"],
-                "research_manager": ["investment_plan", "trader_investment_plan", "final_trade_decision"],
-                "trader": ["trader_investment_plan", "investment_plan"],
+                "research_manager": ["investment_plan"],
+                "trader": ["trader_investment_plan"],  # 只查找trader_investment_plan，避免匹配到research_manager的输出
                 "risky_analyst": ["risk_debate_state.risky_history", "risk_debate_state.history"],
                 "safe_analyst": ["risk_debate_state.safe_history", "risk_debate_state.history"],
                 "neutral_analyst": ["risk_debate_state.neutral_history", "risk_debate_state.history"],
-                "risk_manager": ["risk_debate_state.judge_decision", "final_trade_decision"],
+                "risk_manager": ["risk_debate_state.judge_decision"],
             }
 
             target_fields = field_map.get(node_name, [])

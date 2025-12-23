@@ -597,12 +597,12 @@ class TradingAgentsGraph:
             'social_media_analyst': [('sentiment_report', None)],
             'bull_researcher': [('investment_debate_state', 'bull_history'), ('investment_debate_state', 'history')],
             'bear_researcher': [('investment_debate_state', 'bear_history'), ('investment_debate_state', 'history')],
-            'research_manager': [('investment_plan', None), ('trader_investment_plan', None), ('final_trade_decision', None)],
-            'trader': [('trader_investment_plan', None), ('investment_plan', None)],
+            'research_manager': [('investment_plan', None)],
+            'trader': [('trader_investment_plan', None)],
             'risky_analyst': [('risk_debate_state', 'risky_history'), ('risk_debate_state', 'history')],
             'safe_analyst': [('risk_debate_state', 'safe_history'), ('risk_debate_state', 'history')],
             'neutral_analyst': [('risk_debate_state', 'neutral_history'), ('risk_debate_state', 'history')],
-            'risk_manager': [('risk_debate_state', 'judge_decision'), ('final_trade_decision', None)],
+            'risk_manager': [('risk_debate_state', 'judge_decision')],
         }
 
         targets = field_map.get(node_name, [])
@@ -735,6 +735,16 @@ class TradingAgentsGraph:
         if 'risk_debate_state' in historical_step:
             risk_state = historical_step['risk_debate_state'].copy() if isinstance(historical_step['risk_debate_state'], dict) else historical_step['risk_debate_state']
             if isinstance(risk_state, dict):
+                # 确保所有必需字段都存在，提供默认值
+                risk_state.setdefault('risky_history', '')
+                risk_state.setdefault('safe_history', '')
+                risk_state.setdefault('neutral_history', '')
+                risk_state.setdefault('history', '')
+                risk_state.setdefault('judge_decision', '')
+                risk_state.setdefault('latest_speaker', '')
+                risk_state.setdefault('current_risky_response', '')
+                risk_state.setdefault('current_safe_response', '')
+                risk_state.setdefault('current_neutral_response', '')
                 # 如果当前state中有count值，使用当前state的count值；否则设为0
                 if current_state and 'risk_debate_state' in current_state and isinstance(current_state['risk_debate_state'], dict):
                     current_count = current_state['risk_debate_state'].get('count')
@@ -743,7 +753,7 @@ class TradingAgentsGraph:
                     else:
                         risk_state['count'] = 0
                 else:
-                    risk_state['count'] = 0
+                    risk_state.setdefault('count', 0)
             state['risk_debate_state'] = risk_state
         
         return state
@@ -839,6 +849,10 @@ class TradingAgentsGraph:
                 "neutral_history": risk_state.get("neutral_history", ""),
                 "history": risk_state.get("history", ""),
                 "judge_decision": risk_state.get("judge_decision", ""),
+                "latest_speaker": risk_state.get("latest_speaker", ""),
+                "current_risky_response": risk_state.get("current_risky_response", ""),
+                "current_safe_response": risk_state.get("current_safe_response", ""),
+                "current_neutral_response": risk_state.get("current_neutral_response", ""),
                 "count": risk_state.get("count", 0)
             }
         
