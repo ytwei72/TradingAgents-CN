@@ -237,14 +237,15 @@
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       @click.self="showAnalysisModal = false"
     >
-      <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6 w-full max-w-lg">
+      <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6 w-full max-w-4xl">
         <h2 class="text-xl font-bold text-white mb-4">批量分析</h2>
 
         <form @submit.prevent="startBatchAnalysis">
-          <div class="space-y-4">
-            <div>
+          <div class="flex gap-6">
+            <!-- 左侧：自选股分类 -->
+            <div class="flex-[0.5]">
               <label class="block text-sm font-medium text-gray-300 mb-1">选择分类 *</label>
-              <div class="space-y-2 max-h-48 overflow-y-auto border border-gray-700 rounded-lg p-2">
+              <div class="space-y-2 max-h-96 overflow-y-auto border border-gray-700 rounded-lg p-2">
                 <label
                   v-for="category in availableCategories"
                   :key="category"
@@ -262,68 +263,73 @@
               </div>
             </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">分析日期</label>
-              <input
-                v-model="analysisForm.analysis_date"
-                type="date"
-                class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
+            <!-- 右侧：分析参数 -->
+            <div class="flex-1 space-y-4">
+              <div>
+                <DateRangePicker
+                  :quick-days="[]"
+                  label="分析日期"
+                  singleMode="start"
+                  v-model:modelStartDate="analysisForm.analysis_date"
+                  v-model:modelEndDate="analysisEndDate"
+                  v-model:modelDays="analysisDays"
+                />
+              </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">研究深度</label>
-              <select
-                v-model="analysisForm.research_depth"
-                class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-              >
-                <option :value="1">1 - 浅度</option>
-                <option :value="2">2 - 轻度</option>
-                <option :value="3">3 - 中度</option>
-                <option :value="4">4 - 深度</option>
-                <option :value="5">5 - 极深</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">分析师 *</label>
-              <div class="space-y-2 border border-gray-700 rounded-lg p-2">
-                <label
-                  v-for="analyst in analystOptions"
-                  :key="analyst.value"
-                  class="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">研究深度</label>
+                <select
+                  v-model="analysisForm.research_depth"
+                  class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
                 >
+                  <option :value="1">1 - 浅度</option>
+                  <option :value="2">2 - 轻度</option>
+                  <option :value="3">3 - 中度</option>
+                  <option :value="4">4 - 深度</option>
+                  <option :value="5">5 - 极深</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">分析师 *</label>
+                <div class="grid grid-cols-2 gap-2 border border-gray-700 rounded-lg p-2">
+                  <label
+                    v-for="analyst in analystOptions"
+                    :key="analyst.value"
+                    class="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
+                  >
+                    <input
+                      type="checkbox"
+                      :value="analyst.value"
+                      v-model="analysisForm.analysts"
+                      class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span class="text-white text-sm">{{ analyst.label }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    :value="analyst.value"
-                    v-model="analysisForm.analysts"
+                    v-model="analysisForm.include_sentiment"
                     class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
                   />
-                  <span class="text-white text-sm">{{ analyst.label }}</span>
+                  <span class="text-white text-sm">包含情感分析</span>
                 </label>
               </div>
-            </div>
 
-            <div>
-              <label class="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  v-model="analysisForm.include_sentiment"
-                  class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                />
-                <span class="text-white text-sm">包含情感分析</span>
-              </label>
-            </div>
-
-            <div>
-              <label class="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  v-model="analysisForm.include_risk_assessment"
-                  class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                />
-                <span class="text-white text-sm">包含风险评估</span>
-              </label>
+              <div>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    v-model="analysisForm.include_risk_assessment"
+                    class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                  />
+                  <span class="text-white text-sm">包含风险评估</span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -495,6 +501,7 @@ import {
   startBatchAnalysisSameParams,
   type FavoriteStock
 } from '../api'
+import DateRangePicker from '../components/DateRangePicker.vue'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -527,6 +534,10 @@ const analysisForm = reactive({
   include_sentiment: true,
   include_risk_assessment: true
 })
+
+// DateRangePicker 需要两个日期，但我们只使用 analysis_date
+const analysisEndDate = ref(new Date().toISOString().split('T')[0])
+const analysisDays = ref<number | null>(null)
 
 const formData = reactive({
   stock_code: '',
