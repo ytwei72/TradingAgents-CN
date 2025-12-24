@@ -501,7 +501,7 @@
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       @click.self="closeBatchImportModal"
     >
-      <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+      <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6 w-full max-w-6xl max-h-[96vh] overflow-y-auto">
         <h2 class="text-xl font-bold text-white mb-4">批量导入自选股</h2>
 
         <form @submit.prevent="handleBatchImport">
@@ -510,7 +510,7 @@
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">行业板块</label>
-                <div class="max-h-64 overflow-y-auto border border-gray-700 rounded-lg p-2">
+                <div class="max-h-48 overflow-y-auto border border-gray-700 rounded-lg p-2">
                   <label
                     v-for="industry in industryList"
                     :key="`industry-${industry.name}`"
@@ -531,7 +531,7 @@
 
               <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">概念板块</label>
-                <div class="max-h-64 overflow-y-auto border border-gray-700 rounded-lg p-2">
+                <div class="max-h-48 overflow-y-auto border border-gray-700 rounded-lg p-2">
                   <label
                     v-for="concept in conceptList"
                     :key="`concept-${concept.name}`"

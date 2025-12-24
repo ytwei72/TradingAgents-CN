@@ -487,12 +487,39 @@ export const getCacheCount = async (): Promise<CacheCountResponse> => {
 
 export const getCacheList = async (
   page: number = 1,
-  page_size: number = 10
+  page_size: number = 10,
+  filters?: {
+    task_id?: string;
+    analysis_date?: string;
+    status?: string;
+    stock_symbol?: string;
+    company_name?: string;
+  }
 ): Promise<CacheListResponse> => {
   const params = new URLSearchParams({
     page: page.toString(),
     page_size: page_size.toString()
   });
+  
+  // 添加筛选参数
+  if (filters) {
+    if (filters.task_id) {
+      params.append('task_id', filters.task_id);
+    }
+    if (filters.analysis_date) {
+      params.append('analysis_date', filters.analysis_date);
+    }
+    if (filters.status) {
+      params.append('status', filters.status);
+    }
+    if (filters.stock_symbol) {
+      params.append('stock_symbol', filters.stock_symbol);
+    }
+    if (filters.company_name) {
+      params.append('company_name', filters.company_name);
+    }
+  }
+  
   const response = await api.get<CacheListResponse>(`/cache/list?${params.toString()}`);
   return response.data;
 };

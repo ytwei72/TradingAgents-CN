@@ -329,24 +329,34 @@ class RedisCacheManager:
         sub_key: str = "props",
         fields: Optional[List[str]] = None,
         page: int = 1,
-        page_size: int = 10
+        page_size: int = 10,
+        task_id: Optional[str] = None,
+        analysis_date: Optional[str] = None,
+        status: Optional[str] = None,
+        stock_symbol: Optional[str] = None,
+        company_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        获取缓存记录列表（分页）
+        获取缓存记录列表（分页，支持筛选）
         
         Args:
             sub_key: 要查询的子键（如 'props', 'current_step', 'history'），默认为 'props'
             fields: 要提取的字段列表，如果为None则返回所有字段
             page: 页码，从1开始
             page_size: 每页数量
+            task_id: 筛选条件：任务ID（支持部分匹配）
+            analysis_date: 筛选条件：分析日期（精确匹配）
+            status: 筛选条件：运行状态（精确匹配）
+            stock_symbol: 筛选条件：股票代码（支持部分匹配）
+            company_name: 筛选条件：公司名称（支持部分匹配，需要从stock_dict_manager获取）
             
         Returns:
             Dict[str, Any]: 包含以下键的字典
                 - items: List[Dict[str, Any]]: 缓存记录列表
-                - total: int: 总记录数
+                - total: int: 总记录数（筛选后）
                 - page: int: 当前页码
                 - page_size: int: 每页数量
-                - pages: int: 总页数
+                - pages: int: 总页数（筛选后）
         """
         if not self.is_available():
             return {
@@ -359,22 +369,17 @@ class RedisCacheManager:
         
         try:
             # 获取所有task_id
-            task_ids = self.get_all_task_ids()
-            total = len(task_ids)
+            all_task_ids = self.get_all_task_ids()
             
-            # 计算分页
-            pages = (total + page_size - 1) // page_size if total > 0 else 0
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-            
-            # 获取当前页的task_id
-            page_task_ids = task_ids[start_idx:end_idx]
-            
-            # 获取每个task的数据
-            items = []
-            for task_id in page_task_ids:
-                key = f"task:{task_id}:{sub_key}"
-                item = {"task_id": task_id}
+            # 获取每个task的数据并进行筛选
+            filtered_items = []
+            for task_id_item in all_task_ids:
+                # 如果指定了task_id筛选，先进行快速筛选
+                if task_id and task_id not in task_id_item:
+                    continue
+                
+                key = f"task:{task_id_item}:{sub_key}"
+                item = {"task_id": task_id_item}
                 try:
                     data = self._client.get(key)
                     if data:
@@ -393,12 +398,25 @@ class RedisCacheManager:
                             else:
                                 # 返回所有字段
                                 item.update(task_data)
-                    # 即使没有数据，也添加基本项（只包含task_id）
-                    items.append(item)
+                    
+                    # 应用筛选条件
+                    if self._match_filters(item, task_id, analysis_date, status, stock_symbol, company_name):
+                        filtered_items.append(item)
                 except Exception as e:
-                    logger.warning(f"获取task {task_id} 的 {sub_key} 数据失败: {e}")
-                    # 即使获取失败，也添加基本项
-                    items.append(item)
+                    logger.warning(f"获取task {task_id_item} 的 {sub_key} 数据失败: {e}")
+                    # 即使获取失败，如果只有task_id筛选，也可以添加
+                    if task_id and task_id in task_id_item:
+                        if self._match_filters(item, task_id, analysis_date, status, stock_symbol, company_name):
+                            filtered_items.append(item)
+            
+            # 计算筛选后的总数和分页
+            total = len(filtered_items)
+            pages = (total + page_size - 1) // page_size if total > 0 else 0
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            
+            # 获取当前页的数据
+            items = filtered_items[start_idx:end_idx]
             
             return {
                 "items": items,
@@ -416,6 +434,64 @@ class RedisCacheManager:
                 "page_size": page_size,
                 "pages": 0
             }
+    
+    def _match_filters(
+        self,
+        item: Dict[str, Any],
+        task_id: Optional[str] = None,
+        analysis_date: Optional[str] = None,
+        status: Optional[str] = None,
+        stock_symbol: Optional[str] = None,
+        company_name: Optional[str] = None
+    ) -> bool:
+        """
+        检查item是否匹配所有筛选条件
+        
+        Args:
+            item: 缓存项数据
+            task_id: 任务ID筛选（部分匹配）
+            analysis_date: 分析日期筛选（精确匹配）
+            status: 状态筛选（精确匹配）
+            stock_symbol: 股票代码筛选（部分匹配）
+            company_name: 公司名称筛选（部分匹配）
+            
+        Returns:
+            bool: 是否匹配所有筛选条件
+        """
+        # task_id筛选（部分匹配，不区分大小写）
+        if task_id:
+            item_task_id = item.get("task_id", "")
+            if task_id.lower() not in item_task_id.lower():
+                return False
+        
+        # analysis_date筛选（精确匹配）
+        if analysis_date:
+            item_analysis_date = item.get("analysis_date", "")
+            if item_analysis_date != analysis_date:
+                return False
+        
+        # status筛选（精确匹配）
+        if status:
+            item_status = item.get("status", "")
+            if item_status != status:
+                return False
+        
+        # stock_symbol筛选（部分匹配，不区分大小写）
+        if stock_symbol:
+            item_stock_symbol = item.get("stock_symbol") or item.get("company_of_interest", "")
+            if not item_stock_symbol or stock_symbol.lower() not in item_stock_symbol.lower():
+                return False
+        
+        # company_name筛选（部分匹配，不区分大小写）
+        # 注意：company_name不在缓存数据中，需要从stock_dict_manager获取
+        if company_name:
+            item_stock_symbol = item.get("stock_symbol") or item.get("company_of_interest", "")
+            if not item_stock_symbol:
+                return False
+            # 这里需要从外部获取公司名称，暂时跳过，在路由层处理
+            # 因为这里没有stock_dict_manager的引用
+        
+        return True
     
     def get_task_cache_detail(
         self,
