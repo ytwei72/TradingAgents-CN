@@ -65,6 +65,14 @@ class SectorUpdateResponse(BaseModel):
     message: str
 
 
+class SectorListResponse(BaseModel):
+    """板块列表响应"""
+    success: bool
+    data: Optional[List[Dict[str, Any]]] = None
+    total: int = 0
+    message: str
+
+
 class ConceptNamesUpdateRequest(BaseModel):
     """概念板块名称列表更新请求"""
     concept_names: List[str] = Field(..., description="概念板块名称列表")
@@ -587,13 +595,12 @@ class IndustryNamesRequest(BaseModel):
 
 
 @router.post("/sectors/industry/stocks", response_model=SectorStocksResponse)
-async def get_stocks_by_industries(request: IndustryNamesRequest):
+async def get_stocks_by_industries(request: IndustryNamesRequest = Body(...)):
     """
     根据指定的行业板块名称列表，返回每个行业板块的股票列表
     
     - **industry_names**: 行业板块名称列表（支持多个）
     """
-    industry_names = request.industry_names
     try:
         # 检查板块管理器连接
         if not sector_manager or not sector_manager.is_connected():
@@ -602,15 +609,26 @@ async def get_stocks_by_industries(request: IndustryNamesRequest):
                 detail="板块数据服务不可用，请检查数据库配置"
             )
         
-        if not industry_names:
+        if not request.industry_names:
             raise HTTPException(
                 status_code=400,
                 detail="行业板块名称列表不能为空"
             )
         
+        # 确保 industry_names 是列表
+        if not isinstance(request.industry_names, list):
+            raise HTTPException(
+                status_code=400,
+                detail=f"industry_names 必须是列表类型，当前类型: {type(request.industry_names)}"
+            )
+        
+        industry_names = request.industry_names
         result = {}
         
         for industry_name in industry_names:
+            if not isinstance(industry_name, str):
+                logger.warning(f"跳过非字符串类型的行业板块名称: {industry_name} (类型: {type(industry_name)})")
+                continue
             stocks = sector_manager.get_stocks_by_industry(industry_name)
             result[industry_name] = stocks
         
@@ -636,13 +654,12 @@ class ConceptNamesRequest(BaseModel):
 
 
 @router.post("/sectors/concept/stocks", response_model=SectorStocksResponse)
-async def get_stocks_by_concepts(request: ConceptNamesRequest):
+async def get_stocks_by_concepts(request: ConceptNamesRequest = Body(...)):
     """
     根据指定的概念板块名称列表，返回每个概念板块的股票列表
     
     - **concept_names**: 概念板块名称列表（支持多个）
     """
-    concept_names = request.concept_names
     try:
         # 检查板块管理器连接
         if not sector_manager or not sector_manager.is_connected():
@@ -651,15 +668,26 @@ async def get_stocks_by_concepts(request: ConceptNamesRequest):
                 detail="板块数据服务不可用，请检查数据库配置"
             )
         
-        if not concept_names:
+        if not request.concept_names:
             raise HTTPException(
                 status_code=400,
                 detail="概念板块名称列表不能为空"
             )
         
+        # 确保 concept_names 是列表
+        if not isinstance(request.concept_names, list):
+            raise HTTPException(
+                status_code=400,
+                detail=f"concept_names 必须是列表类型，当前类型: {type(request.concept_names)}"
+            )
+        
+        concept_names = request.concept_names
         result = {}
         
         for concept_name in concept_names:
+            if not isinstance(concept_name, str):
+                logger.warning(f"跳过非字符串类型的概念板块名称: {concept_name} (类型: {type(concept_name)})")
+                continue
             stocks = sector_manager.get_stocks_by_concept(concept_name)
             result[concept_name] = stocks
         
@@ -855,5 +883,83 @@ async def update_specific_industry_sectors(request: IndustryNamesUpdateRequest):
         raise HTTPException(
             status_code=500,
             detail=f"更新指定行业板块失败: {str(e)}"
+        )
+
+
+@router.get("/sectors/concept/list", response_model=SectorListResponse)
+async def get_concept_list(
+    limit: Optional[int] = Query(None, ge=1, le=10000, description="最大返回数量"),
+    skip: Optional[int] = Query(0, ge=0, description="跳过记录数（用于分页）")
+):
+    """
+    获取所有概念板块列表
+    
+    - **limit**: 最大返回数量（可选）
+    - **skip**: 跳过记录数（可选，用于分页）
+    """
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        # 获取概念板块列表
+        concepts = sector_manager.get_concept_list(limit=limit, skip=skip)
+        
+        return SectorListResponse(
+            success=True,
+            data=concepts,
+            total=len(concepts),
+            message=f"查询成功，共 {len(concepts)} 个概念板块"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询概念板块列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询概念板块列表失败: {str(e)}"
+        )
+
+
+@router.get("/sectors/industry/list", response_model=SectorListResponse)
+async def get_industry_list(
+    limit: Optional[int] = Query(None, ge=1, le=10000, description="最大返回数量"),
+    skip: Optional[int] = Query(0, ge=0, description="跳过记录数（用于分页）")
+):
+    """
+    获取所有行业板块列表
+    
+    - **limit**: 最大返回数量（可选）
+    - **skip**: 跳过记录数（可选，用于分页）
+    """
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        # 获取行业板块列表
+        industries = sector_manager.get_industry_list(limit=limit, skip=skip)
+        
+        return SectorListResponse(
+            success=True,
+            data=industries,
+            total=len(industries),
+            message=f"查询成功，共 {len(industries)} 个行业板块"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询行业板块列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询行业板块列表失败: {str(e)}"
         )
 

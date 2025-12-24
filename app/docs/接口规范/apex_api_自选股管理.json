@@ -230,6 +230,35 @@
 				"description": "获取自选股的统计信息，包括总数、按分类统计、按标签统计等。"
 			},
 			"response": []
+		},
+		{
+			"name": "批量创建自选股",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"stock_codes\": [\"000001\", \"600036\", \"601166\"],\n  \"user_id\": \"guest\",\n  \"category\": \"银行板块\",\n  \"tags\": [\"金融\", \"蓝筹\"],\n  \"themes\": [\"银行\"],\n  \"sectors\": [\"银行\"],\n  \"notes\": \"批量导入\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/favorite-stocks/batch",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"favorite-stocks",
+						"batch"
+					]
+				},
+				"description": "批量创建自选股记录，支持一次添加多只股票到指定分类。"
+			},
+			"response": []
 		}
 	],
 	"variable": [

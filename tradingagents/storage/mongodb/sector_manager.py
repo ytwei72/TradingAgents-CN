@@ -583,29 +583,60 @@ class SectorManager:
             stocks_df = ak.stock_board_concept_cons_em(symbol=concept_name)
             
             if stocks_df is not None and not stocks_df.empty:
-                # 提取股票代码列表
-                stock_codes = []
-                if '代码' in stocks_df.columns:
-                    stock_codes = stocks_df['代码'].tolist()
-                elif '股票代码' in stocks_df.columns:
-                    stock_codes = stocks_df['股票代码'].tolist()
-                else:
-                    # 尝试第一列
-                    stock_codes = stocks_df.iloc[:, 0].tolist()
+                # 提取股票代码和名称，构建包含code和name的字典列表
+                stock_list = []
                 
-                # 清理股票代码格式（确保是6位数字）
-                stock_codes = [str(code).zfill(6) for code in stock_codes if code]
+                # 确定代码列和名称列
+                code_col = None
+                name_col = None
+                
+                if '代码' in stocks_df.columns:
+                    code_col = '代码'
+                elif '股票代码' in stocks_df.columns:
+                    code_col = '股票代码'
+                else:
+                    # 尝试第一列作为代码
+                    code_col = stocks_df.columns[0]
+                
+                if '名称' in stocks_df.columns:
+                    name_col = '名称'
+                elif '股票名称' in stocks_df.columns:
+                    name_col = '股票名称'
+                elif len(stocks_df.columns) > 1:
+                    # 尝试第二列作为名称
+                    name_col = stocks_df.columns[1]
+                
+                # 构建股票列表
+                for _, row in stocks_df.iterrows():
+                    code = None
+                    name = None
+                    
+                    if code_col and code_col in row.index:
+                        code_val = row[code_col]
+                        if pd.notna(code_val):
+                            code = str(code_val).zfill(6)
+                    
+                    if name_col and name_col in row.index:
+                        name_val = row[name_col]
+                        if pd.notna(name_val):
+                            name = str(name_val)
+                    
+                    if code:  # 只要有代码就保存
+                        stock_list.append({
+                            'code': code,
+                            'name': name if name else ''  # 如果没有名称，使用空字符串
+                        })
                 
                 # 保存到数据库
                 self._save_sector(
                     self.concept_collection,
                     concept_name,
-                    stock_codes,
+                    stock_list,
                     "概念"
                 )
                 
-                logger.info(f"✅ [板块管理] 概念板块 '{concept_name}' 更新成功，包含 {len(stock_codes)} 只股票")
-                return True, None, len(stock_codes)
+                logger.info(f"✅ [板块管理] 概念板块 '{concept_name}' 更新成功，包含 {len(stock_list)} 只股票")
+                return True, None, len(stock_list)
             else:
                 logger.warning(f"⚠️ [板块管理] 概念板块 '{concept_name}' 无股票数据")
                 return False, "无股票数据", None
@@ -630,29 +661,60 @@ class SectorManager:
             stocks_df = ak.stock_board_industry_cons_em(symbol=industry_name)
             
             if stocks_df is not None and not stocks_df.empty:
-                # 提取股票代码列表
-                stock_codes = []
-                if '代码' in stocks_df.columns:
-                    stock_codes = stocks_df['代码'].tolist()
-                elif '股票代码' in stocks_df.columns:
-                    stock_codes = stocks_df['股票代码'].tolist()
-                else:
-                    # 尝试第一列
-                    stock_codes = stocks_df.iloc[:, 0].tolist()
+                # 提取股票代码和名称，构建包含code和name的字典列表
+                stock_list = []
                 
-                # 清理股票代码格式（确保是6位数字）
-                stock_codes = [str(code).zfill(6) for code in stock_codes if code]
+                # 确定代码列和名称列
+                code_col = None
+                name_col = None
+                
+                if '代码' in stocks_df.columns:
+                    code_col = '代码'
+                elif '股票代码' in stocks_df.columns:
+                    code_col = '股票代码'
+                else:
+                    # 尝试第一列作为代码
+                    code_col = stocks_df.columns[0]
+                
+                if '名称' in stocks_df.columns:
+                    name_col = '名称'
+                elif '股票名称' in stocks_df.columns:
+                    name_col = '股票名称'
+                elif len(stocks_df.columns) > 1:
+                    # 尝试第二列作为名称
+                    name_col = stocks_df.columns[1]
+                
+                # 构建股票列表
+                for _, row in stocks_df.iterrows():
+                    code = None
+                    name = None
+                    
+                    if code_col and code_col in row.index:
+                        code_val = row[code_col]
+                        if pd.notna(code_val):
+                            code = str(code_val).zfill(6)
+                    
+                    if name_col and name_col in row.index:
+                        name_val = row[name_col]
+                        if pd.notna(name_val):
+                            name = str(name_val)
+                    
+                    if code:  # 只要有代码就保存
+                        stock_list.append({
+                            'code': code,
+                            'name': name if name else ''  # 如果没有名称，使用空字符串
+                        })
                 
                 # 保存到数据库
                 self._save_sector(
                     self.industry_collection,
                     industry_name,
-                    stock_codes,
+                    stock_list,
                     "行业"
                 )
                 
-                logger.info(f"✅ [板块管理] 行业板块 '{industry_name}' 更新成功，包含 {len(stock_codes)} 只股票")
-                return True, None, len(stock_codes)
+                logger.info(f"✅ [板块管理] 行业板块 '{industry_name}' 更新成功，包含 {len(stock_list)} 只股票")
+                return True, None, len(stock_list)
             else:
                 logger.warning(f"⚠️ [板块管理] 行业板块 '{industry_name}' 无股票数据")
                 return False, "无股票数据", None
@@ -1006,14 +1068,14 @@ class SectorManager:
         logger.info(f"✅ [板块管理] 指定行业板块更新完成，成功 {len(success_list)} 个，失败 {len(failed_dict)} 个")
         return result
     
-    def _save_sector(self, collection, sector_name: str, stock_codes: List[str], sector_type: str):
+    def _save_sector(self, collection, sector_name: str, stock_list: List[Dict[str, str]], sector_type: str):
         """
         保存板块数据到数据库
         
         Args:
             collection: MongoDB集合对象
             sector_name: 板块名称
-            stock_codes: 股票代码列表
+            stock_list: 股票列表，每个元素为 {'code': str, 'name': str}
             sector_type: 板块类型（"概念" 或 "行业"）
         """
         try:
@@ -1025,8 +1087,8 @@ class SectorManager:
                 {
                     "$set": {
                         "name": sector_name,
-                        "stocks": stock_codes,
-                        "stock_count": len(stock_codes),
+                        "stocks": stock_list,  # 保存包含code和name的字典列表
+                        "stock_count": len(stock_list),
                         "updated_at": now
                     },
                     "$setOnInsert": {

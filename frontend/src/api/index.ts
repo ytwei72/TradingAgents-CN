@@ -650,4 +650,102 @@ export const getFavoriteStocksStatistics = async (
   return response.data;
 };
 
+// Batch import favorite stocks
+export interface FavoriteStockBatchCreateRequest {
+  stock_codes: string[];
+  user_id?: string;
+  category?: string;
+  tags?: string[];
+  themes?: string[];
+  sectors?: string[];
+  notes?: string;
+}
+
+export interface FavoriteStockBatchCreateResponse {
+  success: boolean;
+  data: {
+    total: number;
+    success_count: number;
+    failed_count: number;
+    success_list: string[];
+    failed_list: Array<{
+      stock_code: string;
+      error: string;
+    }>;
+  } | null;
+  message: string;
+}
+
+export const batchCreateFavoriteStocks = async (
+  data: FavoriteStockBatchCreateRequest
+): Promise<FavoriteStockBatchCreateResponse> => {
+  const response = await api.post<FavoriteStockBatchCreateResponse>('/favorite-stocks/batch', data);
+  return response.data;
+};
+
+// Sector list APIs
+export interface SectorInfo {
+  name: string;
+  stocks?: Array<{ code: string; name: string }>;
+  updated_at?: string;
+}
+
+export interface SectorListResponse {
+  success: boolean;
+  data: SectorInfo[] | null;
+  total: number;
+  message: string;
+}
+
+export const getConceptList = async (
+  limit?: number,
+  skip?: number
+): Promise<SectorListResponse> => {
+  const queryParams = new URLSearchParams();
+  if (limit) queryParams.append('limit', limit.toString());
+  if (skip) queryParams.append('skip', skip.toString());
+  const queryString = queryParams.toString();
+  const url = `/stock-data/sectors/concept/list${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<SectorListResponse>(url);
+  return response.data;
+};
+
+export const getIndustryList = async (
+  limit?: number,
+  skip?: number
+): Promise<SectorListResponse> => {
+  const queryParams = new URLSearchParams();
+  if (limit) queryParams.append('limit', limit.toString());
+  if (skip) queryParams.append('skip', skip.toString());
+  const queryString = queryParams.toString();
+  const url = `/stock-data/sectors/industry/list${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<SectorListResponse>(url);
+  return response.data;
+};
+
+// Get stocks by sector
+export interface SectorStocksResponse {
+  success: boolean;
+  data: Record<string, Array<{ code: string; name: string }>> | null;
+  message: string;
+}
+
+export const getStocksByConcept = async (
+  conceptNames: string[]
+): Promise<SectorStocksResponse> => {
+  const response = await api.post<SectorStocksResponse>('/stock-data/sectors/concept/stocks', {
+    concept_names: conceptNames
+  });
+  return response.data;
+};
+
+export const getStocksByIndustry = async (
+  industryNames: string[]
+): Promise<SectorStocksResponse> => {
+  const response = await api.post<SectorStocksResponse>('/stock-data/sectors/industry/stocks', {
+    industry_names: industryNames
+  });
+  return response.data;
+};
+
 export default api;

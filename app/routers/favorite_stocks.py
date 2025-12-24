@@ -63,6 +63,24 @@ class FavoriteStockStatisticsResponse(BaseModel):
     message: str
 
 
+class FavoriteStockBatchCreateRequest(BaseModel):
+    """批量创建自选股请求"""
+    stock_codes: List[str] = Field(..., description="股票代码列表")
+    user_id: Optional[str] = Field(None, description="用户ID（如不提供，默认为'guest'）")
+    category: Optional[str] = Field("自选股", description="分类")
+    tags: Optional[List[str]] = Field(default_factory=list, description="标签列表")
+    themes: Optional[List[str]] = Field(default_factory=list, description="概念板块（Theme）列表")
+    sectors: Optional[List[str]] = Field(default_factory=list, description="行业板块（Sector）列表")
+    notes: Optional[str] = Field("无", description="备注")
+
+
+class FavoriteStockBatchCreateResponse(BaseModel):
+    """批量创建自选股响应"""
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    message: str
+
+
 # ==================== API接口 ====================
 
 @router.post("", response_model=FavoriteStockResponse)
@@ -432,5 +450,109 @@ async def get_favorite_stocks_statistics(
         raise HTTPException(
             status_code=500,
             detail=f"获取自选股统计失败: {str(e)}"
+        )
+
+
+@router.post("/batch", response_model=FavoriteStockBatchCreateResponse)
+async def batch_create_favorite_stocks(batch_data: FavoriteStockBatchCreateRequest):
+    """
+    批量创建自选股记录
+    
+    - **stock_codes**: 股票代码列表（必填）
+    - **user_id**: 用户ID（可选，如不提供默认为"guest"）
+    - **category**: 分类（可选，默认"自选股"）
+    - **tags**: 标签列表（可选）
+    - **themes**: 概念板块列表（可选）
+    - **sectors**: 行业板块列表（可选）
+    - **notes**: 备注（可选，默认"无"）
+    """
+    try:
+        if not favorite_stocks_manager.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="MongoDB自选股服务不可用，请检查数据库配置"
+            )
+        
+        if not batch_data.stock_codes or len(batch_data.stock_codes) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="股票代码列表不能为空"
+            )
+        
+        # 转换为字典
+        batch_dict = batch_data.model_dump(exclude_unset=True)
+        stock_codes = batch_dict.pop('stock_codes')
+        
+        # 统计结果
+        success_count = 0
+        failed_count = 0
+        success_list = []
+        failed_list = []
+        
+        # 批量处理
+        for stock_code in stock_codes:
+            try:
+                # 构建单条记录数据
+                stock_dict = {
+                    'stock_code': stock_code,
+                    **batch_dict
+                }
+                
+                # 验证和预处理数据
+                prepared_data = favorite_stocks_manager.validate_and_prepare_stock_data(
+                    stock_dict,
+                    set_timestamps=True
+                )
+                
+                if prepared_data is None:
+                    failed_list.append({
+                        'stock_code': stock_code,
+                        'error': '股票代码不能为空'
+                    })
+                    failed_count += 1
+                    continue
+                
+                # 插入记录
+                success = favorite_stocks_manager.insert(prepared_data)
+                
+                if success:
+                    success_list.append(stock_code)
+                    success_count += 1
+                else:
+                    failed_list.append({
+                        'stock_code': stock_code,
+                        'error': '创建失败，可能已存在相同的记录'
+                    })
+                    failed_count += 1
+                    
+            except Exception as e:
+                logger.warning(f"批量创建自选股失败: {stock_code}, 错误: {e}")
+                failed_list.append({
+                    'stock_code': stock_code,
+                    'error': str(e)
+                })
+                failed_count += 1
+        
+        result = {
+            'total': len(stock_codes),
+            'success_count': success_count,
+            'failed_count': failed_count,
+            'success_list': success_list,
+            'failed_list': failed_list
+        }
+        
+        return FavoriteStockBatchCreateResponse(
+            success=failed_count == 0,
+            data=result,
+            message=f"批量创建完成，成功 {success_count} 条，失败 {failed_count} 条"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"批量创建自选股失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"批量创建自选股失败: {str(e)}"
         )
 

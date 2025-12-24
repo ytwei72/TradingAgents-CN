@@ -9,6 +9,13 @@
           总数: {{ totalCount }}
         </span>
         <button
+          @click="showBatchImportModal = true"
+          class="px-4 py-2 bg-green-700 hover:bg-green-800 text-white text-sm rounded-lg transition-colors font-medium"
+        >
+          <span class="mr-1">📥</span>
+          批量导入
+        </button>
+        <button
           @click="showAddModal = true"
           class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors font-medium"
         >
@@ -487,6 +494,136 @@
         </div>
       </div>
     </div>
+
+    <!-- Batch Import Modal -->
+    <div
+      v-if="showBatchImportModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="closeBatchImportModal"
+    >
+      <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+        <h2 class="text-xl font-bold text-white mb-4">批量导入自选股</h2>
+
+        <form @submit.prevent="handleBatchImport">
+          <div class="grid grid-cols-2 gap-6 mb-6">
+            <!-- 左侧：板块选择 -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">行业板块</label>
+                <div class="max-h-64 overflow-y-auto border border-gray-700 rounded-lg p-2">
+                  <label
+                    v-for="industry in industryList"
+                    :key="`industry-${industry.name}`"
+                    class="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
+                  >
+                    <input
+                      type="radio"
+                      :value="`industry-${industry.name}`"
+                      v-model="batchImportForm.selectedSector"
+                      @change="onSectorChange('industry', industry.name)"
+                      class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500"
+                    />
+                    <span class="text-white text-sm">{{ industry.name }}</span>
+                    <span class="text-gray-400 text-xs">({{ industry.stocks?.length || 0 }}只)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">概念板块</label>
+                <div class="max-h-64 overflow-y-auto border border-gray-700 rounded-lg p-2">
+                  <label
+                    v-for="concept in conceptList"
+                    :key="`concept-${concept.name}`"
+                    class="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
+                  >
+                    <input
+                      type="radio"
+                      :value="`concept-${concept.name}`"
+                      v-model="batchImportForm.selectedSector"
+                      @change="onSectorChange('concept', concept.name)"
+                      class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500"
+                    />
+                    <span class="text-white text-sm">{{ concept.name }}</span>
+                    <span class="text-gray-400 text-xs">({{ concept.stocks?.length || 0 }}只)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右侧：股票列表和分类名称 -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">分类名称 *</label>
+                <input
+                  v-model="batchImportForm.category"
+                  type="text"
+                  required
+                  class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="例如: 银行板块"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  股票列表 (已选择 {{ selectedStocks.length }} 只)
+                  <button
+                    type="button"
+                    @click="selectAllStocks"
+                    class="ml-2 text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    全选
+                  </button>
+                  <button
+                    type="button"
+                    @click="clearAllStocks"
+                    class="ml-2 text-xs text-red-400 hover:text-red-300"
+                  >
+                    清空
+                  </button>
+                </label>
+                <div class="max-h-96 overflow-y-auto border border-gray-700 rounded-lg p-2">
+                  <label
+                    v-for="stock in availableStocks"
+                    :key="stock.code"
+                    class="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
+                  >
+                    <input
+                      type="checkbox"
+                      :value="stock.code"
+                      v-model="selectedStocks"
+                      class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span class="text-white text-sm">{{ stock.code }}</span>
+                    <span class="text-gray-400 text-sm">{{ stock.name }}</span>
+                  </label>
+                  <div v-if="availableStocks.length === 0" class="text-gray-400 text-sm p-4 text-center">
+                    请先选择一个板块
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 mt-6">
+            <button
+              type="button"
+              @click="closeBatchImportModal"
+              class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              :disabled="batchImporting || selectedStocks.length === 0 || !batchImportForm.category"
+              class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ batchImporting ? '导入中...' : '确认导入' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -499,6 +636,11 @@ import {
   deleteFavoriteStock,
   getFavoriteStocksStatistics,
   startBatchAnalysisSameParams,
+  batchCreateFavoriteStocks,
+  getConceptList,
+  getIndustryList,
+  getStocksByConcept,
+  getStocksByIndustry,
   type FavoriteStock
 } from '../api'
 import DateRangePicker from '../components/DateRangePicker.vue'
@@ -513,6 +655,7 @@ const totalCount = ref(0)
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const showAnalysisModal = ref(false)
+const showBatchImportModal = ref(false)
 const stockToDelete = ref<FavoriteStock | null>(null)
 
 const activeTab = ref('all')
@@ -552,6 +695,18 @@ const formData = reactive({
 const tagsInput = ref('')
 const themesInput = ref('')
 const sectorsInput = ref('')
+
+// Batch import related
+const industryList = ref<Array<{ name: string; stocks?: Array<{ code: string; name: string }> }>>([])
+const conceptList = ref<Array<{ name: string; stocks?: Array<{ code: string; name: string }> }>>([])
+const availableStocks = ref<Array<{ code: string; name: string }>>([])
+const selectedStocks = ref<string[]>([])
+const batchImporting = ref(false)
+const batchImportForm = reactive({
+  selectedSector: '',
+  sectorType: '' as 'industry' | 'concept' | '',
+  category: ''
+})
 
 // 计算属性：根据activeTab过滤显示的股票
 const displayedStocks = computed(() => {
@@ -842,8 +997,121 @@ const startBatchAnalysis = async () => {
   }
 }
 
+const loadSectorLists = async () => {
+  try {
+    const [industryRes, conceptRes] = await Promise.all([
+      getIndustryList(),
+      getConceptList()
+    ])
+    
+    if (industryRes.success && industryRes.data) {
+      industryList.value = industryRes.data.map(item => ({
+        name: item.name,
+        stocks: item.stocks || []
+      }))
+    }
+    
+    if (conceptRes.success && conceptRes.data) {
+      conceptList.value = conceptRes.data.map(item => ({
+        name: item.name,
+        stocks: item.stocks || []
+      }))
+    }
+  } catch (e) {
+    console.error('加载板块列表失败:', e)
+    error.value = '加载板块列表失败'
+  }
+}
+
+const onSectorChange = async (type: 'industry' | 'concept', sectorName: string) => {
+  batchImportForm.sectorType = type
+  batchImportForm.selectedSector = `${type}-${sectorName}`
+  batchImportForm.category = sectorName // 默认填入板块名称
+  
+  selectedStocks.value = []
+  availableStocks.value = []
+  
+  try {
+    let stocks: Array<{ code: string; name: string }> = []
+    
+    if (type === 'industry') {
+      const response = await getStocksByIndustry([sectorName])
+      if (response.success && response.data && response.data[sectorName]) {
+        stocks = response.data[sectorName]
+      }
+    } else {
+      const response = await getStocksByConcept([sectorName])
+      if (response.success && response.data && response.data[sectorName]) {
+        stocks = response.data[sectorName]
+      }
+    }
+    
+    availableStocks.value = stocks
+  } catch (e) {
+    console.error('加载板块股票列表失败:', e)
+    error.value = '加载板块股票列表失败'
+  }
+}
+
+const selectAllStocks = () => {
+  selectedStocks.value = availableStocks.value.map(stock => stock.code)
+}
+
+const clearAllStocks = () => {
+  selectedStocks.value = []
+}
+
+const closeBatchImportModal = () => {
+  showBatchImportModal.value = false
+  batchImportForm.selectedSector = ''
+  batchImportForm.sectorType = ''
+  batchImportForm.category = ''
+  selectedStocks.value = []
+  availableStocks.value = []
+}
+
+const handleBatchImport = async () => {
+  if (selectedStocks.value.length === 0) {
+    error.value = '请至少选择一只股票'
+    return
+  }
+  
+  if (!batchImportForm.category) {
+    error.value = '请输入分类名称'
+    return
+  }
+  
+  batchImporting.value = true
+  error.value = ''
+  
+  try {
+    const response = await batchCreateFavoriteStocks({
+      stock_codes: selectedStocks.value,
+      category: batchImportForm.category,
+      user_id: 'guest'
+    })
+    
+    if (response.success) {
+      alert(`批量导入完成！\n总计: ${response.data?.total || 0}只\n成功: ${response.data?.success_count || 0}只\n失败: ${response.data?.failed_count || 0}只`)
+      
+      // 关闭弹窗
+      closeBatchImportModal()
+      
+      // 重新加载自选股列表
+      await loadFavoriteStocks()
+    } else {
+      error.value = response.message || '批量导入失败'
+    }
+  } catch (e: any) {
+    error.value = e.message || '批量导入失败'
+  } finally {
+    batchImporting.value = false
+  }
+}
+
 onMounted(() => {
   loadFavoriteStocks()
+  loadSectorLists()
 })
 </script>
 
