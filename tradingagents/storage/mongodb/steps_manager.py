@@ -55,7 +55,7 @@ class MongoDBStepsStatusManager:
     def _create_indexes(self):
         """创建索引以提高查询性能"""
         try:
-            if not self.connected or not self.collection:
+            if not self.connected or self.collection is None:
                 return
                 
             # 创建复合唯一索引，确保每个股票代码、日期和分析ID只有一条记录

@@ -591,10 +591,12 @@ export const getFavoriteStocks = async (params?: {
 
 export const getFavoriteStock = async (
   stockCode: string,
-  userId?: string
+  userId?: string,
+  category?: string
 ): Promise<FavoriteStockResponse> => {
   const queryParams = new URLSearchParams();
   if (userId) queryParams.append('user_id', userId);
+  if (category) queryParams.append('category', category);
   const queryString = queryParams.toString();
   const url = `/favorite-stocks/${stockCode}${queryString ? `?${queryString}` : ''}`;
   const response = await api.get<FavoriteStockResponse>(url);
@@ -611,10 +613,12 @@ export const createFavoriteStock = async (
 export const updateFavoriteStock = async (
   stockCode: string,
   data: FavoriteStockUpdateRequest,
-  userId?: string
+  userId?: string,
+  category?: string
 ): Promise<FavoriteStockResponse> => {
   const queryParams = new URLSearchParams();
   if (userId) queryParams.append('user_id', userId);
+  if (category) queryParams.append('category', category);
   const queryString = queryParams.toString();
   const url = `/favorite-stocks/${stockCode}${queryString ? `?${queryString}` : ''}`;
   const response = await api.put<FavoriteStockResponse>(url, data);
@@ -623,10 +627,12 @@ export const updateFavoriteStock = async (
 
 export const deleteFavoriteStock = async (
   stockCode: string,
-  userId?: string
+  userId?: string,
+  category?: string
 ): Promise<FavoriteStockResponse> => {
   const queryParams = new URLSearchParams();
   if (userId) queryParams.append('user_id', userId);
+  if (category) queryParams.append('category', category);
   const queryString = queryParams.toString();
   const url = `/favorite-stocks/${stockCode}${queryString ? `?${queryString}` : ''}`;
   const response = await api.delete<FavoriteStockResponse>(url);

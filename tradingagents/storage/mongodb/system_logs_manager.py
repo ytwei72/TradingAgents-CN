@@ -56,7 +56,7 @@ class SystemLogsManager:
     def _create_indexes(self):
         """创建索引以提高查询性能"""
         try:
-            if not self.connected or not self.collection:
+            if not self.connected or self.collection is None:
                 return
             
             # 创建复合索引用于去重查询

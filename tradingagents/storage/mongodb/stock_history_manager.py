@@ -59,17 +59,52 @@ class StockHistoryManager:
     def _create_indexes(self):
         """创建索引以提高查询性能"""
         try:
+            if not self.connected or self.collection is None:
+                return
+            
             # 复合索引：股票代码 + 日期（最常用的查询组合）
-            self.collection.create_index([
-                ("code", ASCENDING),
-                ("date", DESCENDING)
-            ])
+            try:
+                self.collection.create_index([
+                    ("code", ASCENDING),
+                    ("date", DESCENDING)
+                ])
+            except Exception as e:
+                error_str = str(e).lower()
+                if "already exists" in error_str or "indexoptionsconflict" in error_str:
+                    logger.debug("✅ [a_stock_his_trans] 复合索引已存在")
+                else:
+                    logger.warning(f"⚠️ [a_stock_his_trans] 创建复合索引时出错: {e}")
             
-            # 单字段索引
-            self.collection.create_index("code")
-            self.collection.create_index("date")
+            # 单字段索引 - code
+            try:
+                self.collection.create_index("code")
+            except Exception as e:
+                error_str = str(e).lower()
+                if "already exists" in error_str or "indexoptionsconflict" in error_str:
+                    logger.debug("✅ [a_stock_his_trans] code索引已存在")
+                else:
+                    logger.warning(f"⚠️ [a_stock_his_trans] 创建code索引时出错: {e}")
             
-            logger.info("✅ a_stock_his_trans索引创建成功")
+            # 单字段索引 - date
+            # 注意：如果数据库中已存在名为 idx_date_only 的索引，创建 date 索引会失败
+            # 这是正常的，因为 MongoDB 不允许在同一字段上创建重复的索引（即使名称不同）
+            try:
+                self.collection.create_index("date")
+            except Exception as e:
+                error_str = str(e).lower()
+                error_code = getattr(e, 'code', None)
+                # 检查是否是索引冲突错误（已存在不同名称的同字段索引）
+                # 错误代码 85 表示 IndexOptionsConflict
+                if ("already exists" in error_str or 
+                    "indexoptionsconflict" in error_str or 
+                    error_code == 85 or
+                    "idx_date_only" in error_str):
+                    # 索引已存在（可能是 idx_date_only 或其他名称），这是正常的
+                    logger.debug("✅ [a_stock_his_trans] date索引已存在（可能是 idx_date_only）")
+                else:
+                    logger.warning(f"⚠️ [a_stock_his_trans] 创建date索引时出错: {e}")
+            
+            logger.info("✅ a_stock_his_trans索引创建/检查完成")
             
         except Exception as e:
             logger.error(f"❌ a_stock_his_trans索引创建失败: {e}")

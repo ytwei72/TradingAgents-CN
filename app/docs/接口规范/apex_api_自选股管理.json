@@ -18,7 +18,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"stock_code\": \"000001\",\n  \"user_id\": \"default\",\n  \"stock_name\": \"平安银行\",\n  \"market_type\": \"A股\",\n  \"category\": \"银行股\",\n  \"tags\": [\"蓝筹\", \"金融\"],\n  \"themes\": [\"银行\", \"金融科技\"],\n  \"sectors\": [\"银行\"],\n  \"notes\": \"重点关注\"\n}"
+					"raw": "{\n  \"stock_code\": \"000001\",\n  \"user_id\": \"guest\",\n  \"stock_name\": \"平安银行\",\n  \"market_type\": \"A股\",\n  \"category\": \"自选股\",\n  \"tags\": [\"蓝筹\", \"金融\"],\n  \"themes\": [\"银行\", \"金融科技\"],\n  \"sectors\": [\"银行\"],\n  \"notes\": \"重点关注\"\n}"
 				},
 				"url": {
 					"raw": "{{base_url}}/api/favorite-stocks",
@@ -40,7 +40,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{base_url}}/api/favorite-stocks?user_id=default&category=银行股&limit=100&skip=0&sort_by=created_at&sort_order=desc",
+					"raw": "{{base_url}}/api/favorite-stocks?user_id=guest&category=自选股&limit=100&skip=0&sort_by=created_at&sort_order=desc",
 					"host": [
 						"{{base_url}}"
 					],
@@ -51,8 +51,8 @@
 					"query": [
 						{
 							"key": "user_id",
-							"value": "default",
-							"description": "用户ID，默认\"default\""
+							"value": "guest",
+							"description": "用户ID，默认\"guest\""
 						},
 						{
 							"key": "stock_code",
@@ -62,7 +62,7 @@
 						},
 						{
 							"key": "category",
-							"value": "银行股",
+							"value": "自选股",
 							"description": "分类（可选）"
 						},
 						{
@@ -103,7 +103,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=default",
+					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=guest&category=自选股",
 					"host": [
 						"{{base_url}}"
 					],
@@ -115,8 +115,14 @@
 					"query": [
 						{
 							"key": "user_id",
-							"value": "default",
-							"description": "用户ID，默认\"default\""
+							"value": "guest",
+							"description": "用户ID，默认\"guest\""
+						},
+						{
+							"key": "category",
+							"value": "自选股",
+							"description": "分类（可选，用于精确匹配）",
+							"disabled": true
 						}
 					]
 				},
@@ -136,10 +142,10 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"stock_name\": \"平安银行股份有限公司\",\n  \"category\": \"金融股\",\n  \"tags\": [\"蓝筹\", \"金融\", \"银行\"],\n  \"themes\": [\"银行\", \"金融科技\", \"数字金融\"],\n  \"sectors\": [\"银行\"],\n  \"notes\": \"更新后的备注\"\n}"
+					"raw": "{\n  \"stock_name\": \"平安银行股份有限公司\",\n  \"category\": \"自选股\",\n  \"tags\": [\"蓝筹\", \"金融\", \"银行\"],\n  \"themes\": [\"银行\", \"金融科技\", \"数字金融\"],\n  \"sectors\": [\"银行\"],\n  \"notes\": \"更新后的备注\"\n}"
 				},
 				"url": {
-					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=default",
+					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=guest&category=自选股",
 					"host": [
 						"{{base_url}}"
 					],
@@ -151,8 +157,13 @@
 					"query": [
 						{
 							"key": "user_id",
-							"value": "default",
-							"description": "用户ID，默认\"default\""
+							"value": "guest",
+							"description": "用户ID，默认\"guest\""
+						},
+						{
+							"key": "category",
+							"value": "自选股",
+							"description": "分类（可选，用于定位要更新的记录）"
 						}
 					]
 				},
@@ -166,7 +177,7 @@
 				"method": "DELETE",
 				"header": [],
 				"url": {
-					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=default",
+					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=guest&category=自选股",
 					"host": [
 						"{{base_url}}"
 					],
@@ -178,8 +189,13 @@
 					"query": [
 						{
 							"key": "user_id",
-							"value": "default",
-							"description": "用户ID，默认\"default\""
+							"value": "guest",
+							"description": "用户ID，默认\"guest\""
+						},
+						{
+							"key": "category",
+							"value": "自选股",
+							"description": "分类（可选，用于定位要删除的记录）"
 						}
 					]
 				},
@@ -193,7 +209,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{base_url}}/api/favorite-stocks/statistics/summary?user_id=default",
+					"raw": "{{base_url}}/api/favorite-stocks/statistics/summary?user_id=guest",
 					"host": [
 						"{{base_url}}"
 					],
@@ -206,8 +222,8 @@
 					"query": [
 						{
 							"key": "user_id",
-							"value": "default",
-							"description": "用户ID，默认\"default\""
+							"value": "guest",
+							"description": "用户ID，默认\"guest\""
 						}
 					]
 				},

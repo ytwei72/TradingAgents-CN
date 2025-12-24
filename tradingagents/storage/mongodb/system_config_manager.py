@@ -80,16 +80,112 @@ class SystemConfigManager:
             logger.warning(f"⚠️ MongoDB连接失败: {e}，系统配置将使用JSON文件存储")
             self._connected = False
     
+    def _cleanup_duplicates(self, collection, key_fields: List[str], collection_name: str):
+        """
+        清理集合中的重复数据
+        
+        Args:
+            collection: MongoDB 集合对象
+            key_fields: 用于判断重复的字段列表
+            collection_name: 集合名称（用于日志）
+        """
+        if collection is None:
+            return
+        
+        try:
+            # 查找所有重复的记录
+            pipeline = [
+                {
+                    "$group": {
+                        "_id": {field: f"${field}" for field in key_fields},
+                        "count": {"$sum": 1},
+                        "docs": {"$push": "$$ROOT"}
+                    }
+                },
+                {
+                    "$match": {
+                        "count": {"$gt": 1}  # 只保留重复的记录
+                    }
+                }
+            ]
+            
+            duplicates = list(collection.aggregate(pipeline))
+            
+            if duplicates:
+                logger.warning(f"⚠️ [系统配置] 在 {collection_name} 中发现 {len(duplicates)} 组重复数据，开始清理...")
+                
+                deleted_count = 0
+                for dup_group in duplicates:
+                    docs = dup_group["docs"]
+                    # 按 updated_at 降序排序，保留最新的记录
+                    # 如果没有 updated_at，按 _id 排序（ObjectId 包含时间戳）
+                    docs.sort(key=lambda x: (
+                        x.get("updated_at", datetime.min) if isinstance(x.get("updated_at"), datetime) else datetime.min,
+                        str(x.get("_id", ""))
+                    ), reverse=True)
+                    
+                    # 保留第一条（最新的），删除其余的
+                    for doc in docs[1:]:
+                        collection.delete_one({"_id": doc["_id"]})
+                        deleted_count += 1
+                
+                logger.info(f"✅ [系统配置] {collection_name} 清理完成，删除了 {deleted_count} 条重复记录")
+            else:
+                logger.debug(f"✅ [系统配置] {collection_name} 无重复数据")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ [系统配置] 清理 {collection_name} 重复数据时出错: {e}")
+    
     def _create_indexes(self):
         """创建数据库索引"""
         try:
             # models 集合索引：按 provider 和 model_name
-            if self.models_collection:
-                self.models_collection.create_index([("provider", 1), ("model_name", 1)], unique=True)
+            if self.models_collection is not None:
+                # 先清理重复数据
+                self._cleanup_duplicates(
+                    self.models_collection,
+                    ["provider", "model_name"],
+                    "dict_models"
+                )
+                
+                try:
+                    self.models_collection.create_index([("provider", 1), ("model_name", 1)], unique=True)
+                    logger.debug("✅ [系统配置] models 索引创建成功")
+                except Exception as e:
+                    error_str = str(e).lower()
+                    error_code = getattr(e, 'code', None)
+                    if "already exists" in error_str or "indexoptionsconflict" in error_str or error_code == 85:
+                        logger.debug("✅ [系统配置] models 索引已存在")
+                    elif "duplicate key" in error_str or error_code == 11000:
+                        # 如果清理后仍有重复，记录详细错误
+                        logger.error(f"❌ [系统配置] models 索引创建失败，仍有重复数据: {e}")
+                        logger.error("❌ [系统配置] 请手动清理 dict_models 集合中的重复数据后重试")
+                    else:
+                        logger.warning(f"⚠️ [系统配置] 创建 models 索引时出错: {e}")
             
             # pricing 集合索引：按 provider 和 model_name
-            if self.pricing_collection:
-                self.pricing_collection.create_index([("provider", 1), ("model_name", 1)], unique=True)
+            if self.pricing_collection is not None:
+                # 先清理重复数据
+                self._cleanup_duplicates(
+                    self.pricing_collection,
+                    ["provider", "model_name"],
+                    "dict_pricing"
+                )
+                
+                try:
+                    self.pricing_collection.create_index([("provider", 1), ("model_name", 1)], unique=True)
+                    logger.debug("✅ [系统配置] pricing 索引创建成功")
+                except Exception as e:
+                    error_str = str(e).lower()
+                    error_code = getattr(e, 'code', None)
+                    if "already exists" in error_str or "indexoptionsconflict" in error_str or error_code == 85:
+                        logger.debug("✅ [系统配置] pricing 索引已存在")
+                    elif "duplicate key" in error_str or error_code == 11000:
+                        # 如果清理后仍有重复，记录详细错误
+                        logger.error(f"❌ [系统配置] pricing 索引创建失败，仍有重复数据: {e}")
+                        logger.error("❌ [系统配置] 请手动清理 dict_pricing 集合中的重复数据后重试")
+                    else:
+                        logger.warning(f"⚠️ [系统配置] 创建 pricing 索引时出错: {e}")
             
             # settings 集合只有一个文档，使用 _id 索引即可
             

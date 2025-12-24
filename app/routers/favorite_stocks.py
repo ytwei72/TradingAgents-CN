@@ -20,10 +20,10 @@ logger = get_logger("favorite_stocks_router")
 class FavoriteStockCreate(BaseModel):
     """创建自选股请求"""
     stock_code: str = Field(..., description="股票代码")
-    user_id: Optional[str] = Field("default", description="用户ID")
+    user_id: Optional[str] = Field(None, description="用户ID（如不提供，默认为'guest'）")
     stock_name: Optional[str] = Field(None, description="股票名称（如不提供，将从股票字典自动查询）")
     market_type: Optional[str] = Field(None, description="市场类型")
-    category: Optional[str] = Field("default", description="分类")
+    category: Optional[str] = Field("自选股", description="分类")
     tags: Optional[List[str]] = Field(default_factory=list, description="标签列表")
     themes: Optional[List[str]] = Field(default_factory=list, description="概念板块（Theme）列表")
     sectors: Optional[List[str]] = Field(default_factory=list, description="行业板块（Sector）列表")
@@ -71,10 +71,10 @@ async def create_favorite_stock(stock_data: FavoriteStockCreate):
     创建自选股记录
     
     - **stock_code**: 股票代码（必填）
-    - **user_id**: 用户ID（可选，默认"default"）
+    - **user_id**: 用户ID（可选，如不提供默认为"guest"）
     - **stock_name**: 股票名称（可选）
     - **market_type**: 市场类型（可选）
-    - **category**: 分类（可选，默认"default"）
+    - **category**: 分类（可选，默认"自选股"）
     - **tags**: 标签列表（可选）
     - **notes**: 备注（可选）
     """
@@ -88,19 +88,37 @@ async def create_favorite_stock(stock_data: FavoriteStockCreate):
         # 转换为字典
         stock_dict = stock_data.model_dump(exclude_unset=True)
         
+        # 验证和预处理数据（包括默认值处理）
+        prepared_data = favorite_stocks_manager.validate_and_prepare_stock_data(
+            stock_dict, 
+            set_timestamps=True
+        )
+        
+        if prepared_data is None:
+            raise HTTPException(
+                status_code=400,
+                detail="股票代码不能为空"
+            )
+        
         # 插入记录
-        success = favorite_stocks_manager.insert(stock_dict)
+        success = favorite_stocks_manager.insert(prepared_data)
         
         if not success:
             raise HTTPException(
                 status_code=400,
-                detail="创建自选股失败，可能已存在相同的记录"
+                detail="创建自选股失败，可能已存在相同的记录（同一用户、股票代码和分类的组合）"
             )
         
-        # 查询刚创建的记录
+        # 查询刚创建的记录并处理返回数据
+        # 确保使用实际的值，而不是None
+        stock_code = prepared_data.get('stock_code')
+        user_id = prepared_data.get('user_id') or 'guest'
+        category = prepared_data.get('category') or '自选股'
+        
         result = favorite_stocks_manager.get_by_stock_code(
-            stock_data.stock_code,
-            stock_data.user_id
+            stock_code,
+            user_id,
+            category
         )
         
         return FavoriteStockResponse(
@@ -121,7 +139,7 @@ async def create_favorite_stock(stock_data: FavoriteStockCreate):
 
 @router.get("", response_model=FavoriteStockListResponse)
 async def get_favorite_stocks(
-    user_id: Optional[str] = Query("default", description="用户ID"),
+    user_id: Optional[str] = Query("guest", description="用户ID，默认'guest'"),
     stock_code: Optional[str] = Query(None, description="股票代码（可选，用于精确查询）"),
     category: Optional[str] = Query(None, description="分类（可选）"),
     tag: Optional[str] = Query(None, description="标签（可选）"),
@@ -133,7 +151,7 @@ async def get_favorite_stocks(
     """
     查询自选股列表
     
-    - **user_id**: 用户ID（默认"default"）
+    - **user_id**: 用户ID（默认"guest"）
     - **stock_code**: 股票代码（可选）
     - **category**: 分类（可选）
     - **tag**: 标签（可选）
@@ -197,13 +215,15 @@ async def get_favorite_stocks(
 @router.get("/{stock_code}", response_model=FavoriteStockResponse)
 async def get_favorite_stock(
     stock_code: str,
-    user_id: Optional[str] = Query("default", description="用户ID")
+    user_id: Optional[str] = Query("guest", description="用户ID"),
+    category: Optional[str] = Query(None, description="分类（可选）")
 ):
     """
     根据股票代码查询自选股详情
     
     - **stock_code**: 股票代码
-    - **user_id**: 用户ID（默认"default"）
+    - **user_id**: 用户ID（默认"guest"）
+    - **category**: 分类（可选，如果提供则精确匹配）
     """
     try:
         if not favorite_stocks_manager.connected:
@@ -212,7 +232,7 @@ async def get_favorite_stock(
                 detail="MongoDB自选股服务不可用，请检查数据库配置"
             )
         
-        result = favorite_stocks_manager.get_by_stock_code(stock_code, user_id)
+        result = favorite_stocks_manager.get_by_stock_code(stock_code, user_id, category)
         
         if result is None:
             raise HTTPException(
@@ -240,13 +260,15 @@ async def get_favorite_stock(
 async def update_favorite_stock(
     stock_code: str,
     update_data: FavoriteStockUpdate,
-    user_id: Optional[str] = Query("default", description="用户ID")
+    user_id: Optional[str] = Query("guest", description="用户ID"),
+    category: Optional[str] = Query(None, description="分类（可选，用于定位要更新的记录）")
 ):
     """
     更新自选股记录
     
     - **stock_code**: 股票代码
-    - **user_id**: 用户ID（默认"default"）
+    - **user_id**: 用户ID（默认"guest"）
+    - **category**: 分类（可选，用于定位要更新的记录）
     - **update_data**: 要更新的数据
     """
     try:
@@ -261,17 +283,20 @@ async def update_favorite_stock(
             "stock_code": stock_code,
             "user_id": user_id
         }
+        if category:
+            filter_dict["category"] = category
+        
+        # 先查询现有记录
+        existing_record = favorite_stocks_manager.get_by_stock_code(stock_code, user_id, category)
+        
+        if existing_record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到股票{stock_code}的自选股记录"
+            )
         
         # 转换为字典，排除未设置的字段
         update_dict = update_data.model_dump(exclude_unset=True)
-        
-        # 确保数组字段的类型正确
-        if 'tags' in update_dict and not isinstance(update_dict['tags'], list):
-            update_dict['tags'] = [update_dict['tags']] if update_dict['tags'] else []
-        if 'themes' in update_dict and not isinstance(update_dict['themes'], list):
-            update_dict['themes'] = [update_dict['themes']] if update_dict['themes'] else []
-        if 'sectors' in update_dict and not isinstance(update_dict['sectors'], list):
-            update_dict['sectors'] = [update_dict['sectors']] if update_dict['sectors'] else []
         
         if not update_dict:
             raise HTTPException(
@@ -279,17 +304,24 @@ async def update_favorite_stock(
                 detail="没有提供要更新的字段"
             )
         
-        # 更新记录
-        success = favorite_stocks_manager.update(filter_dict, update_dict)
+        # 合并现有数据和更新数据
+        merged_data = existing_record.copy()
+        merged_data.update(update_dict)
+        
+        # 从预处理后的数据中提取需要更新的字段（只更新用户提供的字段）
+        final_update_dict = {key: merged_data[key] for key in update_dict.keys() if key in merged_data}
+        
+        # 更新记录（只更新需要更新的字段）
+        success = favorite_stocks_manager.update(filter_dict, final_update_dict)
         
         if not success:
             raise HTTPException(
-                status_code=404,
-                detail=f"未找到股票{stock_code}的自选股记录"
+                status_code=500,
+                detail="更新失败"
             )
         
-        # 查询更新后的记录
-        result = favorite_stocks_manager.get_by_stock_code(stock_code, user_id)
+        # 查询更新后的记录并处理返回数据
+        result = favorite_stocks_manager.get_by_stock_code(stock_code, user_id, category)
         
         return FavoriteStockResponse(
             success=True,
@@ -310,13 +342,15 @@ async def update_favorite_stock(
 @router.delete("/{stock_code}", response_model=FavoriteStockResponse)
 async def delete_favorite_stock(
     stock_code: str,
-    user_id: Optional[str] = Query("default", description="用户ID")
+    user_id: Optional[str] = Query("guest", description="用户ID"),
+    category: Optional[str] = Query(None, description="分类（可选，用于定位要删除的记录）")
 ):
     """
     删除自选股记录
     
     - **stock_code**: 股票代码
-    - **user_id**: 用户ID（默认"default"）
+    - **user_id**: 用户ID（默认"guest"）
+    - **category**: 分类（可选，用于定位要删除的记录）
     """
     try:
         if not favorite_stocks_manager.connected:
@@ -330,9 +364,11 @@ async def delete_favorite_stock(
             "stock_code": stock_code,
             "user_id": user_id
         }
+        if category:
+            filter_dict["category"] = category
         
         # 先查询记录（用于返回）
-        result = favorite_stocks_manager.get_by_stock_code(stock_code, user_id)
+        result = favorite_stocks_manager.get_by_stock_code(stock_code, user_id, category)
         
         if result is None:
             raise HTTPException(
@@ -367,12 +403,12 @@ async def delete_favorite_stock(
 
 @router.get("/statistics/summary", response_model=FavoriteStockStatisticsResponse)
 async def get_favorite_stocks_statistics(
-    user_id: Optional[str] = Query("default", description="用户ID")
+    user_id: Optional[str] = Query("guest", description="用户ID")
 ):
     """
     获取自选股统计信息
     
-    - **user_id**: 用户ID（默认"default"）
+    - **user_id**: 用户ID（默认"guest"）
     """
     try:
         if not favorite_stocks_manager.connected:

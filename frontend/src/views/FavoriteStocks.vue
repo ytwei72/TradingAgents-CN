@@ -720,7 +720,12 @@ const saveStock = async () => {
         error.value = response.message || '创建失败'
       }
     } else {
-      const response = await updateFavoriteStock(formData.stock_code, stockData)
+      const response = await updateFavoriteStock(
+        formData.stock_code,
+        stockData,
+        undefined,
+        formData.category
+      )
       if (response.success) {
         closeModal()
         await loadFavoriteStocks()
@@ -747,7 +752,11 @@ const deleteStock = async () => {
   error.value = ''
 
   try {
-    const response = await deleteFavoriteStock(stockToDelete.value.stock_code)
+    const response = await deleteFavoriteStock(
+      stockToDelete.value.stock_code,
+      undefined,
+      stockToDelete.value.category
+    )
     if (response.success) {
       stockToDelete.value = null
       await loadFavoriteStocks()

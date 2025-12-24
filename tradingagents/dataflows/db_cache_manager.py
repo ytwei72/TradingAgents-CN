@@ -86,7 +86,7 @@ class DatabaseCacheManager:
             
             # 股票数据集合索引
             stock_collection = get_mongo_collection("stock_data")
-            if stock_collection:
+            if stock_collection is not None:
                 stock_collection.create_index([
                     ("symbol", 1),
                     ("data_source", 1),
@@ -97,7 +97,7 @@ class DatabaseCacheManager:
             
             # 新闻数据集合索引
             news_collection = get_mongo_collection("news_data")
-            if news_collection:
+            if news_collection is not None:
                 news_collection.create_index([
                     ("symbol", 1),
                     ("data_source", 1),
@@ -107,7 +107,7 @@ class DatabaseCacheManager:
             
             # 基本面数据集合索引
             fundamentals_collection = get_mongo_collection("fundamentals_data")
-            if fundamentals_collection:
+            if fundamentals_collection is not None:
                 fundamentals_collection.create_index([
                     ("symbol", 1),
                     ("data_source", 1),
@@ -187,7 +187,7 @@ class DatabaseCacheManager:
             try:
                 from tradingagents.storage.manager import get_mongo_collection
                 collection = get_mongo_collection("stock_data")
-                if collection:
+                if collection is not None:
                     collection.replace_one({"_id": cache_key}, doc, upsert=True)
                     logger.info(f"💾 股票数据已保存到MongoDB: {symbol} -> {cache_key}")
             except Exception as e:
@@ -237,7 +237,7 @@ class DatabaseCacheManager:
             try:
                 from tradingagents.storage.manager import get_mongo_collection
                 collection = get_mongo_collection("stock_data")
-                if collection:
+                if collection is not None:
                     doc = collection.find_one({"_id": cache_key})
                     
                     if doc:
@@ -293,7 +293,7 @@ class DatabaseCacheManager:
             try:
                 from tradingagents.storage.manager import get_mongo_collection
                 collection = get_mongo_collection("stock_data")
-                if collection:
+                if collection is not None:
                     cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
                     
                     query = {
@@ -348,7 +348,7 @@ class DatabaseCacheManager:
             try:
                 from tradingagents.storage.manager import get_mongo_collection
                 collection = get_mongo_collection("news_data")
-                if collection:
+                if collection is not None:
                     collection.replace_one({"_id": cache_key}, doc, upsert=True)
                     logger.info(f"📰 新闻数据已保存到MongoDB: {symbol} -> {cache_key}")
             except Exception as e:
@@ -401,7 +401,7 @@ class DatabaseCacheManager:
             try:
                 from tradingagents.storage.manager import get_mongo_collection
                 collection = get_mongo_collection("fundamentals_data")
-                if collection:
+                if collection is not None:
                     collection.replace_one({"_id": cache_key}, doc, upsert=True)
                     logger.info(f"💼 基本面数据已保存到MongoDB: {symbol} -> {cache_key}")
             except Exception as e:
@@ -445,7 +445,7 @@ class DatabaseCacheManager:
                 if db:
                     for collection_name in ["stock_data", "news_data", "fundamentals_data"]:
                         collection = get_mongo_collection(collection_name)
-                        if collection:
+                        if collection is not None:
                             count = collection.count_documents({})
                             size = db.command("collStats", collection_name).get("size", 0)
                             stats["mongodb"]["collections"][collection_name] = {
@@ -477,7 +477,7 @@ class DatabaseCacheManager:
                 from tradingagents.storage.manager import get_mongo_collection
                 for collection_name in ["stock_data", "news_data", "fundamentals_data"]:
                     collection = get_mongo_collection(collection_name)
-                    if collection:
+                    if collection is not None:
                         result = collection.delete_many({"created_at": {"$lt": cutoff_time}})
                         cleared_count += result.deleted_count
                         logger.info(f"🧹 MongoDB {collection_name} 清理了 {result.deleted_count} 条记录")
