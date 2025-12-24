@@ -197,6 +197,27 @@ class FavoriteStocksManager:
         elif not isinstance(document['sectors'], list):
             document['sectors'] = [document['sectors']]
         
+        # 如果概念板块（themes）或行业板块（sectors）为空，从sector_manager查询填充
+        if not document.get('themes') or not document.get('sectors'):
+            try:
+                from tradingagents.storage.mongodb.sector_manager import sector_manager
+                if sector_manager.connected:
+                    # 如果概念板块为空，查询并填充
+                    if not document.get('themes'):
+                        concepts = sector_manager.get_concepts_by_stock(stock_code)
+                        if concepts:
+                            document['themes'] = concepts
+                            logger.debug(f"✅ [自选股管理] 自动填充概念板块: {stock_code} -> {concepts}")
+                    
+                    # 如果行业板块为空，查询并填充
+                    if not document.get('sectors'):
+                        industries = sector_manager.get_industries_by_stock(stock_code)
+                        if industries:
+                            document['sectors'] = industries
+                            logger.debug(f"✅ [自选股管理] 自动填充行业板块: {stock_code} -> {industries}")
+            except Exception as e:
+                logger.warning(f"⚠️ [自选股管理] 查询板块信息失败: {e}")
+        
         # 设置分类默认值
         if 'category' not in document:
             document['category'] = '自选股'

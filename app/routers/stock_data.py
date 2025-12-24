@@ -3,7 +3,7 @@
 提供股票基本信息、历史交易数据等接口
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -14,6 +14,7 @@ from tradingagents.utils.logging_manager import get_logger
 from tradingagents.dataflows.stock_data_service import get_stock_data_service
 from tradingagents.storage.mongodb.stock_history_manager import stock_history_manager
 from tradingagents.storage.mongodb.stock_dict_manager import stock_dict_manager
+from tradingagents.storage.mongodb.sector_manager import sector_manager
 from tradingagents.utils.stock_utils import StockUtils
 
 router = APIRouter()
@@ -40,6 +41,27 @@ class StockListResponse(BaseModel):
     success: bool
     data: Optional[List[Dict[str, Any]]] = None
     total: int = 0
+    message: str
+
+
+class StockSectorsResponse(BaseModel):
+    """股票所属板块响应"""
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    message: str
+
+
+class SectorStocksResponse(BaseModel):
+    """板块股票列表响应"""
+    success: bool
+    data: Optional[Dict[str, List[Dict[str, Any]]]] = None
+    message: str
+
+
+class SectorUpdateResponse(BaseModel):
+    """板块更新响应"""
+    success: bool
+    data: Optional[Dict[str, Any]] = None
     message: str
 
 
@@ -400,5 +422,338 @@ async def get_analysis_reports_by_stock(
         raise HTTPException(
             status_code=500,
             detail=f"获取分析结果失败: {str(e)}"
+        )
+
+
+def _get_stock_sectors_data(stock_code: str) -> Dict[str, Any]:
+    """
+    内部辅助函数：根据股票代码获取所属板块数据
+    
+    Args:
+        stock_code: 股票代码
+    
+    Returns:
+        包含股票板块信息的字典
+    """
+    # 获取股票基本信息
+    stock_info = None
+    if stock_dict_manager and stock_dict_manager.connected:
+        stock_info = stock_dict_manager.get_by_symbol(stock_code)
+    
+    # 获取所属概念板块
+    concepts = sector_manager.get_concepts_by_stock(stock_code)
+    
+    # 获取所属行业板块
+    industries = sector_manager.get_industries_by_stock(stock_code)
+    
+    # 构建响应数据
+    result = {
+        "stock_code": stock_code,
+        "stock_name": stock_info.get('name') if stock_info else None,
+        "concepts": concepts,
+        "industries": industries,
+        "concept_count": len(concepts),
+        "industry_count": len(industries)
+    }
+    
+    # 如果股票信息存在，添加更多字段
+    if stock_info:
+        result.update({
+            "market": stock_info.get('market'),
+            "exchange": stock_info.get('exchange'),
+            "industry": stock_info.get('industry')
+        })
+    
+    return result
+
+
+@router.get("/sectors_by_id/{stock_id}", response_model=StockSectorsResponse)
+async def get_stock_sectors_by_id(stock_id: str):
+    """
+    根据股票代码查询所属板块
+    
+    - **stock_id**: 股票代码（如：000001）
+    """
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        # 处理股票代码格式（去掉交易所后缀）
+        stock_code = stock_id
+        if "." in stock_code:
+            stock_code = stock_code.split(".")[0]
+        
+        # 验证股票代码格式
+        if not stock_code.isdigit() or len(stock_code) != 6:
+            raise HTTPException(
+                status_code=400,
+                detail=f"股票代码格式错误，应为6位数字，如：000001"
+            )
+        
+        # 获取板块数据
+        result = _get_stock_sectors_data(stock_code)
+        
+        return StockSectorsResponse(
+            success=True,
+            data=result,
+            message="查询成功"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询股票所属板块失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询股票所属板块失败: {str(e)}"
+        )
+
+
+@router.get("/sectors_by_name/{company_name}", response_model=StockSectorsResponse)
+async def get_stock_sectors_by_name(company_name: str):
+    """
+    根据上市公司名称查询所属板块
+    
+    - **company_name**: 上市公司名称（如：平安银行）
+    """
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        if not stock_dict_manager or not stock_dict_manager.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="股票基础信息服务不可用，无法通过名称查询"
+            )
+        
+        # 通过名称查询股票代码（精确匹配）
+        matched_stocks = stock_dict_manager.get_by_name(company_name, exact=True)
+        
+        if not matched_stocks:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到名称为 '{company_name}' 的股票"
+            )
+        
+        # 取第一个匹配的股票
+        matched_stock = matched_stocks[0]
+        stock_code = matched_stock.get('symbol')
+        if not stock_code:
+            raise HTTPException(
+                status_code=404,
+                detail=f"股票 '{company_name}' 缺少股票代码信息"
+            )
+        
+        # 获取板块数据
+        result = _get_stock_sectors_data(stock_code)
+        
+        return StockSectorsResponse(
+            success=True,
+            data=result,
+            message="查询成功"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询股票所属板块失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询股票所属板块失败: {str(e)}"
+        )
+
+
+class IndustryNamesRequest(BaseModel):
+    """行业板块名称列表请求"""
+    industry_names: List[str] = Field(..., description="行业板块名称列表")
+
+
+@router.post("/sectors/industry/stocks", response_model=SectorStocksResponse)
+async def get_stocks_by_industries(request: IndustryNamesRequest):
+    """
+    根据指定的行业板块名称列表，返回每个行业板块的股票列表
+    
+    - **industry_names**: 行业板块名称列表（支持多个）
+    """
+    industry_names = request.industry_names
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        if not industry_names:
+            raise HTTPException(
+                status_code=400,
+                detail="行业板块名称列表不能为空"
+            )
+        
+        result = {}
+        
+        for industry_name in industry_names:
+            stocks = sector_manager.get_stocks_by_industry(industry_name)
+            result[industry_name] = stocks
+        
+        return SectorStocksResponse(
+            success=True,
+            data=result,
+            message=f"查询成功，共 {len(industry_names)} 个行业板块"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询行业板块股票列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询行业板块股票列表失败: {str(e)}"
+        )
+
+
+class ConceptNamesRequest(BaseModel):
+    """概念板块名称列表请求"""
+    concept_names: List[str] = Field(..., description="概念板块名称列表")
+
+
+@router.post("/sectors/concept/stocks", response_model=SectorStocksResponse)
+async def get_stocks_by_concepts(request: ConceptNamesRequest):
+    """
+    根据指定的概念板块名称列表，返回每个概念板块的股票列表
+    
+    - **concept_names**: 概念板块名称列表（支持多个）
+    """
+    concept_names = request.concept_names
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        if not concept_names:
+            raise HTTPException(
+                status_code=400,
+                detail="概念板块名称列表不能为空"
+            )
+        
+        result = {}
+        
+        for concept_name in concept_names:
+            stocks = sector_manager.get_stocks_by_concept(concept_name)
+            result[concept_name] = stocks
+        
+        return SectorStocksResponse(
+            success=True,
+            data=result,
+            message=f"查询成功，共 {len(concept_names)} 个概念板块"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询概念板块股票列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询概念板块股票列表失败: {str(e)}"
+        )
+
+
+@router.post("/sectors/update", response_model=SectorUpdateResponse)
+async def update_sectors(
+    update_concept: bool = Query(True, description="是否更新概念板块"),
+    update_industry: bool = Query(True, description="是否更新行业板块")
+):
+    """
+    更新板块数据（概念板块和/或行业板块）
+    
+    - **update_concept**: 是否更新概念板块（默认：true）
+    - **update_industry**: 是否更新行业板块（默认：true）
+    """
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        result = {}
+        
+        # 更新概念板块
+        if update_concept:
+            try:
+                concept_count = sector_manager.update_concept_sectors()
+                result["concept"] = {
+                    "updated": concept_count >= 0,
+                    "count": concept_count if concept_count >= 0 else 0,
+                    "message": f"概念板块更新成功，共更新 {concept_count} 个板块" if concept_count >= 0 else "概念板块更新失败"
+                }
+            except Exception as e:
+                logger.error(f"更新概念板块失败: {e}", exc_info=True)
+                result["concept"] = {
+                    "updated": False,
+                    "count": 0,
+                    "message": f"概念板块更新失败: {str(e)}"
+                }
+        else:
+            result["concept"] = {
+                "updated": False,
+                "count": 0,
+                "message": "跳过概念板块更新"
+            }
+        
+        # 更新行业板块
+        if update_industry:
+            try:
+                industry_count = sector_manager.update_industry_sectors()
+                result["industry"] = {
+                    "updated": industry_count >= 0,
+                    "count": industry_count if industry_count >= 0 else 0,
+                    "message": f"行业板块更新成功，共更新 {industry_count} 个板块" if industry_count >= 0 else "行业板块更新失败"
+                }
+            except Exception as e:
+                logger.error(f"更新行业板块失败: {e}", exc_info=True)
+                result["industry"] = {
+                    "updated": False,
+                    "count": 0,
+                    "message": f"行业板块更新失败: {str(e)}"
+                }
+        else:
+            result["industry"] = {
+                "updated": False,
+                "count": 0,
+                "message": "跳过行业板块更新"
+            }
+        
+        # 判断整体是否成功
+        all_success = (
+            (not update_concept or result["concept"]["updated"]) and
+            (not update_industry or result["industry"]["updated"])
+        )
+        
+        return SectorUpdateResponse(
+            success=all_success,
+            data=result,
+            message="板块更新完成" if all_success else "板块更新部分失败，请查看详细信息"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新板块数据失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"更新板块数据失败: {str(e)}"
         )
 

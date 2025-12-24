@@ -170,6 +170,218 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "板块查询",
+			"item": [
+				{
+					"name": "根据股票代码查询所属板块",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors_by_id/000001",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors_by_id",
+								"000001"
+							]
+						},
+						"description": "根据股票代码查询该股票所属的概念板块和行业板块"
+					},
+					"response": []
+				},
+				{
+					"name": "根据公司名称查询所属板块",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors_by_name/平安银行",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors_by_name",
+								"平安银行"
+							]
+						},
+						"description": "根据上市公司名称查询该股票所属的概念板块和行业板块"
+					},
+					"response": []
+				},
+				{
+					"name": "查询行业板块股票列表",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"industry_names\": [\"银行\", \"证券\", \"保险\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors/industry/stocks",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors",
+								"industry",
+								"stocks"
+							]
+						},
+						"description": "根据指定的行业板块名称列表，返回每个行业板块包含的股票代码列表"
+					},
+					"response": []
+				},
+				{
+					"name": "查询概念板块股票列表",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"concept_names\": [\"新能源\", \"人工智能\", \"5G\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors/concept/stocks",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors",
+								"concept",
+								"stocks"
+							]
+						},
+						"description": "根据指定的概念板块名称列表，返回每个概念板块包含的股票代码列表"
+					},
+					"response": []
+				},
+				{
+					"name": "更新板块数据（全部）",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors/update?update_concept=true&update_industry=true",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors",
+								"update"
+							],
+							"query": [
+								{
+									"key": "update_concept",
+									"value": "true"
+								},
+								{
+									"key": "update_industry",
+									"value": "true"
+								}
+							]
+						},
+						"description": "更新概念板块和行业板块的数据（从 akshare 获取最新数据）"
+					},
+					"response": []
+				},
+				{
+					"name": "更新板块数据（仅概念）",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors/update?update_concept=true&update_industry=false",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors",
+								"update"
+							],
+							"query": [
+								{
+									"key": "update_concept",
+									"value": "true"
+								},
+								{
+									"key": "update_industry",
+									"value": "false"
+								}
+							]
+						},
+						"description": "仅更新概念板块数据"
+					},
+					"response": []
+				},
+				{
+					"name": "更新板块数据（仅行业）",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors/update?update_concept=false&update_industry=true",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors",
+								"update"
+							],
+							"query": [
+								{
+									"key": "update_concept",
+									"value": "false"
+								},
+								{
+									"key": "update_industry",
+									"value": "true"
+								}
+							]
+						},
+						"description": "仅更新行业板块数据"
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
