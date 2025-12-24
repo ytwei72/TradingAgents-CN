@@ -65,6 +65,16 @@ class SectorUpdateResponse(BaseModel):
     message: str
 
 
+class ConceptNamesUpdateRequest(BaseModel):
+    """概念板块名称列表更新请求"""
+    concept_names: List[str] = Field(..., description="概念板块名称列表")
+
+
+class IndustryNamesUpdateRequest(BaseModel):
+    """行业板块名称列表更新请求"""
+    industry_names: List[str] = Field(..., description="行业板块名称列表")
+
+
 def _dataframe_to_dict(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """将DataFrame转换为字典列表"""
     if df.empty:
@@ -693,53 +703,61 @@ async def update_sectors(
         # 更新概念板块
         if update_concept:
             try:
-                concept_count = sector_manager.update_concept_sectors()
-                result["concept"] = {
-                    "updated": concept_count >= 0,
-                    "count": concept_count if concept_count >= 0 else 0,
-                    "message": f"概念板块更新成功，共更新 {concept_count} 个板块" if concept_count >= 0 else "概念板块更新失败"
-                }
+                concept_result = sector_manager.update_concept_sectors()
+                result["concept"] = concept_result
+                result["concept"]["updated"] = concept_result.get("failed_count", 0) == 0
             except Exception as e:
                 logger.error(f"更新概念板块失败: {e}", exc_info=True)
                 result["concept"] = {
-                    "updated": False,
-                    "count": 0,
-                    "message": f"概念板块更新失败: {str(e)}"
+                    "success": [],
+                    "failed": {"整体更新": str(e)},
+                    "total": 0,
+                    "success_count": 0,
+                    "failed_count": 1,
+                    "updated": False
                 }
         else:
             result["concept"] = {
+                "success": [],
+                "failed": {},
+                "total": 0,
+                "success_count": 0,
+                "failed_count": 0,
                 "updated": False,
-                "count": 0,
                 "message": "跳过概念板块更新"
             }
         
         # 更新行业板块
         if update_industry:
             try:
-                industry_count = sector_manager.update_industry_sectors()
-                result["industry"] = {
-                    "updated": industry_count >= 0,
-                    "count": industry_count if industry_count >= 0 else 0,
-                    "message": f"行业板块更新成功，共更新 {industry_count} 个板块" if industry_count >= 0 else "行业板块更新失败"
-                }
+                industry_result = sector_manager.update_industry_sectors()
+                result["industry"] = industry_result
+                result["industry"]["updated"] = industry_result.get("failed_count", 0) == 0
             except Exception as e:
                 logger.error(f"更新行业板块失败: {e}", exc_info=True)
                 result["industry"] = {
-                    "updated": False,
-                    "count": 0,
-                    "message": f"行业板块更新失败: {str(e)}"
+                    "success": [],
+                    "failed": {"整体更新": str(e)},
+                    "total": 0,
+                    "success_count": 0,
+                    "failed_count": 1,
+                    "updated": False
                 }
         else:
             result["industry"] = {
+                "success": [],
+                "failed": {},
+                "total": 0,
+                "success_count": 0,
+                "failed_count": 0,
                 "updated": False,
-                "count": 0,
                 "message": "跳过行业板块更新"
             }
         
         # 判断整体是否成功
         all_success = (
-            (not update_concept or result["concept"]["updated"]) and
-            (not update_industry or result["industry"]["updated"])
+            (not update_concept or result["concept"].get("updated", False)) and
+            (not update_industry or result["industry"].get("updated", False))
         )
         
         return SectorUpdateResponse(
@@ -755,5 +773,87 @@ async def update_sectors(
         raise HTTPException(
             status_code=500,
             detail=f"更新板块数据失败: {str(e)}"
+        )
+
+
+@router.post("/sectors/concept/update", response_model=SectorUpdateResponse)
+async def update_specific_concept_sectors(request: ConceptNamesUpdateRequest):
+    """
+    更新指定的概念板块列表
+    
+    - **concept_names**: 概念板块名称列表
+    """
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        if not request.concept_names:
+            raise HTTPException(
+                status_code=400,
+                detail="概念板块名称列表不能为空"
+            )
+        
+        # 更新指定的概念板块
+        result = sector_manager.update_specific_concept_sectors(request.concept_names)
+        result["updated"] = result.get("failed_count", 0) == 0
+        
+        return SectorUpdateResponse(
+            success=result["updated"],
+            data={"concept": result},
+            message=f"概念板块更新完成，成功 {result.get('success_count', 0)} 个，失败 {result.get('failed_count', 0)} 个"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新指定概念板块失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"更新指定概念板块失败: {str(e)}"
+        )
+
+
+@router.post("/sectors/industry/update", response_model=SectorUpdateResponse)
+async def update_specific_industry_sectors(request: IndustryNamesUpdateRequest):
+    """
+    更新指定的行业板块列表
+    
+    - **industry_names**: 行业板块名称列表
+    """
+    try:
+        # 检查板块管理器连接
+        if not sector_manager or not sector_manager.is_connected():
+            raise HTTPException(
+                status_code=500,
+                detail="板块数据服务不可用，请检查数据库配置"
+            )
+        
+        if not request.industry_names:
+            raise HTTPException(
+                status_code=400,
+                detail="行业板块名称列表不能为空"
+            )
+        
+        # 更新指定的行业板块
+        result = sector_manager.update_specific_industry_sectors(request.industry_names)
+        result["updated"] = result.get("failed_count", 0) == 0
+        
+        return SectorUpdateResponse(
+            success=result["updated"],
+            data={"industry": result},
+            message=f"行业板块更新完成，成功 {result.get('success_count', 0)} 个，失败 {result.get('failed_count', 0)} 个"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新指定行业板块失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"更新指定行业板块失败: {str(e)}"
         )
 

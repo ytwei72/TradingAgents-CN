@@ -380,6 +380,78 @@
 						"description": "仅更新行业板块数据"
 					},
 					"response": []
+				},
+				{
+					"name": "更新指定的概念板块",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"concept_names\": [\"中字头\", \"消毒剂\", \"蚂蚁概念\", \"2025中报扭亏\", \"融资融券\", \"创业板综\", \"大数据\", \"工业气体\", \"OLED\", \"MiniLED\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors/concept/update",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors",
+								"concept",
+								"update"
+							]
+						},
+						"description": "更新指定的概念板块列表，返回成功和失败的板块信息"
+					},
+					"response": []
+				},
+				{
+					"name": "更新指定的行业板块",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"industry_names\": [\"银行\", \"证券\", \"保险\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/stock-data/sectors/industry/update",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"stock-data",
+								"sectors",
+								"industry",
+								"update"
+							]
+						},
+						"description": "更新指定的行业板块列表，返回成功和失败的板块信息"
+					},
+					"response": []
 				}
 			]
 		}
@@ -392,6 +464,3 @@
 		}
 	]
 }
-
-
-
