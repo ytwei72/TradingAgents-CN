@@ -82,8 +82,8 @@ class FavoriteStocksManager:
             self.collection.create_index("user_id")
             self.collection.create_index("stock_code")
             self.collection.create_index("tags")
-            self.collection.create_index("concept_plates")
-            self.collection.create_index("industry_plates")
+            self.collection.create_index("themes")
+            self.collection.create_index("sectors")
             self.collection.create_index([("created_at", DESCENDING)])
             self.collection.create_index([("updated_at", DESCENDING)])
             
@@ -98,7 +98,7 @@ class FavoriteStocksManager:
         
         Args:
             stock_data: 自选股数据字典，必须包含 stock_code 字段
-                      可选字段：user_id, stock_name, market_type, tags, category, notes, concept_plates, industry_plates 等
+                      可选字段：user_id, stock_name, market_type, tags, category, notes, themes, sectors 等
         
         Returns:
             插入成功返回 True，否则返回 False
@@ -137,15 +137,15 @@ class FavoriteStocksManager:
             elif not isinstance(document['tags'], list):
                 document['tags'] = [document['tags']]
             
-            if 'concept_plates' not in document:
-                document['concept_plates'] = []
-            elif not isinstance(document['concept_plates'], list):
-                document['concept_plates'] = [document['concept_plates']]
+            if 'themes' not in document:
+                document['themes'] = []
+            elif not isinstance(document['themes'], list):
+                document['themes'] = [document['themes']]
             
-            if 'industry_plates' not in document:
-                document['industry_plates'] = []
-            elif not isinstance(document['industry_plates'], list):
-                document['industry_plates'] = [document['industry_plates']]
+            if 'sectors' not in document:
+                document['sectors'] = []
+            elif not isinstance(document['sectors'], list):
+                document['sectors'] = [document['sectors']]
             
             if 'category' not in document:
                 document['category'] = 'default'

@@ -1,0 +1,227 @@
+{
+	"info": {
+		"_postman_id": "favorite-stocks-collection",
+		"name": "TradingAgents API - 自选股管理",
+		"description": "自选股的增删改查、统计等功能接口",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "创建自选股",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"stock_code\": \"000001\",\n  \"user_id\": \"default\",\n  \"stock_name\": \"平安银行\",\n  \"market_type\": \"A股\",\n  \"category\": \"银行股\",\n  \"tags\": [\"蓝筹\", \"金融\"],\n  \"themes\": [\"银行\", \"金融科技\"],\n  \"sectors\": [\"银行\"],\n  \"notes\": \"重点关注\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/favorite-stocks",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"favorite-stocks"
+					]
+				},
+				"description": "创建一条自选股记录。如果未提供股票名称，系统会自动从股票字典查询并填充。"
+			},
+			"response": []
+		},
+		{
+			"name": "查询自选股列表",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/favorite-stocks?user_id=default&category=银行股&limit=100&skip=0&sort_by=created_at&sort_order=desc",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"favorite-stocks"
+					],
+					"query": [
+						{
+							"key": "user_id",
+							"value": "default",
+							"description": "用户ID，默认\"default\""
+						},
+						{
+							"key": "stock_code",
+							"value": "",
+							"description": "股票代码（可选，用于精确查询）",
+							"disabled": true
+						},
+						{
+							"key": "category",
+							"value": "银行股",
+							"description": "分类（可选）"
+						},
+						{
+							"key": "tag",
+							"value": "",
+							"description": "标签（可选）",
+							"disabled": true
+						},
+						{
+							"key": "limit",
+							"value": "100",
+							"description": "最大返回数量，默认100，范围1-1000"
+						},
+						{
+							"key": "skip",
+							"value": "0",
+							"description": "跳过记录数（用于分页），默认0"
+						},
+						{
+							"key": "sort_by",
+							"value": "created_at",
+							"description": "排序字段，默认\"created_at\""
+						},
+						{
+							"key": "sort_order",
+							"value": "desc",
+							"description": "排序方向（asc/desc），默认\"desc\""
+						}
+					]
+				},
+				"description": "查询自选股列表，支持按用户ID、股票代码、分类、标签等条件过滤，支持分页和排序。"
+			},
+			"response": []
+		},
+		{
+			"name": "查询单个自选股详情",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=default",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"favorite-stocks",
+						"000001"
+					],
+					"query": [
+						{
+							"key": "user_id",
+							"value": "default",
+							"description": "用户ID，默认\"default\""
+						}
+					]
+				},
+				"description": "根据股票代码查询指定自选股的详细信息。"
+			},
+			"response": []
+		},
+		{
+			"name": "更新自选股",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"stock_name\": \"平安银行股份有限公司\",\n  \"category\": \"金融股\",\n  \"tags\": [\"蓝筹\", \"金融\", \"银行\"],\n  \"themes\": [\"银行\", \"金融科技\", \"数字金融\"],\n  \"sectors\": [\"银行\"],\n  \"notes\": \"更新后的备注\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=default",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"favorite-stocks",
+						"000001"
+					],
+					"query": [
+						{
+							"key": "user_id",
+							"value": "default",
+							"description": "用户ID，默认\"default\""
+						}
+					]
+				},
+				"description": "更新指定自选股的记录信息。所有字段都是可选的，只更新提供的字段。"
+			},
+			"response": []
+		},
+		{
+			"name": "删除自选股",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/favorite-stocks/000001?user_id=default",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"favorite-stocks",
+						"000001"
+					],
+					"query": [
+						{
+							"key": "user_id",
+							"value": "default",
+							"description": "用户ID，默认\"default\""
+						}
+					]
+				},
+				"description": "删除指定的自选股记录。"
+			},
+			"response": []
+		},
+		{
+			"name": "获取自选股统计信息",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/favorite-stocks/statistics/summary?user_id=default",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"favorite-stocks",
+						"statistics",
+						"summary"
+					],
+					"query": [
+						{
+							"key": "user_id",
+							"value": "default",
+							"description": "用户ID，默认\"default\""
+						}
+					]
+				},
+				"description": "获取自选股的统计信息，包括总数、按分类统计、按标签统计等。"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}
+

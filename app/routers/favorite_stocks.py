@@ -25,8 +25,8 @@ class FavoriteStockCreate(BaseModel):
     market_type: Optional[str] = Field(None, description="市场类型")
     category: Optional[str] = Field("default", description="分类")
     tags: Optional[List[str]] = Field(default_factory=list, description="标签列表")
-    concept_plates: Optional[List[str]] = Field(default_factory=list, description="概念板块列表")
-    industry_plates: Optional[List[str]] = Field(default_factory=list, description="行业板块列表")
+    themes: Optional[List[str]] = Field(default_factory=list, description="概念板块（Theme）列表")
+    sectors: Optional[List[str]] = Field(default_factory=list, description="行业板块（Sector）列表")
     notes: Optional[str] = Field("无", description="备注")
 
 
@@ -36,8 +36,8 @@ class FavoriteStockUpdate(BaseModel):
     market_type: Optional[str] = Field(None, description="市场类型")
     category: Optional[str] = Field(None, description="分类")
     tags: Optional[List[str]] = Field(None, description="标签列表")
-    concept_plates: Optional[List[str]] = Field(None, description="概念板块列表")
-    industry_plates: Optional[List[str]] = Field(None, description="行业板块列表")
+    themes: Optional[List[str]] = Field(None, description="概念板块（Theme）列表")
+    sectors: Optional[List[str]] = Field(None, description="行业板块（Sector）列表")
     notes: Optional[str] = Field(None, description="备注")
 
 
@@ -268,10 +268,10 @@ async def update_favorite_stock(
         # 确保数组字段的类型正确
         if 'tags' in update_dict and not isinstance(update_dict['tags'], list):
             update_dict['tags'] = [update_dict['tags']] if update_dict['tags'] else []
-        if 'concept_plates' in update_dict and not isinstance(update_dict['concept_plates'], list):
-            update_dict['concept_plates'] = [update_dict['concept_plates']] if update_dict['concept_plates'] else []
-        if 'industry_plates' in update_dict and not isinstance(update_dict['industry_plates'], list):
-            update_dict['industry_plates'] = [update_dict['industry_plates']] if update_dict['industry_plates'] else []
+        if 'themes' in update_dict and not isinstance(update_dict['themes'], list):
+            update_dict['themes'] = [update_dict['themes']] if update_dict['themes'] else []
+        if 'sectors' in update_dict and not isinstance(update_dict['sectors'], list):
+            update_dict['sectors'] = [update_dict['sectors']] if update_dict['sectors'] else []
         
         if not update_dict:
             raise HTTPException(

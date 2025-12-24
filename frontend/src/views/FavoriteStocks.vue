@@ -25,40 +25,38 @@
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="mb-6 flex items-center gap-4 flex-wrap">
+    <!-- Tabs -->
+    <div class="flex items-center justify-between mb-6 border-b border-gray-700">
       <div class="flex items-center gap-2">
-        <label class="text-sm text-gray-400">分类:</label>
-        <select
-          v-model="filterCategory"
-          @change="loadFavoriteStocks"
-          class="px-3 py-1.5 bg-[#1e293b] border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+        <button
+          @click="activeTab = 'all'"
+          class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+          :class="activeTab === 'all' 
+            ? 'text-blue-400 border-blue-400' 
+            : 'text-gray-400 border-transparent hover:text-gray-300'"
         >
-          <option value="">全部</option>
-          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-        </select>
-      </div>
-      <div class="flex items-center gap-2">
-        <label class="text-sm text-gray-400">标签:</label>
-        <select
-          v-model="filterTag"
-          @change="loadFavoriteStocks"
-          class="px-3 py-1.5 bg-[#1e293b] border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+          全部自选
+        </button>
+        <button
+          v-for="category in categories"
+          :key="category"
+          @click="activeTab = category"
+          class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+          :class="activeTab === category 
+            ? 'text-blue-400 border-blue-400' 
+            : 'text-gray-400 border-transparent hover:text-gray-300'"
         >
-          <option value="">全部</option>
-          <option v-for="tag in tags" :key="tag" :value="tag">{{ tag }}</option>
-        </select>
+          {{ category }}
+        </button>
       </div>
-      <div class="flex items-center gap-2">
-        <label class="text-sm text-gray-400">搜索:</label>
-        <input
-          v-model="searchKeyword"
-          @input="debouncedSearch"
-          type="text"
-          placeholder="股票代码/名称"
-          class="px-3 py-1.5 bg-[#1e293b] border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 w-48"
-        />
-      </div>
+      <button
+        @click="showAnalysisModal = true"
+        class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors font-medium"
+        :disabled="!canAnalyze"
+      >
+        <span class="mr-1">📈</span>
+        批量分析
+      </button>
     </div>
 
     <!-- Loading State -->
@@ -72,10 +70,11 @@
     </div>
 
     <!-- Stock List -->
-    <div v-else-if="favoriteStocks.length > 0" class="flex-1 overflow-y-auto pb-20">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div v-else-if="displayedStocks.length > 0" class="flex-1 overflow-y-auto pb-20">
+      <!-- Card View for "全部自选" -->
+      <div v-if="activeTab === 'all'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
-          v-for="stock in favoriteStocks"
+          v-for="stock in displayedStocks"
           :key="stock.stock_code"
           class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 p-4"
         >
@@ -124,25 +123,25 @@
             </span>
           </div>
 
-          <!-- Concept Plates -->
-          <div v-if="stock.concept_plates && stock.concept_plates.length > 0" class="mb-3 flex flex-wrap gap-1">
+          <!-- Themes -->
+          <div v-if="stock.themes && stock.themes.length > 0" class="mb-3 flex flex-wrap gap-1">
             <span
-              v-for="plate in stock.concept_plates"
-              :key="plate"
+              v-for="theme in stock.themes"
+              :key="theme"
               class="px-2 py-1 text-xs font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30"
             >
-              概念: {{ plate }}
+              概念: {{ theme }}
             </span>
           </div>
 
-          <!-- Industry Plates -->
-          <div v-if="stock.industry_plates && stock.industry_plates.length > 0" class="mb-3 flex flex-wrap gap-1">
+          <!-- Sectors -->
+          <div v-if="stock.sectors && stock.sectors.length > 0" class="mb-3 flex flex-wrap gap-1">
             <span
-              v-for="plate in stock.industry_plates"
-              :key="plate"
+              v-for="sector in stock.sectors"
+              :key="sector"
               class="px-2 py-1 text-xs font-semibold rounded bg-orange-600/20 text-orange-400 border border-orange-600/30"
             >
-              行业: {{ plate }}
+              行业: {{ sector }}
             </span>
           </div>
 
@@ -160,11 +159,192 @@
           </div>
         </div>
       </div>
+
+      <!-- List View for Categories -->
+      <div v-else class="space-y-2">
+        <div
+          v-for="stock in displayedStocks"
+          :key="stock.stock_code"
+          class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 p-4 flex items-center justify-between"
+        >
+          <div class="flex items-center gap-4 flex-1">
+            <div class="flex items-center gap-3">
+              <span class="text-lg font-bold text-white">{{ stock.stock_code }}</span>
+              <span class="text-sm text-gray-400">{{ stock.stock_name || 'N/A' }}</span>
+            </div>
+            <div v-if="stock.tags && stock.tags.length > 0" class="flex flex-wrap gap-1">
+              <span
+                v-for="tag in stock.tags"
+                :key="tag"
+                class="px-2 py-1 text-xs font-semibold rounded bg-purple-600/20 text-purple-400 border border-purple-600/30"
+              >
+                {{ tag }}
+              </span>
+            </div>
+            <div v-if="stock.themes && stock.themes.length > 0" class="flex flex-wrap gap-1">
+              <span
+                v-for="theme in stock.themes"
+                :key="theme"
+                class="px-2 py-1 text-xs font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30"
+              >
+                概念: {{ theme }}
+              </span>
+            </div>
+            <div v-if="stock.sectors && stock.sectors.length > 0" class="flex flex-wrap gap-1">
+              <span
+                v-for="sector in stock.sectors"
+                :key="sector"
+                class="px-2 py-1 text-xs font-semibold rounded bg-orange-600/20 text-orange-400 border border-orange-600/30"
+              >
+                行业: {{ sector }}
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 ml-4">
+            <button
+              @click="openEditModal(stock)"
+              class="text-gray-400 hover:text-blue-400 transition-colors p-1"
+              title="编辑"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              @click="confirmDelete(stock)"
+              class="text-gray-400 hover:text-red-400 transition-colors p-1"
+              title="删除"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Empty State -->
     <div v-else class="flex items-center justify-center py-12">
-      <div class="text-gray-400">暂无自选股记录</div>
+      <div class="text-gray-400">
+        {{ activeTab === 'all' ? '暂无自选股记录' : `分类"${activeTab}"中暂无自选股` }}
+      </div>
+    </div>
+
+    <!-- Analysis Modal -->
+    <div
+      v-if="showAnalysisModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="showAnalysisModal = false"
+    >
+      <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6 w-full max-w-lg">
+        <h2 class="text-xl font-bold text-white mb-4">批量分析</h2>
+
+        <form @submit.prevent="startBatchAnalysis">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1">选择分类 *</label>
+              <div class="space-y-2 max-h-48 overflow-y-auto border border-gray-700 rounded-lg p-2">
+                <label
+                  v-for="category in availableCategories"
+                  :key="category"
+                  class="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
+                >
+                  <input
+                    type="checkbox"
+                    :value="category"
+                    v-model="analysisForm.selectedCategories"
+                    class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                  />
+                  <span class="text-white text-sm">{{ category }}</span>
+                  <span class="text-gray-400 text-xs">({{ getCategoryStockCount(category) }}只)</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1">分析日期</label>
+              <input
+                v-model="analysisForm.analysis_date"
+                type="date"
+                class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1">研究深度</label>
+              <select
+                v-model="analysisForm.research_depth"
+                class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              >
+                <option :value="1">1 - 浅度</option>
+                <option :value="2">2 - 轻度</option>
+                <option :value="3">3 - 中度</option>
+                <option :value="4">4 - 深度</option>
+                <option :value="5">5 - 极深</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1">分析师 *</label>
+              <div class="space-y-2 border border-gray-700 rounded-lg p-2">
+                <label
+                  v-for="analyst in analystOptions"
+                  :key="analyst.value"
+                  class="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
+                >
+                  <input
+                    type="checkbox"
+                    :value="analyst.value"
+                    v-model="analysisForm.analysts"
+                    class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                  />
+                  <span class="text-white text-sm">{{ analyst.label }}</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="analysisForm.include_sentiment"
+                  class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                />
+                <span class="text-white text-sm">包含情感分析</span>
+              </label>
+            </div>
+
+            <div>
+              <label class="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="analysisForm.include_risk_assessment"
+                  class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                />
+                <span class="text-white text-sm">包含风险评估</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 mt-6">
+            <button
+              type="button"
+              @click="showAnalysisModal = false"
+              class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              :disabled="analyzing || analysisForm.selectedCategories.length === 0 || analysisForm.analysts.length === 0"
+              class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ analyzing ? '分析中...' : '开始分析' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Add/Edit Modal -->
@@ -223,9 +403,9 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">概念板块（用逗号分隔）</label>
+              <label class="block text-sm font-medium text-gray-300 mb-1">概念板块（Theme，用逗号分隔）</label>
               <input
-                v-model="conceptPlatesInput"
+                v-model="themesInput"
                 type="text"
                 class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
                 placeholder="例如: 人工智能,新能源,5G"
@@ -233,9 +413,9 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">行业板块（用逗号分隔）</label>
+              <label class="block text-sm font-medium text-gray-300 mb-1">行业板块（Sector，用逗号分隔）</label>
               <input
-                v-model="industryPlatesInput"
+                v-model="sectorsInput"
                 type="text"
                 class="w-full px-3 py-2 bg-[#0f172a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
                 placeholder="例如: 银行,证券,保险"
@@ -312,49 +492,79 @@ import {
   updateFavoriteStock,
   deleteFavoriteStock,
   getFavoriteStocksStatistics,
+  startBatchAnalysisSameParams,
   type FavoriteStock
 } from '../api'
 
 const loading = ref(false)
 const saving = ref(false)
+const analyzing = ref(false)
 const error = ref('')
 const favoriteStocks = ref<FavoriteStock[]>([])
 const totalCount = ref(0)
 
 const showAddModal = ref(false)
 const showEditModal = ref(false)
+const showAnalysisModal = ref(false)
 const stockToDelete = ref<FavoriteStock | null>(null)
 
-const filterCategory = ref('')
-const filterTag = ref('')
-const searchKeyword = ref('')
+const activeTab = ref('all')
+const categories = ref<string[]>([])
+const tags = ref<string[]>([])
+
+const analystOptions = [
+  { value: 'market', label: '市场分析师' },
+  { value: 'fundamentals', label: '基本面分析师' },
+  { value: 'news', label: '新闻分析师' },
+  { value: 'social', label: '社交媒体分析师' },
+]
+
+const analysisForm = reactive({
+  selectedCategories: [] as string[],
+  analysis_date: new Date().toISOString().split('T')[0],
+  research_depth: 3,
+  analysts: ['market', 'fundamentals', 'news'] as string[],
+  include_sentiment: true,
+  include_risk_assessment: true
+})
 
 const formData = reactive({
   stock_code: '',
   stock_name: '',
   category: 'default',
   tags: [] as string[],
-  concept_plates: [] as string[],
-  industry_plates: [] as string[],
+  themes: [] as string[],
+  sectors: [] as string[],
   notes: '无'
 })
 
 const tagsInput = ref('')
-const conceptPlatesInput = ref('')
-const industryPlatesInput = ref('')
+const themesInput = ref('')
+const sectorsInput = ref('')
 
-const categories = ref<string[]>([])
-const tags = ref<string[]>([])
-
-// 防抖搜索
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
-const debouncedSearch = () => {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
+// 计算属性：根据activeTab过滤显示的股票
+const displayedStocks = computed(() => {
+  if (activeTab.value === 'all') {
+    return favoriteStocks.value
   }
-  searchTimeout = setTimeout(() => {
-    loadFavoriteStocks()
-  }, 500)
+  return favoriteStocks.value.filter(stock => stock.category === activeTab.value)
+})
+
+// 计算属性：可用的分类列表（包括"全部自选"）
+const availableCategories = computed(() => {
+  return categories.value.filter(cat => cat !== 'default')
+})
+
+// 计算属性：是否可以进行分析（至少有一个分类有股票）
+const canAnalyze = computed(() => {
+  return availableCategories.value.some(cat => {
+    return favoriteStocks.value.some(stock => stock.category === cat)
+  })
+})
+
+// 获取分类中的股票数量
+const getCategoryStockCount = (category: string) => {
+  return favoriteStocks.value.filter(stock => stock.category === category).length
 }
 
 const formatDate = (dateStr?: string) => {
@@ -377,30 +587,12 @@ const loadFavoriteStocks = async () => {
       skip: 0
     }
 
-    if (filterCategory.value) {
-      params.category = filterCategory.value
-    }
-
-    if (filterTag.value) {
-      params.tag = filterTag.value
-    }
-
     const response = await getFavoriteStocks(params)
     if (response.success && response.data) {
-      let stocks = response.data
-
-      // 客户端搜索过滤
-      if (searchKeyword.value) {
-        const keyword = searchKeyword.value.toLowerCase()
-        stocks = stocks.filter(
-          (stock: FavoriteStock) =>
-            stock.stock_code?.toLowerCase().includes(keyword) ||
-            stock.stock_name?.toLowerCase().includes(keyword)
-        )
-      }
-
-      favoriteStocks.value = stocks
-      totalCount.value = response.total || stocks.length
+      favoriteStocks.value = response.data
+      totalCount.value = response.total || response.data.length
+      // 加载完股票后，更新分类列表
+      await loadStatistics()
     } else {
       error.value = response.message || '加载失败'
     }
@@ -416,11 +608,38 @@ const loadStatistics = async () => {
     const response = await getFavoriteStocksStatistics()
     if (response.success && response.data) {
       // 提取分类和标签列表
-      categories.value = Object.keys(response.data.category_stats || {})
+      const categoryKeys = Object.keys(response.data.category_stats || {})
+      // 确保包含所有实际存在的分类（从股票数据中提取）
+      const allCategories = new Set<string>()
+      favoriteStocks.value.forEach(stock => {
+        if (stock.category && stock.category !== 'default') {
+          allCategories.add(stock.category)
+        }
+      })
+      // 合并统计中的分类和实际数据中的分类
+      categoryKeys.forEach(cat => allCategories.add(cat))
+      categories.value = Array.from(allCategories)
       tags.value = Object.keys(response.data.tag_stats || {})
+    } else {
+      // 如果统计接口失败，从股票数据中提取分类
+      const allCategories = new Set<string>()
+      favoriteStocks.value.forEach(stock => {
+        if (stock.category && stock.category !== 'default') {
+          allCategories.add(stock.category)
+        }
+      })
+      categories.value = Array.from(allCategories)
     }
   } catch (e) {
     console.error('加载统计信息失败:', e)
+    // 如果统计接口失败，从股票数据中提取分类
+    const allCategories = new Set<string>()
+    favoriteStocks.value.forEach(stock => {
+      if (stock.category && stock.category !== 'default') {
+        allCategories.add(stock.category)
+      }
+    })
+    categories.value = Array.from(allCategories)
   }
 }
 
@@ -429,12 +648,12 @@ const openEditModal = (stock: FavoriteStock) => {
   formData.stock_name = stock.stock_name || ''
   formData.category = stock.category || 'default'
   formData.tags = stock.tags || []
-  formData.concept_plates = stock.concept_plates || []
-  formData.industry_plates = stock.industry_plates || []
+  formData.themes = stock.themes || []
+  formData.sectors = stock.sectors || []
   formData.notes = stock.notes || '无'
   tagsInput.value = (stock.tags || []).join(',')
-  conceptPlatesInput.value = (stock.concept_plates || []).join(',')
-  industryPlatesInput.value = (stock.industry_plates || []).join(',')
+  themesInput.value = (stock.themes || []).join(',')
+  sectorsInput.value = (stock.sectors || []).join(',')
   showEditModal.value = true
 }
 
@@ -450,12 +669,12 @@ const resetForm = () => {
   formData.stock_name = ''
   formData.category = 'default'
   formData.tags = []
-  formData.concept_plates = []
-  formData.industry_plates = []
+  formData.themes = []
+  formData.sectors = []
   formData.notes = '无'
   tagsInput.value = ''
-  conceptPlatesInput.value = ''
-  industryPlatesInput.value = ''
+  themesInput.value = ''
+  sectorsInput.value = ''
 }
 
 const saveStock = async () => {
@@ -469,25 +688,25 @@ const saveStock = async () => {
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0)
 
-    // 处理概念板块
-    const conceptPlates = conceptPlatesInput.value
+    // 处理概念板块（Theme）
+    const themes = themesInput.value
       .split(',')
-      .map(plate => plate.trim())
-      .filter(plate => plate.length > 0)
+      .map(theme => theme.trim())
+      .filter(theme => theme.length > 0)
 
-    // 处理行业板块
-    const industryPlates = industryPlatesInput.value
+    // 处理行业板块（Sector）
+    const sectors = sectorsInput.value
       .split(',')
-      .map(plate => plate.trim())
-      .filter(plate => plate.length > 0)
+      .map(sector => sector.trim())
+      .filter(sector => sector.length > 0)
 
     const stockData: any = {
       stock_code: formData.stock_code,
       stock_name: formData.stock_name || undefined,
       category: formData.category || 'default',
       tags: tags,
-      concept_plates: conceptPlates,
-      industry_plates: industryPlates,
+      themes: themes,
+      sectors: sectors,
       notes: formData.notes || '无'
     }
 
@@ -543,9 +762,68 @@ const deleteStock = async () => {
   }
 }
 
+const startBatchAnalysis = async () => {
+  if (analysisForm.selectedCategories.length === 0 || analysisForm.analysts.length === 0) {
+    error.value = '请至少选择一个分类和分析师'
+    return
+  }
+
+  analyzing.value = true
+  error.value = ''
+
+  try {
+    // 收集所有选中分类的股票代码，去重
+    const stockCodesSet = new Set<string>()
+    analysisForm.selectedCategories.forEach(category => {
+      favoriteStocks.value
+        .filter(stock => stock.category === category)
+        .forEach(stock => {
+          if (stock.stock_code) {
+            stockCodesSet.add(stock.stock_code)
+          }
+        })
+    })
+
+    const stockSymbols = Array.from(stockCodesSet)
+
+    if (stockSymbols.length === 0) {
+      error.value = '选中的分类中没有股票'
+      analyzing.value = false
+      return
+    }
+
+    // 调用批量分析接口
+    const response = await startBatchAnalysisSameParams({
+      stock_symbols: stockSymbols,
+      market_type: 'A股',
+      analysis_date: analysisForm.analysis_date || undefined,
+      analysts: analysisForm.analysts,
+      research_depth: analysisForm.research_depth,
+      include_sentiment: analysisForm.include_sentiment,
+      include_risk_assessment: analysisForm.include_risk_assessment
+    })
+
+    // 显示成功消息
+    alert(`批量分析已启动！\n总计: ${response.total}只股票\n成功: ${response.success_count}只\n失败: ${response.failed_count}只`)
+    
+    // 关闭弹窗
+    showAnalysisModal.value = false
+    
+    // 重置表单
+    analysisForm.selectedCategories = []
+    analysisForm.analysts = ['market', 'fundamentals', 'news']
+    analysisForm.research_depth = 3
+    analysisForm.include_sentiment = true
+    analysisForm.include_risk_assessment = true
+  } catch (e: any) {
+    error.value = e.message || '批量分析启动失败'
+  } finally {
+    analyzing.value = false
+  }
+}
+
 onMounted(() => {
   loadFavoriteStocks()
-  loadStatistics()
 })
 </script>
 

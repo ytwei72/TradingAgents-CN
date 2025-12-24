@@ -64,6 +64,38 @@ export const stopAnalysis = async (analysisId: string) => {
   return response.data;
 };
 
+// Batch Analysis API
+export interface BatchSameParamsRequest {
+  stock_symbols: string[];
+  market_type: string;
+  analysis_date?: string;
+  analysts: string[];
+  research_depth: number;
+  include_sentiment?: boolean;
+  include_risk_assessment?: boolean;
+  custom_prompt?: string;
+  extra_config?: Record<string, any>;
+}
+
+export interface BatchTaskResult {
+  stock_symbol: string;
+  analysis_id: string;
+  status: string;
+  message: string;
+}
+
+export interface BatchAnalysisResponse {
+  total: number;
+  success_count: number;
+  failed_count: number;
+  tasks: BatchTaskResult[];
+}
+
+export const startBatchAnalysisSameParams = async (data: BatchSameParamsRequest): Promise<BatchAnalysisResponse> => {
+  const response = await api.post<BatchAnalysisResponse>('/analysis/start/batch-same-params', data);
+  return response.data;
+};
+
 export const getPlannedSteps = async (analysisId: string) => {
   const response = await api.get<any>(`/analysis/${analysisId}/planned_steps`);
   return response.data;
@@ -478,8 +510,8 @@ export interface FavoriteStock {
   market_type?: string;
   category?: string;
   tags?: string[];
-  concept_plates?: string[];
-  industry_plates?: string[];
+  themes?: string[];
+  sectors?: string[];
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -515,8 +547,8 @@ export interface FavoriteStockCreateRequest {
   market_type?: string;
   category?: string;
   tags?: string[];
-  concept_plates?: string[];
-  industry_plates?: string[];
+  themes?: string[];
+  sectors?: string[];
   notes?: string;
 }
 
@@ -525,8 +557,8 @@ export interface FavoriteStockUpdateRequest {
   market_type?: string;
   category?: string;
   tags?: string[];
-  concept_plates?: string[];
-  industry_plates?: string[];
+  themes?: string[];
+  sectors?: string[];
   notes?: string;
 }
 
