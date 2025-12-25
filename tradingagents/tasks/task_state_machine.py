@@ -65,6 +65,10 @@ class TaskStateMachine:
         self.redis_client = None
         self.use_redis = self._init_redis()
         
+        # 初始化MongoDB连接
+        self.mongo_helper = None
+        self.use_mongo = self._init_mongo()
+        
         if not self.use_redis:
             # 使用文件存储
             self.storage_dir = Path("./data/task_states")
@@ -73,7 +77,15 @@ class TaskStateMachine:
         # 尝试加载现有状态
         self._load_state()
         
-        logger.debug(f"📊 [任务状态机] 初始化完成: {task_id}, 存储方式: {'Redis' if self.use_redis else '文件'}")
+        storage_modes = []
+        if self.use_redis:
+            storage_modes.append('Redis')
+        if self.use_mongo:
+            storage_modes.append('MongoDB')
+        if not storage_modes:
+            storage_modes.append('文件')
+        
+        logger.debug(f"📊 [任务状态机] 初始化完成: {task_id}, 存储方式: {', '.join(storage_modes)}")
     
     def _init_redis(self) -> bool:
         """初始化 Redis 连接（使用统一的连接管理）"""
@@ -99,6 +111,22 @@ class TaskStateMachine:
         except Exception as e:
             logger.warning(f"📊 [任务状态机] Redis 连接失败，使用文件存储: {e}")
             return False
+    
+    def _init_mongo(self) -> bool:
+        """初始化 MongoDB 连接（使用统一的连接管理）"""
+        try:
+            from tradingagents.storage.mongodb.tasks_state_machine_helper import tasks_state_machine_helper
+            
+            if not tasks_state_machine_helper.connected:
+                logger.warning(f"📊 [任务状态机] MongoDB 连接不可用")
+                return False
+            
+            self.mongo_helper = tasks_state_machine_helper
+            logger.info(f"📊 [任务状态机] MongoDB 连接成功（使用统一连接管理）")
+            return True
+        except Exception as e:
+            logger.warning(f"📊 [任务状态机] MongoDB 连接失败: {e}")
+            return False
             
     def _load_state(self):
         """加载状态"""
@@ -120,6 +148,20 @@ class TaskStateMachine:
         
         now = datetime.now().isoformat()
         self._step_start_time = time.time()  # 记录步骤开始时间
+        
+        # 0. 检查并填充company_name（如果缺失且存在stock_symbol）
+        if 'company_name' not in task_params or not task_params.get('company_name'):
+            stock_symbol = task_params.get('stock_symbol')
+            if stock_symbol:
+                try:
+                    from tradingagents.storage.mongodb.stock_dict_manager import stock_dict_manager
+                    if stock_dict_manager and stock_dict_manager.connected:
+                        company_name = stock_dict_manager.get_company_name(stock_symbol)
+                        if company_name:
+                            task_params['company_name'] = company_name
+                            logger.debug(f"📊 [任务初始化] 自动填充公司名称: {stock_symbol} -> {company_name}")
+                except Exception as e:
+                    logger.warning(f"📊 [任务初始化] 获取公司名称失败: {e}")
         
         # 1. 初始化任务对象
         self.task_props = {
@@ -512,13 +554,29 @@ class TaskStateMachine:
     def _save_data(self, key_suffix: str, data: Any):
         """保存数据通用方法（会自动清洗为可 JSON 序列化的结构）"""
         safe_data = self._make_json_safe(data)
+        
+        # 1. 保存到 Redis
         if self.use_redis:
             try:
                 key = f"task:{self.task_id}:{key_suffix}"
                 self.redis_client.set(key, json.dumps(safe_data, ensure_ascii=False))
             except Exception as e:
                 logger.error(f"📊 [存储错误] Redis保存失败 ({key_suffix}): {e}")
-        else:
+        
+        # 2. 保存到 MongoDB（JSON格式，不转换为字符串）
+        if self.use_mongo:
+            try:
+                # 直接使用 safe_data（已经是字典格式），不转换为字符串
+                self.mongo_helper.update(
+                    task_id=self.task_id,
+                    task_sub_state=key_suffix,
+                    data=safe_data
+                )
+            except Exception as e:
+                logger.error(f"📊 [存储错误] MongoDB保存失败 ({key_suffix}): {e}")
+        
+        # 3. 如果 Redis 和 MongoDB 都不可用，使用文件存储
+        if not self.use_redis and not self.use_mongo:
             try:
                 file_path = self.storage_dir / f"{self.task_id}_{key_suffix}.json"
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -527,22 +585,52 @@ class TaskStateMachine:
                 logger.error(f"📊 [存储错误] 文件保存失败 ({key_suffix}): {e}")
 
     def _load_data(self, key_suffix: str) -> Any:
-        """加载数据通用方法"""
+        """加载数据通用方法
+        先尝试从 Redis 获取并解析 JSON，如果成功则直接返回
+        如果失败则尝试用 task_id 和 task_sub_state 从 MongoDB 查询
+        都查询不到，则返回 None
+        """
+        # 1. 先尝试从 Redis 获取
         if self.use_redis:
             try:
                 key = f"task:{self.task_id}:{key_suffix}"
                 data = self.redis_client.get(key)
-                return json.loads(data) if data else None
+                if data:
+                    parsed_data = json.loads(data)
+                    return parsed_data
+            except json.JSONDecodeError as e:
+                logger.warning(f"📊 [存储警告] Redis数据JSON解析失败 ({key_suffix}): {e}，尝试从MongoDB加载")
             except Exception as e:
-                logger.error(f"📊 [存储错误] Redis加载失败 ({key_suffix}): {e}")
-                return None
-        else:
+                logger.warning(f"📊 [存储警告] Redis加载失败 ({key_suffix}): {e}，尝试从MongoDB加载")
+        
+        # 2. 如果 Redis 获取失败，尝试从 MongoDB 查询
+        if self.use_mongo:
+            try:
+                data = self.mongo_helper.find_one(
+                    task_id=self.task_id,
+                    task_sub_state=key_suffix
+                )
+                if data is not None:
+                    # 如果从 MongoDB 获取到数据，同时更新到 Redis（如果可用）
+                    if self.use_redis:
+                        try:
+                            key = f"task:{self.task_id}:{key_suffix}"
+                            self.redis_client.set(key, json.dumps(data, ensure_ascii=False))
+                        except Exception:
+                            pass  # Redis 更新失败不影响返回数据
+                    return data
+            except Exception as e:
+                logger.warning(f"📊 [存储警告] MongoDB加载失败 ({key_suffix}): {e}")
+        
+        # 3. 如果 Redis 和 MongoDB 都不可用或都失败，尝试从文件加载
+        if not self.use_redis and not self.use_mongo:
             try:
                 file_path = self.storage_dir / f"{self.task_id}_{key_suffix}.json"
                 if file_path.exists():
                     with open(file_path, 'r', encoding='utf-8') as f:
                         return json.load(f)
-                return None
             except Exception as e:
                 logger.error(f"📊 [存储错误] 文件加载失败 ({key_suffix}): {e}")
-                return None
+        
+        # 4. 都查询不到，返回 None
+        return None

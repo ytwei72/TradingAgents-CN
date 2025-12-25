@@ -8,7 +8,7 @@ import OperationLogsView from '../views/TaskRunLogsOld.vue'
 import TaskRunLogsView from '../views/TaskRunLogs.vue'
 import BacktestView from '../views/Backtest.vue'
 import BatchBacktestView from '../views/BatchBacktest.vue'
-import CacheManagementView from '../views/CacheManagement.vue'
+import TaskMonitoringView from '../views/TaskMonitoring.vue'
 import FavoriteStocksView from '../views/FavoriteStocks.vue'
 
 const routes: Array<RouteRecordRaw> = [
@@ -58,9 +58,9 @@ const routes: Array<RouteRecordRaw> = [
     component: BatchBacktestView
   },
   {
-    path: '/cache-management',
-    name: 'CacheManagement',
-    component: CacheManagementView
+    path: '/task-monitoring',
+    name: 'TaskMonitoring',
+    component: TaskMonitoringView
   },
   {
     path: '/favorite-stocks',

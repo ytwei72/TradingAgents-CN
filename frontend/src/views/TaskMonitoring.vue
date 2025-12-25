@@ -9,7 +9,7 @@
     
     <!-- Left Sidebar: Search Filters -->
     <aside class="w-72 flex-shrink-0">
-      <h1 class="text-2xl font-bold text-white mb-6">缓存管理</h1>
+      <h1 class="text-2xl font-bold text-white mb-6">任务监测</h1>
       <div class="bg-[#1e293b] rounded-lg border border-gray-700 p-6 sticky top-0">
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-lg font-bold text-white">筛选条件</h2>
@@ -116,7 +116,7 @@
             总数: {{ totalCount }}
           </span>
           <button
-            @click="loadCacheList"
+            @click="loadTaskList"
             class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors font-medium"
             :disabled="loading"
           >
@@ -129,7 +129,7 @@
       <div class="flex-1 flex flex-col min-h-0 relative">
         <div class="flex-1 overflow-y-auto">
           <!-- Loading State -->
-          <div v-if="loading && cacheList.length === 0" class="flex items-center justify-center py-12">
+          <div v-if="loading && taskList.length === 0" class="flex items-center justify-center py-12">
             <div class="text-gray-400">加载中...</div>
           </div>
 
@@ -138,11 +138,11 @@
             {{ error }}
           </div>
 
-          <!-- Cache List -->
-          <div v-else-if="cacheList.length > 0" class="pb-20">
+          <!-- Task List -->
+          <div v-else-if="taskList.length > 0" class="pb-20">
       <div class="grid grid-cols-2 gap-4">
         <div
-          v-for="item in cacheList"
+          v-for="item in taskList"
           :key="item.task_id"
           class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 flex flex-col"
           :class="expandedItems.has(item.task_id) ? 'h-[600px]' : ''"
@@ -194,7 +194,7 @@
               <button
                 @click.stop="openModalExDirectly(item)"
                 class="text-gray-400 hover:text-blue-400 transition-colors p-1"
-                title="放大查看缓存详情"
+                title="放大查看任务详情"
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -223,14 +223,14 @@
         <div v-else class="p-4 flex flex-col flex-1 min-h-0">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-white">
-              缓存详情：{{ item.company_name || 'N/A' }}（{{ item.stock_symbol || 'N/A' }}）
+              任务详情：{{ item.company_name || 'N/A' }}（{{ item.stock_symbol || 'N/A' }}）
             </h3>
             <div class="flex items-center gap-2">
               <button
-                v-if="cacheDetails[item.task_id]"
-                @click="openModalEx(item, cacheDetails[item.task_id])"
+                v-if="taskDetails[item.task_id]"
+                @click="openModalEx(item, taskDetails[item.task_id])"
                 class="text-gray-400 hover:text-blue-400 transition-colors p-1"
-                title="放大查看缓存详情"
+                title="放大查看任务详情"
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -272,23 +272,23 @@
           <div v-else-if="detailErrors[item.task_id]" class="text-red-400 py-4 flex-1 flex items-center justify-center">
             {{ detailErrors[item.task_id] }}
           </div>
-          <div v-else-if="cacheDetails[item.task_id]" class="flex-1 flex flex-col min-h-0">
+          <div v-else-if="taskDetails[item.task_id]" class="flex-1 flex flex-col min-h-0">
             <!-- Current Step Tab -->
             <div v-show="activeTabs[item.task_id] === 'current_step'" class="flex-1 flex flex-col min-h-0">
               <div class="flex-1 overflow-hidden min-h-0">
-                <JsonViewer :data="cacheDetails[item.task_id]?.current_step" :max-height="'100%'" :show-search="false" />
+                <JsonViewer :data="taskDetails[item.task_id]?.current_step" :max-height="'100%'" :show-search="false" />
               </div>
             </div>
             <!-- History Tab -->
             <div v-show="activeTabs[item.task_id] === 'history'" class="flex-1 flex flex-col min-h-0">
               <div class="flex-1 overflow-hidden min-h-0">
-                <JsonViewer :data="cacheDetails[item.task_id]?.history" :max-height="'100%'" :show-search="false" />
+                <JsonViewer :data="taskDetails[item.task_id]?.history" :max-height="'100%'" :show-search="false" />
               </div>
             </div>
             <!-- Props Tab -->
             <div v-show="activeTabs[item.task_id] === 'props'" class="flex-1 flex flex-col min-h-0">
               <div class="flex-1 overflow-hidden min-h-0">
-                <JsonViewer :data="cacheDetails[item.task_id]?.props" :max-height="'100%'" :show-search="false" />
+                <JsonViewer :data="taskDetails[item.task_id]?.props" :max-height="'100%'" :show-search="false" />
               </div>
             </div>
           </div>
@@ -302,14 +302,14 @@
 
           <!-- Empty State -->
           <div v-else class="bg-[#1e293b] rounded-lg border border-gray-700 p-12 text-center">
-            <div class="text-gray-400 text-lg">暂无缓存记录</div>
+            <div class="text-gray-400 text-lg">暂无任务记录</div>
           </div>
         </div>
 
         <!-- Floating Pagination -->
         <div v-if="totalPages > 1" class="sticky bottom-0 bg-[#0f172a] border-t border-gray-700 px-6 py-4 flex items-center justify-center gap-4">
           <button
-            @click="currentPage = Math.max(1, currentPage - 1); loadCacheList()"
+            @click="currentPage = Math.max(1, currentPage - 1); loadTaskList()"
             :disabled="currentPage === 1"
             class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -319,7 +319,7 @@
             第 {{ currentPage }} / {{ totalPages }} 页
           </span>
           <button
-            @click="currentPage = Math.min(totalPages, currentPage + 1); loadCacheList()"
+            @click="currentPage = Math.min(totalPages, currentPage + 1); loadTaskList()"
             :disabled="currentPage === totalPages"
             class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -333,14 +333,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { getCacheList, getCacheDetail, type CacheListItem, type CacheDetailData } from '../api'
+import { getTaskList, getTaskDetail, type TaskListItem, type TaskDetailData } from '../api'
 import JsonViewer from '../components/JsonViewer.vue'
 import CacheDetailsModalDlgEx from '../components/CacheDetailsModalDlgEx.vue'
 import DateRangePicker from '../components/DateRangePicker.vue'
 
 const loading = ref(false)
 const error = ref('')
-const cacheList = ref<CacheListItem[]>([])
+const taskList = ref<TaskListItem[]>([])
 const totalCount = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
@@ -366,13 +366,13 @@ const onAnalysisDateChange = () => {
 
 const expandedItems = ref<Set<string>>(new Set())
 const activeTabs = reactive<Record<string, string>>({})
-const cacheDetails = reactive<Record<string, CacheDetailData>>({})
+const taskDetails = reactive<Record<string, TaskDetailData>>({})
 const loadingDetails = reactive<Record<string, boolean>>({})
 const detailErrors = reactive<Record<string, string>>({})
 
 // 扩展模态框相关
 const showModalEx = ref(false)
-const modalCacheInfo = ref<CacheListItem>({
+const modalCacheInfo = ref<TaskListItem>({
   task_id: '',
   status: '',
   created_at: undefined,
@@ -381,7 +381,7 @@ const modalCacheInfo = ref<CacheListItem>({
   stock_symbol: undefined,
   company_name: undefined
 })
-const modalCacheData = ref<CacheDetailData>({})
+const modalCacheData = ref<TaskDetailData>({})
 
 const tabs = [
   { key: 'current_step', label: 'Current Step' },
@@ -423,7 +423,7 @@ const formatDate = (dateStr?: string) => {
   }
 }
 
-const openModalEx = (item: CacheListItem, detailData: CacheDetailData) => {
+const openModalEx = (item: TaskListItem, detailData: TaskDetailData) => {
   modalCacheInfo.value = { ...item }
   modalCacheData.value = { 
     current_step: detailData?.current_step ?? null,
@@ -433,14 +433,14 @@ const openModalEx = (item: CacheListItem, detailData: CacheDetailData) => {
   showModalEx.value = true
 }
 
-const openModalExDirectly = async (item: CacheListItem) => {
+const openModalExDirectly = async (item: TaskListItem) => {
   // 如果数据还没加载，先加载
-  if (!cacheDetails[item.task_id]) {
-    await loadCacheDetail(item.task_id)
+  if (!taskDetails[item.task_id]) {
+    await loadTaskDetail(item.task_id)
   }
   // 打开扩展模态框
-  if (cacheDetails[item.task_id]) {
-    openModalEx(item, cacheDetails[item.task_id])
+  if (taskDetails[item.task_id]) {
+    openModalEx(item, taskDetails[item.task_id])
   }
 }
 
@@ -454,38 +454,38 @@ const toggleExpand = async (taskId: string) => {
       activeTabs[taskId] = 'current_step'
     }
     // 加载详细信息
-    if (!cacheDetails[taskId]) {
-      await loadCacheDetail(taskId)
+    if (!taskDetails[taskId]) {
+      await loadTaskDetail(taskId)
     }
   }
 }
 
-const loadCacheDetail = async (taskId: string) => {
+const loadTaskDetail = async (taskId: string) => {
   loadingDetails[taskId] = true
   delete detailErrors[taskId]
   
   try {
-    const response = await getCacheDetail(taskId)
+    const response = await getTaskDetail(taskId)
     if (response.success) {
       // 确保数据结构正确
-      cacheDetails[taskId] = {
+      taskDetails[taskId] = {
         current_step: response.data.current_step ?? null,
         history: response.data.history ?? null,
         props: response.data.props ?? null
       }
-      console.log('缓存详情数据:', cacheDetails[taskId])
+      console.log('任务详情数据:', taskDetails[taskId])
     } else {
       detailErrors[taskId] = response.message || '加载失败'
     }
   } catch (e: any) {
     detailErrors[taskId] = e.message || '加载失败'
-    console.error('加载缓存详情失败:', e)
+    console.error('加载任务详情失败:', e)
   } finally {
     loadingDetails[taskId] = false
   }
 }
 
-const loadCacheList = async () => {
+const loadTaskList = async () => {
   loading.value = true
   error.value = ''
   
@@ -499,13 +499,13 @@ const loadCacheList = async () => {
     if (filters.value.company_name) filterParams.company_name = filters.value.company_name
     
     // 加载列表（带筛选）
-    const listResponse = await getCacheList(
+    const listResponse = await getTaskList(
       currentPage.value,
       pageSize.value,
       Object.keys(filterParams).length > 0 ? filterParams : undefined
     )
     if (listResponse.success) {
-      cacheList.value = listResponse.data
+      taskList.value = listResponse.data
       totalPages.value = listResponse.pages
       totalCount.value = listResponse.total  // 使用筛选后的总数
     } else {
@@ -522,7 +522,7 @@ const applyFilters = () => {
   // 重置到第一页
   currentPage.value = 1
   // 加载数据
-  loadCacheList()
+  loadTaskList()
 }
 
 const resetFilters = () => {
@@ -536,11 +536,11 @@ const resetFilters = () => {
   analysisDateEnd.value = ''
   analysisDateDays.value = null
   currentPage.value = 1
-  loadCacheList()
+  loadTaskList()
 }
 
 onMounted(() => {
-  loadCacheList()
+  loadTaskList()
 })
 </script>
 

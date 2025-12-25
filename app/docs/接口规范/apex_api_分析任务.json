@@ -518,6 +518,303 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "任务管理",
+			"item": [
+				{
+					"name": "获取任务总数",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"count"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "获取任务总数--按状态筛选",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/count?status=completed",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"count"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "completed"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "获取任务总数--按股票代码筛选",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/count?stock_symbol=603296",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"count"
+							],
+							"query": [
+								{
+									"key": "stock_symbol",
+									"value": "603296"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "获取任务总数--组合筛选",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/count?status=completed&stock_symbol=603296",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"count"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "completed"
+								},
+								{
+									"key": "stock_symbol",
+									"value": "603296"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "分页查询任务列表",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/list?page=1&page_size=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"list"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "分页查询任务列表--按状态筛选",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/list?page=1&page_size=10&status=completed",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"list"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								},
+								{
+									"key": "status",
+									"value": "completed"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "分页查询任务列表--按股票代码筛选",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/list?page=1&page_size=10&stock_symbol=603296",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"list"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								},
+								{
+									"key": "stock_symbol",
+									"value": "603296"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "分页查询任务列表--按公司名称筛选",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/list?page=1&page_size=10&company_name=华勤",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"list"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								},
+								{
+									"key": "company_name",
+									"value": "华勤"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "分页查询任务列表--组合筛选",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/list?page=1&page_size=10&status=completed&stock_symbol=603296",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"list"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								},
+								{
+									"key": "status",
+									"value": "completed"
+								},
+								{
+									"key": "stock_symbol",
+									"value": "603296"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "获取任务详细信息",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/analysis/management/{{analysis_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"analysis",
+								"management",
+								"{{analysis_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [

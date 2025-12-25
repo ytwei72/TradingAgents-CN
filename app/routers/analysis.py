@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
 import datetime
 import asyncio
+import time
 
 from tradingagents.tasks import get_task_manager, TaskStatus
 from tradingagents.utils.logging_manager import get_logger
+from tradingagents.storage.mongodb.tasks_state_machine_helper import tasks_state_machine_helper
 
 
 router = APIRouter()
@@ -334,3 +336,220 @@ async def get_planned_steps(analysis_id: str):
         total_steps=len(steps),
         steps=steps
     )
+
+
+# ==================== 任务管理类 ====================
+
+class TaskCountResponse(BaseModel):
+    """任务总数响应"""
+    success: bool
+    total: int
+    message: str
+
+
+class TaskListItem(BaseModel):
+    """任务列表项"""
+    task_id: str
+    status: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    analysis_date: Optional[str] = None
+    stock_symbol: Optional[str] = None
+    company_name: Optional[str] = None
+
+
+class TaskListResponse(BaseModel):
+    """任务列表响应"""
+    success: bool
+    data: List[TaskListItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    message: str
+
+
+class TaskDetailResponse(BaseModel):
+    """任务详细信息响应"""
+    success: bool
+    data: Dict[str, Any]
+    message: str
+
+
+@router.get("/management/count", response_model=TaskCountResponse)
+async def get_task_count(
+    task_id: Optional[str] = Query(None, description="任务ID筛选（支持部分匹配）"),
+    analysis_date: Optional[str] = Query(None, description="分析日期筛选（精确匹配）"),
+    status: Optional[str] = Query(None, description="运行状态筛选（精确匹配）"),
+    stock_symbol: Optional[str] = Query(None, description="股票代码筛选（支持部分匹配）"),
+    company_name: Optional[str] = Query(None, description="公司名称筛选（支持部分匹配）")
+):
+    """
+    获取任务总数（支持筛选）
+    
+    返回MongoDB中所有任务的数量，支持多种筛选条件。
+    """
+    try:
+        if not tasks_state_machine_helper.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="MongoDB不可用，请检查MongoDB配置"
+            )
+        
+        # 直接使用helper的get_task_count方法，支持company_name筛选
+        total = tasks_state_machine_helper.get_task_count(
+            task_id=task_id,
+            analysis_date=analysis_date,
+            status=status,
+            stock_symbol=stock_symbol,
+            company_name=company_name
+        )
+        
+        return TaskCountResponse(
+            success=True,
+            total=total,
+            message="获取成功"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取任务总数失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取任务总数失败: {str(e)}"
+        )
+
+
+@router.get("/management/list", response_model=TaskListResponse)
+async def get_task_list(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    task_id: Optional[str] = Query(None, description="任务ID筛选（支持部分匹配）"),
+    analysis_date: Optional[str] = Query(None, description="分析日期筛选（精确匹配）"),
+    status: Optional[str] = Query(None, description="运行状态筛选（精确匹配）"),
+    stock_symbol: Optional[str] = Query(None, description="股票代码筛选（支持部分匹配）"),
+    company_name: Optional[str] = Query(None, description="公司名称筛选（支持部分匹配）")
+):
+    """
+    分页查询任务列表（支持筛选）
+    
+    返回包含task_id、status、created_at、updated_at、analysis_date、stock_symbol、company_name的列表
+    
+    筛选参数说明：
+    - task_id: 任务ID筛选，支持部分匹配（不区分大小写）
+    - analysis_date: 分析日期筛选，精确匹配
+    - status: 运行状态筛选，精确匹配（如：completed, running, pending, failed等）
+    - stock_symbol: 股票代码筛选，支持部分匹配（不区分大小写）
+    - company_name: 公司名称筛选，支持部分匹配（不区分大小写）
+    """
+    start_time = time.time()
+    logger.info(f"[任务列表查询] 开始处理请求 - page={page}, page_size={page_size}, "
+                f"filters={{task_id={task_id}, analysis_date={analysis_date}, status={status}, "
+                f"stock_symbol={stock_symbol}, company_name={company_name}}}")
+    
+    try:
+        step_start = time.time()
+        if not tasks_state_machine_helper.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="MongoDB不可用，请检查MongoDB配置"
+            )
+        logger.info(f"[任务列表查询] MongoDB连接检查完成，耗时: {time.time() - step_start:.3f}秒")
+        
+        # 直接使用helper的get_task_list方法，支持company_name筛选
+        step_start = time.time()
+        result = tasks_state_machine_helper.get_task_list(
+            page=page,
+            page_size=page_size,
+            task_id=task_id,
+            analysis_date=analysis_date,
+            status=status,
+            stock_symbol=stock_symbol,
+            company_name=company_name
+        )
+        logger.info(f"[任务列表查询] 从MongoDB获取任务列表完成，获取到 {len(result['items'])} 条记录，总记录数: {result['total']}，耗时: {time.time() - step_start:.3f}秒")
+        
+        # 处理返回的数据，直接使用返回的company_name字段
+        step_start = time.time()
+        task_list = []
+        for item in result["items"]:
+            task_list.append(TaskListItem(
+                task_id=item.get("task_id"),
+                status=item.get('status', 'unknown'),
+                created_at=item.get('created_at'),
+                updated_at=item.get('updated_at'),
+                analysis_date=item.get('analysis_date'),
+                stock_symbol=item.get('stock_symbol'),
+                company_name=item.get('company_name')
+            ))
+        logger.info(f"[任务列表查询] 数据转换完成，耗时: {time.time() - step_start:.3f}秒")
+        
+        total_time = time.time() - start_time
+        logger.info(f"[任务列表查询] 请求处理完成，总耗时: {total_time:.3f}秒，返回 {len(task_list)} 条记录")
+        
+        return TaskListResponse(
+            success=True,
+            data=task_list,
+            total=result["total"],
+            page=result["page"],
+            page_size=result["page_size"],
+            pages=result["pages"],
+            message="获取成功"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(f"[任务列表查询] 请求处理失败，总耗时: {total_time:.3f}秒，错误: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取任务列表失败: {str(e)}"
+        )
+
+
+@router.get("/management/{analysis_id}", response_model=TaskDetailResponse)
+async def get_task_detail(analysis_id: str):
+    """
+    根据analysis_id获取任务的详细信息
+    
+    返回包含current_step、history、props的完整信息
+    每个字段值最多显示50个字符，多余的用省略号表示
+    """
+    try:
+        if not tasks_state_machine_helper.connected:
+            raise HTTPException(
+                status_code=500,
+                detail="MongoDB不可用，请检查MongoDB配置"
+            )
+        
+        # 调用封装的方法获取任务详情
+        # 指定要获取的子键和截断长度
+        result = tasks_state_machine_helper.get_task_detail(
+            task_id=analysis_id,
+            sub_keys=["current_step", "history", "props"],
+            truncate_length=50
+        )
+        
+        # 如果所有数据都不存在，返回404
+        if not any(v for v in result.values() if v is not None):
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到analysis_id为{analysis_id}的任务记录"
+            )
+        
+        return TaskDetailResponse(
+            success=True,
+            data=result,
+            message="获取成功"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取任务详细信息失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取任务详细信息失败: {str(e)}"
+        )
