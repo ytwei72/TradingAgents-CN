@@ -60,7 +60,14 @@ class TasksStateMachineHelper:
             self.connected = False
     
     def _create_indexes(self):
-        """创建索引以提高查询性能"""
+        """创建索引以提高查询性能
+        
+        索引策略说明（遵循ESR规则：Equality, Sort, Range）：
+        1. task_sub_state 是必填的等值查询，总是放在第一位
+        2. status 和 analysis_date 是精确匹配（等值查询），放在中间
+        3. updated_at 用于排序，放在等值字段之后
+        4. task_id、stock_symbol、company_name 是正则表达式查询，索引帮助有限
+        """
         try:
             # 复合唯一索引：task_id + task_sub_state（主键）
             self.collection.create_index(
@@ -78,8 +85,53 @@ class TasksStateMachineHelper:
             # 单字段索引：task_sub_state（用于查询特定状态类型）
             self.collection.create_index("task_sub_state")
             
-            # 时间索引：用于按时间查询
-            self.collection.create_index("updated_at")
+            # 基础复合索引：task_sub_state + updated_at（用于无筛选或只有正则表达式筛选的情况）
+            # 这是最常用的索引，因为所有查询都包含 task_sub_state，且都需要按 updated_at 排序
+            self.collection.create_index(
+                [
+                    ("task_sub_state", ASCENDING),
+                    ("updated_at", DESCENDING)
+                ],
+                name="task_sub_state_updated_at_desc"
+            )
+            
+            # 状态筛选索引：task_sub_state + data.status + updated_at
+            # 用于按状态筛选的查询（最常见的筛选条件之一）
+            self.collection.create_index(
+                [
+                    ("task_sub_state", ASCENDING),
+                    ("data.status", ASCENDING),
+                    ("updated_at", DESCENDING)
+                ],
+                name="task_sub_state_status_updated_at"
+            )
+            
+            # 日期筛选索引：task_sub_state + data.params.analysis_date + updated_at
+            # 用于按日期筛选的查询
+            self.collection.create_index(
+                [
+                    ("task_sub_state", ASCENDING),
+                    ("data.params.analysis_date", ASCENDING),
+                    ("updated_at", DESCENDING)
+                ],
+                name="task_sub_state_analysis_date_updated_at"
+            )
+            
+            # 组合筛选索引：task_sub_state + data.status + data.params.analysis_date + updated_at
+            # 用于同时按状态和日期筛选的查询（如果这种组合查询较常见）
+            self.collection.create_index(
+                [
+                    ("task_sub_state", ASCENDING),
+                    ("data.status", ASCENDING),
+                    ("data.params.analysis_date", ASCENDING),
+                    ("updated_at", DESCENDING)
+                ],
+                name="task_sub_state_status_date_updated_at"
+            )
+            
+            # 对于正则表达式查询（task_id、stock_symbol、company_name），索引帮助有限
+            # 但如果 task_id 查询很频繁，可以创建以下索引（注意：正则表达式可能无法充分利用索引）
+            # 这里不创建，因为正则表达式查询通常需要全表扫描
             
             logger.info("✅ tasks_state_machine索引创建成功")
             
@@ -454,20 +506,31 @@ class TasksStateMachineHelper:
             return 0
         
         try:
-            # 查询所有props子状态的记录
+            # 构建MongoDB查询条件，在数据库层面进行筛选
             query = {'task_sub_state': 'props'}
-            cursor = self.collection.find(query)
             
-            count = 0
-            for doc in cursor:
-                props_data = doc.get('data', {})
-                
-                # 应用筛选（包括company_name）
-                if not self._match_filters(props_data, task_id, analysis_date, status, stock_symbol, company_name):
-                    continue
-                
-                count += 1
+            # status筛选（精确匹配，使用嵌套字段查询）
+            if status:
+                query['data.status'] = status
             
+            # analysis_date筛选（精确匹配，使用嵌套字段查询）
+            if analysis_date:
+                query['data.params.analysis_date'] = analysis_date
+            
+            # task_id筛选（部分匹配，使用正则表达式，不区分大小写）
+            if task_id:
+                query['task_id'] = {'$regex': task_id, '$options': 'i'}
+            
+            # stock_symbol筛选（部分匹配，使用正则表达式，不区分大小写）
+            if stock_symbol:
+                query['data.params.stock_symbol'] = {'$regex': stock_symbol, '$options': 'i'}
+            
+            # company_name筛选（部分匹配，使用正则表达式，不区分大小写）
+            if company_name:
+                query['data.params.company_name'] = {'$regex': company_name, '$options': 'i'}
+            
+            # 使用count_documents在数据库层面统计，避免加载所有文档
+            count = self.collection.count_documents(query)
             return count
             
         except Exception as e:
@@ -509,24 +572,46 @@ class TasksStateMachineHelper:
             }
         
         try:
-            # 查询所有props子状态的记录
+            # 构建MongoDB查询条件，在数据库层面进行筛选
             query = {'task_sub_state': 'props'}
-            cursor = self.collection.find(query).sort('updated_at', DESCENDING)
             
-            # 先应用筛选，获取所有匹配的任务
-            matched_tasks = []
+            # status筛选（精确匹配，使用嵌套字段查询）
+            if status:
+                query['data.status'] = status
+            
+            # analysis_date筛选（精确匹配，使用嵌套字段查询）
+            if analysis_date:
+                query['data.params.analysis_date'] = analysis_date
+            
+            # task_id筛选（部分匹配，使用正则表达式，不区分大小写）
+            if task_id:
+                query['task_id'] = {'$regex': task_id, '$options': 'i'}
+            
+            # stock_symbol筛选（部分匹配，使用正则表达式，不区分大小写）
+            if stock_symbol:
+                query['data.params.stock_symbol'] = {'$regex': stock_symbol, '$options': 'i'}
+            
+            # company_name筛选（部分匹配，使用正则表达式，不区分大小写）
+            if company_name:
+                query['data.params.company_name'] = {'$regex': company_name, '$options': 'i'}
+            
+            # 计算总数（在数据库层面统计）
+            total = self.collection.count_documents(query)
+            
+            # 计算分页
+            pages = (total + page_size - 1) // page_size if total > 0 else 0
+            skip = (page - 1) * page_size
+            
+            # 使用MongoDB的分页和排序，只查询需要的文档
+            cursor = self.collection.find(query).sort('updated_at', DESCENDING).skip(skip).limit(page_size)
+            
+            # 提取需要的字段
+            items = []
             for doc in cursor:
                 props_data = doc.get('data', {})
-                task_id_item = props_data.get('task_id', '')
-                
-                # 应用筛选（包括company_name）
-                if not self._match_filters(props_data, task_id, analysis_date, status, stock_symbol, company_name):
-                    continue
-                
-                # 提取需要的字段
                 params = props_data.get('params', {})
                 item = {
-                    'task_id': task_id_item,
+                    'task_id': props_data.get('task_id', ''),
                     'status': props_data.get('status', 'unknown'),
                     'created_at': props_data.get('created_at'),
                     'updated_at': props_data.get('updated_at'),
@@ -534,14 +619,7 @@ class TasksStateMachineHelper:
                     'stock_symbol': params.get('stock_symbol'),
                     'company_name': params.get('company_name')
                 }
-                matched_tasks.append(item)
-            
-            # 计算分页
-            total = len(matched_tasks)
-            pages = (total + page_size - 1) // page_size if total > 0 else 0
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-            items = matched_tasks[start_idx:end_idx]
+                items.append(item)
             
             return {
                 'items': items,
