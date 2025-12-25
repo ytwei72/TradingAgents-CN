@@ -28,7 +28,7 @@ class IndexHistoryHelper:
     """指数历史数据管理器"""
     
     # 集合名称
-    COLLECTION_NAME = "a_index_his_trans"
+    COLLECTION_NAME = "NO_USE_a_index_his_trans"
     
     def __init__(self):
         self.collection = None

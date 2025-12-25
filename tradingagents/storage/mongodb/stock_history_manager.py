@@ -3,7 +3,7 @@
 A股历史交易数据管理器
 用于从MongoDB的a_stock_his_trans集合中查询历史交易数据
 
-集合名称: a_stock_his_trans
+集合名称: a_share_daily_quotes
 数据库: tradingagents (MongoDB)
 """
 
@@ -26,7 +26,7 @@ class StockHistoryManager:
     """A股历史交易数据管理器"""
     
     # 集合名称
-    COLLECTION_NAME = "a_stock_his_trans"
+    COLLECTION_NAME = "a_share_daily_quotes"
     
     def __init__(self):
         self.collection = None
@@ -71,9 +71,9 @@ class StockHistoryManager:
             except Exception as e:
                 error_str = str(e).lower()
                 if "already exists" in error_str or "indexoptionsconflict" in error_str:
-                    logger.debug("✅ [a_stock_his_trans] 复合索引已存在")
+                    logger.debug("✅ [a_share_daily_quotes] 复合索引已存在")
                 else:
-                    logger.warning(f"⚠️ [a_stock_his_trans] 创建复合索引时出错: {e}")
+                    logger.warning(f"⚠️ [a_share_daily_quotes] 创建复合索引时出错: {e}")
             
             # 单字段索引 - code
             try:
@@ -81,9 +81,9 @@ class StockHistoryManager:
             except Exception as e:
                 error_str = str(e).lower()
                 if "already exists" in error_str or "indexoptionsconflict" in error_str:
-                    logger.debug("✅ [a_stock_his_trans] code索引已存在")
+                    logger.debug("✅ [a_share_daily_quotes] code索引已存在")
                 else:
-                    logger.warning(f"⚠️ [a_stock_his_trans] 创建code索引时出错: {e}")
+                    logger.warning(f"⚠️ [a_share_daily_quotes] 创建code索引时出错: {e}")
             
             # 单字段索引 - date
             # 注意：如果数据库中已存在名为 idx_date_only 的索引，创建 date 索引会失败
@@ -100,9 +100,9 @@ class StockHistoryManager:
                     error_code == 85 or
                     "idx_date_only" in error_str):
                     # 索引已存在（可能是 idx_date_only 或其他名称），这是正常的
-                    logger.debug("✅ [a_stock_his_trans] date索引已存在（可能是 idx_date_only）")
+                    logger.debug("✅ [a_share_daily_quotes] date索引已存在（可能是 idx_date_only）")
                 else:
-                    logger.warning(f"⚠️ [a_stock_his_trans] 创建date索引时出错: {e}")
+                    logger.warning(f"⚠️ [a_share_daily_quotes] 创建date索引时出错: {e}")
             
             logger.info("✅ a_stock_his_trans索引创建/检查完成")
             

@@ -252,7 +252,7 @@ class BacktestService:
         # 获取大盘指数代码
         index_code, index_name = _get_market_index_code(clean_stock_code)
         
-        # 获取大盘指数历史数据（使用index_history_manager从a_index_his_records集合读取）
+        # 获取大盘指数历史数据（使用index_history_manager从thematic_index_daily集合读取）
         index_data = index_history_manager.get_index_history(
             index_code=index_code,
             start_date=start_date.strftime("%Y-%m-%d"),

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 指数历史数据管理器
-用于从MongoDB集合a_index_his_records中读取指数历史数据
+用于从MongoDB集合thematic_index_daily中读取指数历史数据
 
-集合名称: a_index_his_records
+集合名称: thematic_index_daily
 数据库: tradingagents (MongoDB)
 """
 
@@ -25,11 +25,11 @@ except ImportError:
 class IndexHistoryManager:
     """指数历史数据管理器
     
-    从a_index_his_records集合读取指数历史数据
+    从thematic_index_daily集合读取指数历史数据
     """
     
     # 集合名称
-    COLLECTION_NAME = "a_index_his_records"
+    COLLECTION_NAME = "thematic_index_daily"
     
     def __init__(self):
         self.collection = None
@@ -78,10 +78,10 @@ class IndexHistoryManager:
             self.collection.create_index("code")
             self.collection.create_index("date")
             
-            logger.info("✅ a_index_his_records索引创建成功")
+            logger.info("✅ thematic_index_daily索引创建成功")
             
         except Exception as e:
-            logger.error(f"❌ a_index_his_records索引创建失败: {e}")
+            logger.error(f"❌ thematic_index_daily索引创建失败: {e}")
     
     def _convert_index_code(self, index_code: str) -> str:
         """
@@ -115,7 +115,7 @@ class IndexHistoryManager:
     ) -> pd.DataFrame:
         """
         获取指数指定日期区间的历史数据
-        完全从数据库集合a_index_his_records中读取
+        完全从数据库集合thematic_index_daily中读取
         
         Args:
             index_code: 指数代码（如：000001、399001）
