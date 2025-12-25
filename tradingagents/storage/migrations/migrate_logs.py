@@ -3,11 +3,20 @@
 将 logs 目录下的 tradingagents_structured.log* 文件迁移到 MongoDB
 
 该工具会：
-1. 遍历 logs 目录下所有 tradingagents_structured.log* 文件（包括轮转文件）
+1. 遍历 logs 目录下所有 tradingagents_structured.log* 文件（默认包括轮转文件，可使用 --no-rotated 排除）
 2. 读取每行的 JSON 格式日志
 3. 清理 ANSI 颜色代码
 4. 保存到 MongoDB 的 trading_agents_logs 集合
 5. 支持去重（基于 timestamp + logger + message 的组合）
+
+使用方法：
+    python -m tradingagents.storage.migrations.migrate_logs
+
+    不包含轮转文件，只处理主日志文件
+    python -m tradingagents.storage.migrations.migrate_logs --no-rotated
+
+或者直接运行：
+    python tradingagents/storage/migrations/migrate_logs.py
 """
 
 import os
@@ -38,19 +47,21 @@ except ImportError:
 class LogsMigrator:
     """将日志文件迁移到 MongoDB"""
     
-    def __init__(self, logs_dir: str = "logs", batch_size: int = 1000):
+    def __init__(self, logs_dir: str = "logs", batch_size: int = 1000, include_rotated: bool = True):
         """
         初始化迁移器
         
         Args:
             logs_dir: logs 目录路径
             batch_size: 批量插入的大小（默认1000）
+            include_rotated: 是否包含轮转文件（.log.1, .log.2 等），默认 True
         """
         if not MONGODB_AVAILABLE:
             raise ImportError("pymongo is not installed. Please install it with: pip install pymongo")
         
         self.logs_dir = Path(logs_dir)
         self.batch_size = batch_size
+        self.include_rotated = include_rotated
         self.client = None
         self.db = None
         self.collection = None
@@ -114,12 +125,17 @@ class LogsMigrator:
         
         for log_file in self.logs_dir.glob(pattern):
             if log_file.is_file():
+                # 如果不包含轮转文件，则跳过轮转文件
+                if not self.include_rotated:
+                    # 检查是否是轮转文件（包含 .log.数字 格式）
+                    if re.search(r'\.log\.\d+$', log_file.name):
+                        continue
                 log_files.append(log_file)
         
         # 按文件名排序（主文件在前，轮转文件按数字顺序）
         log_files.sort(key=lambda x: self._get_log_file_order(x))
         
-        print(f"📁 找到 {len(log_files)} 个日志文件")
+        print(f"📁 找到 {len(log_files)} 个日志文件{'（不包含轮转文件）' if not self.include_rotated else ''}")
         for log_file in log_files:
             print(f"   - {log_file.name}")
         
@@ -506,11 +522,20 @@ def main():
         default=1000,
         help="批量插入的大小（默认: 1000）"
     )
+    parser.add_argument(
+        "--no-rotated",
+        action="store_true",
+        help="不包含轮转文件（.log.1, .log.2 等），只处理主日志文件"
+    )
     
     args = parser.parse_args()
     
     try:
-        migrator = LogsMigrator(logs_dir=args.logs_dir, batch_size=args.batch_size)
+        migrator = LogsMigrator(
+            logs_dir=args.logs_dir,
+            batch_size=args.batch_size,
+            include_rotated=not args.no_rotated
+        )
         stats = migrator.migrate(
             skip_duplicates=not args.no_skip_duplicates,
             dry_run=args.dry_run
@@ -530,11 +555,14 @@ if __name__ == "__main__":
     exit(main())
 
 """
-# 使用默认批量大小（1000）
+# 使用默认批量大小（1000），包含所有日志文件（包括轮转文件）
 python -m tradingagents.storage.migrations.migrate_logs
 
 # 自定义批量大小（例如5000）
 python -m tradingagents.storage.migrations.migrate_logs --batch-size 5000
+
+# 不包含轮转文件，只处理主日志文件
+python -m tradingagents.storage.migrations.migrate_logs --no-rotated
 
 # 其他参数保持不变
 python -m tradingagents.storage.migrations.migrate_logs --logs-dir logs --dry-run

@@ -4,6 +4,14 @@
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-white">自选股管理</h1>
       <div class="flex items-center gap-3">
+        <button
+          @click="showAnalysisModal = true"
+          class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors font-medium"
+          :disabled="!canAnalyze"
+        >
+          <span class="mr-1">📈</span>
+          批量分析
+        </button>
         <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-600/20 text-blue-400 border border-blue-600/30">
           <span class="mr-1.5">📊</span>
           总数: {{ totalCount }}
@@ -56,14 +64,13 @@
           {{ category }}
         </button>
       </div>
-      <button
-        @click="showAnalysisModal = true"
-        class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors font-medium"
-        :disabled="!canAnalyze"
-      >
-        <span class="mr-1">📈</span>
-        批量分析
-      </button>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-1 text-xs font-semibold rounded bg-orange-600/20 text-orange-400 border border-orange-600/30">行业板块</span>
+          <span class="px-2 py-1 text-xs font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30">概念板块</span>
+          <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-600/20 text-blue-400 border border-blue-600/30">自选分类</span>
+        </div>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -83,19 +90,19 @@
         <div
           v-for="stock in displayedStocks"
           :key="stock.stock_code"
-          class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 p-4"
+          class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 p-4 flex flex-col"
         >
+          <!-- Card Title -->
           <div class="flex items-start justify-between mb-3">
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-lg font-bold text-white">{{ stock.stock_code }}</span>
-                <span class="text-sm text-gray-400">{{ stock.stock_name || 'N/A' }}</span>
-              </div>
-              <div v-if="stock.category && stock.category !== 'default'" class="mb-2">
-                <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-600/20 text-blue-400 border border-blue-600/30">
-                  {{ stock.category }}
-                </span>
-              </div>
+            <div class="flex-1 flex items-center gap-2 flex-wrap">
+              <span class="text-lg font-bold text-white">{{ stock.stock_name || 'N/A' }}（{{ stock.stock_code }}）</span>
+              <span
+                v-for="sector in (stock.sectors || []).slice(0, 1)"
+                :key="sector"
+                class="px-2 py-1 text-xs font-semibold rounded bg-orange-600/20 text-orange-400 border border-orange-600/30"
+              >
+                {{ sector }}
+              </span>
             </div>
             <div class="flex items-center gap-1">
               <button
@@ -119,45 +126,30 @@
             </div>
           </div>
 
-          <!-- Tags -->
-          <div v-if="stock.tags && stock.tags.length > 0" class="mb-3 flex flex-wrap gap-1">
-            <span
-              v-for="tag in stock.tags"
-              :key="tag"
-              class="px-2 py-1 text-xs font-semibold rounded bg-purple-600/20 text-purple-400 border border-purple-600/30"
-            >
-              {{ tag }}
-            </span>
+          <!-- Card Content -->
+          <div class="flex-1">
+            <!-- First line: Category -->
+            <div v-if="stock.category && stock.category !== 'default'" class="mb-2">
+              <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-600/20 text-blue-400 border border-blue-600/30">
+                {{ stock.category }}
+              </span>
+            </div>
+
+            <!-- Second and Third lines: Concept themes (max 2 lines) -->
+            <div v-if="stock.themes && stock.themes.length > 0" class="mb-3">
+              <div class="flex flex-wrap gap-1 concept-themes-container">
+                <span
+                  v-for="theme in stock.themes"
+                  :key="theme"
+                  class="px-2 py-1 text-xs font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30 concept-theme-tag"
+                >
+                  {{ theme }}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <!-- Themes -->
-          <div v-if="stock.themes && stock.themes.length > 0" class="mb-3 flex flex-wrap gap-1">
-            <span
-              v-for="theme in stock.themes"
-              :key="theme"
-              class="px-2 py-1 text-xs font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30"
-            >
-              概念: {{ theme }}
-            </span>
-          </div>
-
-          <!-- Sectors -->
-          <div v-if="stock.sectors && stock.sectors.length > 0" class="mb-3 flex flex-wrap gap-1">
-            <span
-              v-for="sector in stock.sectors"
-              :key="sector"
-              class="px-2 py-1 text-xs font-semibold rounded bg-orange-600/20 text-orange-400 border border-orange-600/30"
-            >
-              行业: {{ sector }}
-            </span>
-          </div>
-
-          <!-- Notes -->
-          <div v-if="stock.notes && stock.notes !== '无'" class="text-sm text-gray-400 mb-2 line-clamp-2">
-            {{ stock.notes }}
-          </div>
-
-          <!-- Metadata -->
+          <!-- Footer -->
           <div class="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-700">
             <div>添加时间: {{ formatDate(stock.created_at) }}</div>
             <div v-if="stock.updated_at && stock.updated_at !== stock.created_at">
@@ -167,65 +159,96 @@
         </div>
       </div>
 
-      <!-- List View for Categories -->
-      <div v-else class="space-y-2">
+      <!-- Card View for Categories (4 columns) -->
+      <div v-else class="grid grid-cols-1 gap-4">
         <div
           v-for="stock in displayedStocks"
           :key="stock.stock_code"
-          class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 p-4 flex items-center justify-between"
+          class="bg-[#1e293b] rounded-lg border border-gray-700 overflow-hidden transition-all hover:border-gray-600 p-4"
         >
-          <div class="flex items-center gap-4 flex-1">
-            <div class="flex items-center gap-3">
-              <span class="text-lg font-bold text-white">{{ stock.stock_code }}</span>
-              <span class="text-sm text-gray-400">{{ stock.stock_name || 'N/A' }}</span>
+          <div class="flex items-start gap-4">
+            <!-- Column 1: Company Name and Stock Code (Fixed Width) -->
+            <div class="flex flex-col flex-shrink-0" style="width: 140px;">
+              <div class="text-base font-semibold text-white mb-1">{{ stock.stock_name || 'N/A' }}</div>
+              <div class="text-sm text-gray-400">{{ stock.stock_code }}</div>
             </div>
-            <div v-if="stock.tags && stock.tags.length > 0" class="flex flex-wrap gap-1">
-              <span
-                v-for="tag in stock.tags"
-                :key="tag"
-                class="px-2 py-1 text-xs font-semibold rounded bg-purple-600/20 text-purple-400 border border-purple-600/30"
-              >
-                {{ tag }}
-              </span>
+
+            <!-- Column 2: Latest Historical Data and Concept Themes (Auto Flex) -->
+            <div class="flex flex-col gap-2 flex-1 min-w-0">
+              <div v-if="stockHistoricalData[stock.stock_code]" class="text-sm">
+                <div class="flex gap-4">
+                  <!-- Left column: Date (narrow) -->
+                  <div class="flex flex-col flex-shrink-0" style="width: 60px;">
+                    <div class="text-white font-medium">{{ formatDataMonthDay(stockHistoricalData[stock.stock_code]?.date) }}</div>
+                    <div class="text-xs text-gray-500">{{ formatDataYear(stockHistoricalData[stock.stock_code]?.date) }}</div>
+                  </div>
+                  <!-- Right column: Trading Data (2 rows) -->
+                  <div class="flex flex-col gap-1 flex-1 text-gray-300">
+                    <!-- First row: 4 fields -->
+                    <div class="flex gap-4">
+                      <div>开盘: <span class="text-white font-medium">{{ formatPrice(stockHistoricalData[stock.stock_code]?.open) }}</span></div>
+                      <div>收盘: <span class="text-white font-medium">{{ formatPrice(stockHistoricalData[stock.stock_code]?.close) }}</span></div>
+                      <div>涨跌: <span :class="getPctChangeClass(stockHistoricalData[stock.stock_code]?.pct_change)" class="font-medium">
+                        {{ formatPctChange(stockHistoricalData[stock.stock_code]?.pct_change) }}
+                      </span></div>
+                      <div>涨跌额: <span :class="getPctChangeClass(stockHistoricalData[stock.stock_code]?.pct_change)" class="font-medium">
+                        {{ formatPrice(stockHistoricalData[stock.stock_code]?.change_amount) }}
+                      </span></div>
+                    </div>
+                    <!-- Second row: 4 fields -->
+                    <div class="flex gap-4 text-xs">
+                      <div class="text-gray-500">成交量: {{ formatVolume(stockHistoricalData[stock.stock_code]?.volume) }}</div>
+                      <div class="text-gray-500">成交额: {{ formatAmount(stockHistoricalData[stock.stock_code]?.amount) }}</div>
+                      <div class="text-gray-500">振幅: {{ formatPctChange(stockHistoricalData[stock.stock_code]?.amplitude) }}</div>
+                      <div class="text-gray-500">换手率: {{ formatPctChange(stockHistoricalData[stock.stock_code]?.turnover) }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-sm text-gray-500">加载中...</div>
+              <div v-if="stock.themes && stock.themes.length > 0" class="flex flex-wrap gap-1">
+                <span
+                  v-for="theme in stock.themes"
+                  :key="theme"
+                  class="px-2 py-1 text-xs font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30 concept-theme-tag"
+                >
+                  {{ theme }}
+                </span>
+              </div>
             </div>
-            <div v-if="stock.themes && stock.themes.length > 0" class="flex flex-wrap gap-1">
+
+            <!-- Column 3: Industry Sectors (Fixed Width) -->
+            <div class="flex flex-wrap gap-1 items-start flex-shrink-0" style="width: 120px;">
               <span
-                v-for="theme in stock.themes"
-                :key="theme"
-                class="px-2 py-1 text-xs font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30"
-              >
-                概念: {{ theme }}
-              </span>
-            </div>
-            <div v-if="stock.sectors && stock.sectors.length > 0" class="flex flex-wrap gap-1">
-              <span
-                v-for="sector in stock.sectors"
+                v-for="sector in (stock.sectors || [])"
                 :key="sector"
                 class="px-2 py-1 text-xs font-semibold rounded bg-orange-600/20 text-orange-400 border border-orange-600/30"
               >
-                行业: {{ sector }}
+                {{ sector }}
               </span>
             </div>
-          </div>
-          <div class="flex items-center gap-2 ml-4">
-            <button
-              @click="openEditModal(stock)"
-              class="text-gray-400 hover:text-blue-400 transition-colors p-1"
-              title="编辑"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-            <button
-              @click="confirmDelete(stock)"
-              class="text-gray-400 hover:text-red-400 transition-colors p-1"
-              title="删除"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+
+            <!-- Column 4: Action Buttons (Fixed Width) -->
+            <div class="flex items-center gap-2 flex-shrink-0" style="width: 60px;">
+              <button
+                @click="openEditModal(stock)"
+                class="text-gray-400 hover:text-blue-400 transition-colors p-1"
+                title="编辑"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                @click="confirmDelete(stock)"
+                class="text-gray-400 hover:text-red-400 transition-colors p-1"
+                title="删除"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -628,7 +651,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
   getFavoriteStocks,
   createFavoriteStock,
@@ -641,7 +664,9 @@ import {
   getIndustryList,
   getStocksByConcept,
   getStocksByIndustry,
-  type FavoriteStock
+  getStockHistoricalData,
+  type FavoriteStock,
+  type StockHistoricalData
 } from '../api'
 import DateRangePicker from '../components/DateRangePicker.vue'
 
@@ -651,6 +676,7 @@ const analyzing = ref(false)
 const error = ref('')
 const favoriteStocks = ref<FavoriteStock[]>([])
 const totalCount = ref(0)
+const stockHistoricalData = ref<Record<string, StockHistoricalData | null>>({})
 
 const showAddModal = ref(false)
 const showEditModal = ref(false)
@@ -743,6 +769,105 @@ const formatDate = (dateStr?: string) => {
   }
 }
 
+const formatDataMonthDay = (dateStr?: string) => {
+  if (!dateStr) return 'N/A'
+  try {
+    const date = new Date(dateStr)
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    return `${month}月${day}日`
+  } catch {
+    return 'N/A'
+  }
+}
+
+const formatDataYear = (dateStr?: string) => {
+  if (!dateStr) return ''
+  try {
+    const date = new Date(dateStr)
+    const year = date.getFullYear()
+    return `${year}年`
+  } catch {
+    return ''
+  }
+}
+
+const formatVolume = (volume?: number) => {
+  if (!volume && volume !== 0) return 'N/A'
+  if (volume >= 100000000) {
+    return (volume / 100000000).toFixed(2) + '亿'
+  } else if (volume >= 10000) {
+    return (volume / 10000).toFixed(2) + '万'
+  }
+  return volume.toString()
+}
+
+const formatAmount = (amount?: number) => {
+  if (!amount && amount !== 0) return 'N/A'
+  if (amount >= 100000000) {
+    return (amount / 100000000).toFixed(2) + '亿'
+  } else if (amount >= 10000) {
+    return (amount / 10000).toFixed(2) + '万'
+  }
+  return amount.toFixed(2)
+}
+
+const formatPrice = (price?: number) => {
+  if (!price && price !== 0) return 'N/A'
+  return price.toFixed(2)
+}
+
+const formatPctChange = (pctChange?: number) => {
+  if (!pctChange && pctChange !== 0) return 'N/A'
+  const sign = pctChange > 0 ? '+' : ''
+  return `${sign}${pctChange.toFixed(2)}%`
+}
+
+const getPctChangeClass = (pctChange?: number) => {
+  if (!pctChange && pctChange !== 0) return 'text-gray-400'
+  return pctChange >= 0 ? 'text-red-400' : 'text-green-400'
+}
+
+const loadStockHistoricalData = async (stockCode: string) => {
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - 30) // 获取最近30天的数据
+    
+    const response = await getStockHistoricalData(
+      stockCode,
+      startDate.toISOString().split('T')[0],
+      endDate.toISOString().split('T')[0],
+      30
+    )
+    
+    if (response.success && response.data && response.data.length > 0) {
+      // 获取最新的数据（按日期排序，取最后一个）
+      const sortedData = response.data.sort((a, b) => {
+        const dateA = new Date(a.date).getTime()
+        const dateB = new Date(b.date).getTime()
+        return dateA - dateB
+      })
+      stockHistoricalData.value[stockCode] = sortedData[sortedData.length - 1]
+    } else {
+      stockHistoricalData.value[stockCode] = null
+    }
+  } catch (e) {
+    console.error(`加载股票 ${stockCode} 的历史数据失败:`, e)
+    stockHistoricalData.value[stockCode] = null
+  }
+}
+
+const loadStocksHistoricalData = async () => {
+  const stocksToLoad = displayedStocks.value
+  // 并行加载所有股票的历史数据
+  await Promise.all(
+    stocksToLoad.map(stock => 
+      stock.stock_code ? loadStockHistoricalData(stock.stock_code) : Promise.resolve()
+    )
+  )
+}
+
 const loadFavoriteStocks = async () => {
   loading.value = true
   error.value = ''
@@ -759,6 +884,11 @@ const loadFavoriteStocks = async () => {
       totalCount.value = response.total || response.data.length
       // 加载完股票后，更新分类列表
       await loadStatistics()
+      
+      // 如果当前不在"全部自选"tab，加载历史数据
+      if (activeTab.value !== 'all') {
+        await loadStocksHistoricalData()
+      }
     } else {
       error.value = response.message || '加载失败'
     }
@@ -1109,6 +1239,13 @@ const handleBatchImport = async () => {
   }
 }
 
+// 监听activeTab变化，切换分类时加载历史数据
+watch(activeTab, async (newTab) => {
+  if (newTab !== 'all' && favoriteStocks.value.length > 0) {
+    await loadStocksHistoricalData()
+  }
+})
+
 onMounted(() => {
   loadFavoriteStocks()
   loadSectorLists()
@@ -1119,8 +1256,23 @@ onMounted(() => {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.concept-themes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-height: 3.5rem;
+  overflow: hidden;
+}
+
+.concept-theme-tag {
+  white-space: nowrap;
+  display: inline-block;
+  flex-shrink: 0;
 }
 </style>
 
