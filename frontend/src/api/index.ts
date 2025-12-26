@@ -859,4 +859,115 @@ export const getStocksByIndustry = async (
   return response.data;
 };
 
+// ==================== Cursor Usage API ====================
+
+export interface CursorUsageDateListResponse {
+  success: boolean;
+  dates: string[];
+  count: number;
+  message: string;
+}
+
+export interface CursorUsageStatisticsResponse {
+  success: boolean;
+  data: Record<string, any>;
+  message: string;
+}
+
+export const getCursorUsageDates = async (): Promise<CursorUsageDateListResponse> => {
+  const response = await api.get<CursorUsageDateListResponse>('/cursor-usage/dates');
+  return response.data;
+};
+
+export const getCursorUsageTotalStatistics = async (
+  startDate?: string,
+  endDate?: string
+): Promise<CursorUsageStatisticsResponse> => {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append('start_date', startDate);
+  if (endDate) queryParams.append('end_date', endDate);
+  const queryString = queryParams.toString();
+  const url = `/cursor-usage/statistics/total${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<CursorUsageStatisticsResponse>(url);
+  return response.data;
+};
+
+export const getCursorUsageDailyStatistics = async (
+  startDate?: string,
+  endDate?: string
+): Promise<CursorUsageStatisticsResponse> => {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append('start_date', startDate);
+  if (endDate) queryParams.append('end_date', endDate);
+  const queryString = queryParams.toString();
+  const url = `/cursor-usage/statistics/daily${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<CursorUsageStatisticsResponse>(url);
+  return response.data;
+};
+
+export const getCursorUsageKindStatistics = async (
+  startDate?: string,
+  endDate?: string
+): Promise<CursorUsageStatisticsResponse> => {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append('start_date', startDate);
+  if (endDate) queryParams.append('end_date', endDate);
+  const queryString = queryParams.toString();
+  const url = `/cursor-usage/statistics/kind${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<CursorUsageStatisticsResponse>(url);
+  return response.data;
+};
+
+export const getCursorUsageModelStatistics = async (
+  startDate?: string,
+  endDate?: string
+): Promise<CursorUsageStatisticsResponse> => {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append('start_date', startDate);
+  if (endDate) queryParams.append('end_date', endDate);
+  const queryString = queryParams.toString();
+  const url = `/cursor-usage/statistics/model${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<CursorUsageStatisticsResponse>(url);
+  return response.data;
+};
+
+export const getCursorUsageHourlyStatistics = async (
+  startDate?: string,
+  endDate?: string
+): Promise<CursorUsageStatisticsResponse> => {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append('start_date', startDate);
+  if (endDate) queryParams.append('end_date', endDate);
+  const queryString = queryParams.toString();
+  const url = `/cursor-usage/statistics/hourly${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<CursorUsageStatisticsResponse>(url);
+  return response.data;
+};
+
+export const getCursorUsageCostStatistics = async (
+  startDate?: string,
+  endDate?: string
+): Promise<CursorUsageStatisticsResponse> => {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append('start_date', startDate);
+  if (endDate) queryParams.append('end_date', endDate);
+  const queryString = queryParams.toString();
+  const url = `/cursor-usage/statistics/cost${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<CursorUsageStatisticsResponse>(url);
+  return response.data;
+};
+
+export const getCursorUsageDatesWithRange = async (
+  startDate?: string,
+  endDate?: string
+): Promise<CursorUsageDateListResponse> => {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append('start_date', startDate);
+  if (endDate) queryParams.append('end_date', endDate);
+  const queryString = queryParams.toString();
+  const url = `/cursor-usage/dates${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get<CursorUsageDateListResponse>(url);
+  return response.data;
+};
+
 export default api;

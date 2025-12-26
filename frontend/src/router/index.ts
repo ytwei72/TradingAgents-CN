@@ -10,6 +10,7 @@ import BacktestView from '../views/Backtest.vue'
 import BatchBacktestView from '../views/BatchBacktest.vue'
 import TaskMonitoringView from '../views/TaskMonitoring.vue'
 import FavoriteStocksView from '../views/FavoriteStocks.vue'
+import CursorUsageView from '../views/CursorUsageView.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -66,6 +67,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/favorite-stocks',
     name: 'FavoriteStocks',
     component: FavoriteStocksView
+  },
+  {
+    path: '/cursor-usage',
+    name: 'CursorUsage',
+    component: CursorUsageView
   }
 ]
 
